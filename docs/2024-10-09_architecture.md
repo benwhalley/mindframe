@@ -1,22 +1,63 @@
 ---
-title: Architectural notes for the FIT chatbot system
+title: Architectural notes for the FIT-chatbot system.
 ---
+
+
+# Names
+
+I quite like `mindframe` as a name for the package/project.
 
 
 ### Preface
 
-Ali - we didn't discuss this, but I have previously wondered about the architecture of the 'system' component we identify. 
+Our goal is to build a chatbot which leverages LLMs, but
+doesn't depend on the model for the entire system. We want to be able to coordinate multiple models, and integrate them with a database that tracks the state of the client as they move through sessions and the intervention as a whole.
+
+We need this structure to do things like
+
+- reduce the load on a single prompt/model
+- separate out individual components of the intervention and allow better testing/validation of individual components
+- integrate relevant examples and case studies
+- build and integrate knowledge about the client into later prompting
+
 
 I think there is quite a bit of 'plumbing' that needs to be written to connect the different parts of the system and coordinate jobs etc.
-
-It struck me in places this is a bit like a workflow engine, and I wondered if things lkike Prefect https://github.com/PrefectHQ/prefect or  luigi could be useful here. https://github.com/spotify/luigi   Prefect in particular seems like a good fit, but I haven't used it before.
-
 
 As a warning, I am fully aware that the architecture document is a very complex system. I _don't_ envisage us developing all of that in 3 years... it's more of a 'fantasy system'! It's what I think we would need to enable intervention developers to create chatbots that are:
 
 - theory led 
 - 'manipulable' and suitable for research and experimentation
 - introspectable/monitorable, rather than just a black box
+
+
+
+# Costs and speed
+
+For now, we want to build the best possible system. We don't care about cost or latency (although latency will become important in the medium term, and cost in the longer term).
+
+Rationale: 
+
+A major goal is to generate a large corpus of high quality therapy to analyse. The easiest way to achieve this is to ignore latency for now and just build the best system we can. We can optimise latency later, and TPS rates are increasing quite rapidly, especially for smaller modules so even 'inefficient' designs might not be too slow in the future.
+
+On cost: prices have already fallen by an order of magnitude in the last 18 months. That won't continue for ever, but we can expect prices to fall. 
+Moreover, the price of even the most expensive therapist means LLMs will always be cheap.
+
+Back of envelope: 
+- people speak at ~150 words per minute, so an hour of therapy = 9000 words per hour
+- two tokens are roughly 1 word
+- assume a 6:1 ratio of input tokens to output tokens for all llm prompts used
+- lets assume we have to generate 10 hidden tokens for every token shown to clients
+- tokens cost $2.50 per million tokens on input and $10 per million tokens on output
+
+
+Some chatgpt maths here: https://chatgpt.com/share/670e2135-1748-8001-a846-d1a470c0f5ef
+
+It's going to cost < $2 per hour even with the most expensive current models.
+
+Even if we're out by a factor of 10, it's still only $20 per hour which is peanuts for an on-demand therapist which scales to millions of users.
+
+
+
 
 
 
@@ -47,9 +88,9 @@ As a possible starting point:
 - `steps`
 - `turns`
 - `goals`
-- `transitions`
 - `indicators`
 - `measurements`
+- `transitions`
 - `actions`
 - `examples`
 - `supervision`
@@ -221,8 +262,7 @@ THERAPIST   So, it's not just wine that helps you relax. Um, there's reading a b
 In a `step` prompt, we might want to access "good examples" with a syntax like this:
 
 
-
-`{examples:"giving information", n_examples: 3}`
+`{examples:rag:"giving information", n_examples: 3}`
 
 
 Or if we got really fancy we could specify what search strategy to use  like hyde (https://arxiv.org/abs/2212.10496) also see https://python.langchain.com/v0.1/docs/use_cases/query_analysis/techniques/hyde/
@@ -346,31 +386,38 @@ CLIENT  	Well, to be honest, I drink sometimes when I'm feeling down and I find 
 ```
 
 
-`{turns:last_step}` would drop in all of the turns from the last step.
 
+`{turns:steps:current}` would drop in all of the turns from the current step.
+
+`{turns:steps:-1}` would drop in all of the turns from the last step.
+
+`{turns:steps:[step_a, step_b]}` would include all turns from named steps
 
 `{turns:*, n_tokens: 1000}` would only include the last 1000 tokens. This would be useful for keeping the prompt length down.
 
 
-`{turns:"barriers to change", n_tokens:300, n_turns:50}`  would do something like
+`{turns:rag:"barriers to change", n_tokens:300, n_turns:50, window:3}`  would do something like
 
 - do a semantic search for the string "barriers to change"
+- apply a window of 3 turns to the search (so, matches +/1 3 turns from the conversation)
+- (probably) apply some de-duplication to the selected terns
 - limit the number of records to 50 most recent turns
 - limit the number of tokens to be included to 300
 
 
-As a nice to have, summarising could be included within the rag template too, So `{turns:"barriers to change", n_turns:50, max_tokens=300, summarise=true}`  would do something like
+As a nice to have, summarising could be included within the rag template too, So `{turns:rag:"barriers to change", n_turns:50, max_tokens=300, window:3, summarise=true}`  would do something like
 
 - do a semantic search for the string "barriers to change"
-- limit the number of records to 50 most recent turns
+- limit the number of records to 50 most recent turns, with a window of 3 turns
 - summarise the content of the turns to 300 tokens using a secondary llm call
+
 
 
 ### Metadata
 
-Some system data could also be exposed in templates, e.g.:
+Some system data would be exposed in all templates, e.g.:
 
-- {meta: time_of_day}
+- {meta: time_of_day} 
 - {meta: client_name}
 - {meta: client_location}
 - {meta: client_age}
@@ -395,7 +442,7 @@ This should improve the quality of utterances, but also makes the system more 'i
 A simple example:
 
 ```
-You are a therapist treating a patient for {notes:problem_primary}.
+You are a  therapist treating a patient for {notes:problem_primary}.
 The client has recently said this:
 
 {turns:10}
@@ -689,3 +736,12 @@ The system presents different interfaces for:
 - the system developer: again some web interface + DB access and logging and log analysis.
 
 
+
+
+
+
+# Other relevant work and software
+
+TBC
+
+It struck me in places this is a bit like a workflow engine, and I wondered if things lkike Prefect https://github.com/PrefectHQ/prefect or  luigi could be useful here. https://github.com/spotify/luigi   Prefect in particular seems like a good fit, but I haven't used it before

@@ -1,0 +1,158 @@
+
+steps:
+  # welcome and intro
+  - welcome_and_rapport:
+    id: 1
+    step_type: conversational
+    title: Create welcoming environment and establish rapport
+    edges:
+      - introduce_self:
+          required: [welcome_complete]
+
+  - introduce_self:
+    id: 2
+    step_type: conversational
+    title: Introduce self and role, and the principles of MI/FIT and the use of imagery in FIT.
+    edges:
+      - assess_state:
+          required: [introduction_complete]
+
+  - assess_state:
+    id: 3
+    step_type: measurement
+    title: Assess current state and readiness to work
+    edges:
+      - negotiate_agenda:
+          required: [ready_to_work]
+
+  - negotiate_agenda
+    step_type: conversational
+    title: Negotiate agenda for the session today.
+    description: What does the client want to talk about and work on?
+    edges:
+      - build_discrepancy:
+          required: [agenda_set]
+
+  # building motivation and self-efficacy
+  - build_discrepancy
+    step_type: conversational
+    title: Build motivation for change by identifying a discrepancy between current and desired state. Explore the downsides of the current state and the upsides of the desired state.
+    edges:
+      - build_self_efficacy:
+          required: [discrepancy_identified, downsides_explored, upsides_explored]
+
+  - build_self_efficacy
+    step_type: conversational
+    title: Build self-efficacy by exploring past successes and strengths.
+    edges:
+      - explore_potential_benefits:
+          required: [identify_past_success]
+
+  # making a plan
+  - explore_potential_benefits:
+    step_type: conversational
+    title: Explore potential benefits of change
+    description: What are the potential benefits of making a change? Keep this hypothetical until the client is ready to commit to change.
+    edges:
+      - formulate_plan:
+          required: [emergent_plan_present, benefits_explored]
+
+  - formulate_plan:
+    step_type: conversational
+    title: Formulate a plan for change
+    description: What would be a good first step to take towards making this change?
+    edges:
+      - check_initial_confidence:
+          required: [plan_formulated]
+
+  - check_initial_confidence:
+    step_type: measurement
+    title: Check client's confidence in the initial plan
+    edges: 
+      - strengthen_plan_self_efficacy:
+          required: [confident_in_plan] 
+      - build_discrepancy:
+          required: [not_confident_in_plan]
+
+    # develop and strengthen plan
+    - strengthen_plan_self_efficacy:
+      step_type: conversational
+      title: Strengthen client's self-efficacy in the plan
+      description: Have you tried something like this before? Or succeeded at something else that was difficult? Use imagery to develop
+    
+    - elicit_barriers:
+      step_type: conversational
+      title: Elicit barriers to implementing plan
+      description: What are the potential barriers to making this change?
+      edges: 
+        - overcome_barriers:
+            required: [barriers_elicited|no_real_barriers]
+    
+    - overcome_barriers:
+      step_type: conversational
+      title: Use imagery to develop strategies to overcome barriers
+      edges:
+        # in the case we identify other barriers, repeat this step
+        - overcome_barriers:
+          required: [additional_barriers_identified]
+        - check_plan_confidence:
+          # note that barriers_mitigated_with_imagery would have to check that _all_ barriers had been addressed, or that the client was generally confident in their ability to overcome barriers
+          required: [barriers_mitigated_with_imagery]
+        
+    - summarise_and_reflect_plan:
+      step_type: conversational
+      title: Summarise and reflect on the plan based on the conversation to date
+      edges:
+        - check_plan_confidence:
+            required: [plan_summarised, client_confirms_plan_summary]
+
+    - check_plan_confidence:
+      step_type: measurement
+      title: Check client's confidence in the developed plan
+      edges:
+        - strengthen_plan_self_efficacy:
+            required: [not_confident_in_plan] 
+        - find_daily_cue_for_imagery:
+            required: [confident_in_plan]
+        
+    # training imagery use outside the session
+    - find_daily_cue_for_imagery:
+        title: Reiterate the importance of practice, find a cue to trigger imagery use in daily life
+        edges:
+          - plan_practice:
+              required: [cue_found]
+
+    - plan_practice:
+        title: Plan for practice of imagery in daily life
+        edges:
+          - set_homework:
+              required: [practice_planned]
+
+    - set_homework:
+        title: Set homework for the client to practice imagery in daily life
+        edges:
+          - review_for_followup:
+              required: [homework_set]
+
+    - review_for_followup:
+        title: Review the session and plan for follow-up the next week
+        edges:
+          - followup:
+              required: [reviewed, asked_about_friends_family_support, followup_planned]
+
+    - wrap_up_session:
+        title: Wrap up the session
+        edges:
+          - followup:
+              required: [session_wrapped_up]
+    
+    # 'island' steps for 'excursions'
+    # these are not part of the 'happy path', but can be triggered by indicators (e.g. low mood) or by other measurements
+  
+    - medical_misconception:
+        title: A client expresses a medical misconception
+        edges: none
+        triggers:
+          - [medical_misconception_identified]
+        excursion_ends_when:
+          - [medical_misconception_remedied]
