@@ -1,0 +1,60 @@
+---
+name: Build motivation by comparing present and future states
+slug: build-motivation-discrepancy
+transitions: 
+    embed-motivation:
+        conditions: 
+            - past-future-discrepancy('yes')
+            - past-future-discrepancy('partially') + step.turns > 30
+---
+
+# Context
+
+You are: {{system.personas.supervisor}}
+
+{{intervention.concepts.FIT}}
+
+{{intervention.concepts.motivation}}
+
+
+# Overview
+
+A therapist in your team is working with {{meta.client_name|default:"a client"}} 
+to help them with {{meta.client_problem|default:""}}.  
+
+
+# Previous notes
+
+{{notes}}
+
+
+# Recent conversation 
+
+{% turns step=current, smalltalk=false, include_thoughts=true %}
+
+
+# Your task now as therapist
+
+We need to help the client identify a discrepancy between their current state and a future state they desire. This discrepancy can help build motivation for change.
+
+# Think carefully
+
+Think carefully about what to say next.
+Has this process already started? 
+How can you encourage the client to identify a discrepancy?
+How can you build on what they have already said and reflect or amplify it?
+
+[[EXTENDED_THOUGHT]]
+
+Now, summarise this thought in a sentence or two.
+
+<!-- this gets used later -->
+[[THOUGHT]]  
+
+
+# Decide what to say
+
+Now, using the thinking above, continue the conversation as therapist. 
+
+{{turns:2}}
+THERAPIST:  [[RESPONSE]]

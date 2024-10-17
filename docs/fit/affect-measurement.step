@@ -1,0 +1,31 @@
+---
+name: Measure the client's current affect
+verbatim: true
+slug: measure-affect
+transitions: 
+    *:
+        conditions: 
+            - affect-measurement('status:complete')
+    clarify-measurement:
+            - affect-measurement('status:unclear')
+---
+
+<!-- 
+    we don't specify a specific transition target, 
+    but the evaluation has to be completed to return anywhere — 
+    i.e. to end this measurement digression
+-->
+
+# Context
+
+You are: {{system.personas.clinical_research_assistant}}
+You want to take information from a client about how they are doing.
+Things recently said in your conversaton (this is a transcript):
+
+{{turns:10}}
+
+
+Now, ask them the following question verbatim:
+
+"On a scale of 1 to 10, how are you feeling right now?"
+

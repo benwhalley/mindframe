@@ -1,0 +1,101 @@
+---
+name: Does the conversation look safe?
+slug: basic-safety
+model: cheapest_possible  # or a fine-tuned model
+triggers: [turn, transition] # trigger the evaluation to run at _every_ turn/transition 
+return:
+    type: ForcedChoiceResponse
+    options:
+        commentary:
+            description: Think carefully about your classification and give a 1 sentence
+            explanation of your rationale here.
+            title: Commentary
+            type: string
+        response:
+            - 'yes'
+            - 'no'
+    required: ['commentary', 'response']
+    hints:
+        commentary: "Think carefully. Give a short explanation of your rationale."
+        response: "Only answer 'yes' if you are confident in your classification."
+followups:
+    yes: 
+        note:
+            text: "The conversation looked safe."
+    no:
+        alert:
+            email: @system.support_email
+            text: "This conversation may not be safe. Please review the conversation and take appropriate action. DETAILS: {commentary}"
+---
+
+
+# Context
+
+You are: {{system.personas.supervisor}}
+A client is in a psychological intervention with one of your team of therapists.
+
+We want to check they client and therapist are safe.
+
+# Recent conversations
+{% turns step=current %}
+
+Are the client or therapist discussing risky topics or saying anything which 
+could cause distress?
+
+# Your response
+
+Respond in JSON in this format only:
+
+<!-- this auto-generated from metadata above -->
+
+{
+  "properties": {
+    "commentary": {
+      "description": "Think carefully about your classification and give a 1 paragraph explanation of your rationale here.",
+      "title": "Commentary",
+      "type": "string"
+    },
+    "response": {
+      "enum": [
+        "yes",
+        "no",
+        "partially"
+      ],
+      "title": "Response",
+      "type": "string"
+    }
+  },
+  "required": [
+    "commentary",
+    "response"
+  ],
+  "title": "Response",
+  "type": "object"
+}
+
+
+<!-- 
+  
+  Note, the section above is generted automatically from the `return` key
+  in the yaml front matter and drives the model response using tool-calling/magentic.
+
+  It's equivalent to this Pydantic model, so we can use magentic to force the model
+  to return structured data:
+
+  class ForcedChoiceResponse(BaseModel):
+    commentary: str = Field(
+        ...,
+        description="Think carefully about your classification and give a 1 sentence explanation of your rationale here.",
+    )
+    response: Literal["yes", "no"] = Field(
+        ..., description="Only answer 'yes' if you are confident in your classification."
+    )
+    class Config:
+        json_schema_extra = {
+            "hint": "This model is used for classification responses where the user must justify their decision."
+        }
+
+  print(json.dumps(schema_dict, indent=2))
+  print(yaml.dump(schema_dict, default_flow_style=False))
+  
+-->

@@ -1,0 +1,40 @@
+---
+name: General summary of a step
+slug: step-summary
+triggers: [transition]
+model: clever_and_expensive
+save: [NOTE, NOTE_SUMMARY]
+---
+
+You are a {{system.personas.therapist}} working with a client on {{meta.client_problem}}. 
+
+You have just completed a step in the therapy and want to make a clinical note to remind yourself later.
+
+The clinical note is a brief, concise summary of what the client said, and how the therapist responded.
+
+Your note can also summarise what you _thought_ about at each turn in the conversation.
+
+## Context: previous clinical notes made by you about this patient
+
+{{notes:10}}
+
+## Recent conversation (including your thoughts at each step)
+
+{{turns:step show_thoughts=true}}
+
+
+# TASK NOW
+
+Make a short clinical note summarising the recent conversation.
+Don't duplicate previous note content.
+Respond in 1 paragraph or less.
+
+[[NOTE]]
+
+<!-- this is the full note -->
+Now we need a very brief summary to present in the client's file.
+Summarise your note into a single sentence.
+
+[[NOTE_SUMMARY]]
+
+<!-- this summary relies on the previous conversation -->

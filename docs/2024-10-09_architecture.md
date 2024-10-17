@@ -85,21 +85,111 @@ We should perhaps try and build a vocabulary for talking about these parts --- I
 
 As a possible starting point:
 
-- `steps`
+These are the components of a treatment we need to define:
+
+- `steps` are the components of an intervention. Key steps will be linked (by transitions) to form the core pathway of the intervention. However other steps may be 'islands' — individual, specific behaviours or tasks which a therapist may complete at any point during the intervention. We leave open what each step is for, and their scope: This is determined by the treatment developer as they write the llm prompts and associated actions for their intervention. However in most cass steps are likely to be a single 'logical unit' of therapy which can be achieved in a single LLM prompt (e.g. 'establish rapport at the opening of a session', or 'identify discrepancies to build motivation'). Simpler, 'island' steps might 'give health information' or 'take an affect measurement' from the client.
+
+- `transitions` define the paths allowed between steps, and the conditions required for transitions to occur. In some cases we might explicitly define a transition to an 'unknown' target node. In this case we have conditions for moving to the next step, but no explicit target. This would be used for 'digressions' or 'measurements' which are not part of the main flow of the conversation. We can also attach `actions` to transitions which create side effects for the transition: for example, storing information in the database or triggering a 'supervision'.
+
+
+`actions` the system can take are defined by functions which take the current context as input. Actions can also be chained (so the result of one action can be to trigger another action). Standard actions will be to:
+
+- `evaluate`: i.e., make a judgement about the state of the system or the client, based on the conversation history or other data sources. For example, we might want to evaluate whether the client is engaged in treatment at a given point in time, based on the conversation history and other data sources. An evaluation is very similar to a note, but defines a classification task where the return value is more structured and the categories can be defined by the treatment developer ahead of time. For example, we might want to evaluate whether the client is 'engaged' or 'disengaged' at a given point in time. This would be a binary classification task, and the system would return a structured response to the treatment developer (although the structured response might also include textual explanation of the classification decision). Evaluations can be of both clients and therapists (or of the quality of the relationship). 
+Evaluations can trigger further evaluations or actions (either in all cases, or linked to specific classifications). For example, if the system evaluates that the client is disengaged, it might trigger a 'supervision' action to the therapist model to provide additional guidance or prompts. Evaluations are specified through an llm prompt to include context. They may specify a particular model to use. Evaluations are always logged, and the prompt or markdown file which specifies them includes the format for logging them.
+
+
+- `remember`: a special case of evaluations where the system is tasked with storing information. In some cases this would summarise the current context -- e.g. to summarise conversations within a step before moving on, or combining information from multiple sources to record a 'measurement' of the client's affective state. Most of the time the note function would be a simple templated prompt to the LLM, but could be more complex (e.g. psychophysical analysis). Another example might be to record client responses to 'measurements' of their mood or other states given in questions: Clients could respond in freeform text (defined in a step) and the note function/processing template would validate/extract data from the response and store it. Another special use of `notes` would be to record turn-by-turn utterances. E.g. on each turn we might store `client_speech`, `therapist_utterance`, `therapist_reasoning` (capturing hidden tokens). In some ways this is like a logging system, because we'd also store llm prompt chains and other system data in the database, perhaps under `meta` or `system` note types. 
+
+Types of 'memories' we can make:
+
+- turns (what each person said, and prior/hidden reasoning attached to the therapist's utterances)
+- evaluation (a structured judgement about the state of the system or the client)
+- notes (an unstructured record or summary of the state of the system or the client)
+
+Notes types can be namespaced to help general access and inclusion in templates later e.g. 
+
+- `turn.text`
+- `evaluation.affective`, `evaluation.adherence`, `evaluation.other`
+- `meta.user`, `meta.system`, `meta.other`
+- `system.log` or `system.log.llm_call`
+
+Each memory would store these fields:
+
+- `key` (a unique identifier for the memory)
+- `timestamp`
+- `category` (a dotted-string type identifier for the memory, e.g. 'turn', 'evaluation', 'note')
+- `name` (a human-readable slug-type identifier for the memory, not necessarily unique)
+- `text` (the text content of the memory)
+- `audio` (any audio content of the memory)
+- `meta` (explanation or additional context to help interpret the memory. e.g. the chain of LLM prompts used to generate the memory with COT)
+
+
+
+
+
+
+- `digress`: this means to temporarily move the client to a different step, outside the primary flow of the intervention, but with the intention of returning to the current step. For example, if the client asks a question which is off-topic, the system might digress to a 'information-giving' step and answer that question, and then return to the previous step. Similarly, we might want to 'measure' something about the client: we could achieve this by 'digressing' to a measurement step and then returning to the current step. This could be implemented by marking the current step as an 'exit' and then when digression steps are completed without a specified target the system returns to the 'last exit'.
+
+- `supervise`: i.e., provide additional guidance to the therapist model
+
+- `alert`: i.e., trigger an alert to the system developer or human supervisor. This could be used to flag up dangerous or unexpected responses from the client or therapist model. For example, if the client is asking for medical advice, the system might trigger an alert to the system developer or supervisor to intervene (i.e. if a 'digression' to a special-case step, to explain that the system can't offer medical advice, is insufficient).
+
+
+
+In addition, 
+
+
+
+intro.build_rapport
+intro.elicit_problem
+intro.elicit_goals
+motivate.identify_pros_cons
+motivate.elicit_change_talk
+motivate.elicit_importance
+practice.elicit_imagery
+practice.elicit_change_plan
+practice.set_homework
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Step
+Transition
+Evaluation
+
+
+Turn
+
+
+
+And these are 'state' which might be saved at runtime by the system, or developed over time.
+
 - `turns`
-- `goals`
 - `indicators`
 - `measurements`
-- `transitions`
-- `actions`
 - `examples`
 - `supervision`
 - `notes`
 - `preferences`
 - `evaluations`
 
-
 Intervention developers will need to write some or all of these primitives in a declarative language which the system can interpret and use to generate prompts for the therapist model.
+
+
+
+
+
+
 
 
 ### `steps`
@@ -107,7 +197,6 @@ Intervention developers will need to write some or all of these primitives in a 
 `steps` are nodes in the DAG which represent a particular state in the therapy, and are likely to be achievable using a single LLM prompt. They may not be achievable in a single 'turn' of the conversation, but they are a single 'unit' of the intervention. A step is mostly concerned with defining the content of the conversation at a given point within the session, and not the broader structure of the conversation. A step could be simple a a single LLM prompt like "You are an MI therapist, establish rapport with the patient. Start by asking them about their day".
 
 'Techniques' within a psychological intervention might be implement within either single `step`, plus associated `goal`, or by linking together multiple steps. For example, eliciting imagery in MI might be a single step with the 'goal' of 'has patient generated an image of their problem'. Or it might be a sequence of steps with multiple goals, like 'has patient generated an initial image of their problem', followed by an invitation to make it more concrete and the goal 'has the patient described additional details for the image'.
-
 
 
 ### `turns`
