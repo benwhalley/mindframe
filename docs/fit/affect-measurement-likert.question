@@ -1,0 +1,17 @@
+---
+step_type: question
+name: Measure the client's current affect and get response using UI controls
+slug: measure-affect-fixed
+explanation: "I'm going to ask you a question to measure your current affect."
+question: "On a scale of 1 to 10, how are you feeling right now?"
+response: 
+    type: LikertScaleUI
+    min_value: 1
+    max_value: 10
+    include_skip_button: true
+transitions:
+  response:
+    - int:  none # return to last step before question asked
+---
+
+<!-- There is nothing here because everything gets defined in the YAML above -->

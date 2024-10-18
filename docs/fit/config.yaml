@@ -1,0 +1,45 @@
+models: 
+  clever_and_expensive:
+    name: gpt-4o
+  cheap_and_cheerful:
+    name: gpt-4o-mini
+    default: true
+  
+step_defaults:
+  # set some defaults to push people through the steps if progress is very slow
+  # the transition is forced to the FIRST in the list of transitions
+  force_transition_after:
+    minutes: 30
+    steps: 100
+
+  # when/how often to evaluate step-transition conditions
+  evaluate_transition:
+    after_n_turns: 2
+    every_n_turns: 2
+
+  # actions to run _every_ step transition
+  actions:
+    - summarise-step.note
+    - basic-safety.judgement
+
+turn_defaults:
+  actions:
+    - summarise-step.note
+
+transitions:
+  - elicit-discrepancy.step --> discuss-practice.step:
+      conditions:
+        - discrep-explicit(yes) + engaged-in-treatment(yes)
+        - distressed(no)
+      actions:
+        - review-client-attitude-to-treatment.note
+
+  - discuss-practice.step --> set-homework.step:
+      evaluate_after_n_turns: 10  # override default
+      conditions: [practice_discussed(yes)]
+    
+  - set-homework.step --> end-session.step:
+    conditions: [homework-set(yes)]
+      
+    
+

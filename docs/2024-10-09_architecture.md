@@ -1,17 +1,14 @@
 ---
-title: Architectural notes for the FIT-chatbot system.
+title: Architectural notes for MindFrame (FIT-chatbot system).
 ---
-
-
-# Names
-
-I quite like `mindframe` as a name for the package/project.
 
 
 ### Preface
 
 Our goal is to build a chatbot which leverages LLMs, but
-doesn't depend on the model for the entire system. We want to be able to coordinate multiple models, and integrate them with a database that tracks the state of the client as they move through sessions and the intervention as a whole.
+doesn't depend on a specific model for all interactions. 
+
+We want to be able to coordinate multiple models, and integrate them with a database that tracks the state of the client as they move through sessions, and the intervention as a whole.
 
 We need this structure to do things like
 
@@ -21,14 +18,16 @@ We need this structure to do things like
 - build and integrate knowledge about the client into later prompting
 
 
-I think there is quite a bit of 'plumbing' that needs to be written to connect the different parts of the system and coordinate jobs etc.
+There is quite a bit of 'plumbing' that needs to be written to 
+connect the different parts of the system and coordinate jobs etc.
 
-As a warning, I am fully aware that the architecture document is a very complex system. I _don't_ envisage us developing all of that in 3 years... it's more of a 'fantasy system'! It's what I think we would need to enable intervention developers to create chatbots that are:
+Although we'll build it incrementally, I think it's what we would need 
+to enable intervention developers to create chatbots that are:
 
 - theory led 
-- 'manipulable' and suitable for research and experimentation
 - introspectable/monitorable, rather than just a black box
-
+- safe (and verifiable)
+- 'guidable', so suitable for research and experimentation
 
 
 # Costs and speed
@@ -58,10 +57,7 @@ Even if we're out by a factor of 10, it's still only $20 per hour which is peanu
 
 
 
-
-
-
-# Roles/names of different humans involved
+# Roles/names of different humans involved in using `mindframe`
 
 I envisage 4 primary roles for humans:
 
@@ -77,28 +73,64 @@ Let's call the combined set of models and databases which produce output "the sy
 These user types each have different needs for UI to be met (see below).
 
 
+
+
 # System 'primitives'
 
-In building the system, we will need to think about what 'primitives' are needed for encoding a therapy manual into a system that interacts with clients (the agent).
+In building the system, we need to think about what 'primitives' are needed for encoding a therapy manual into a system that interacts with clients.
 
-We should perhaps try and build a vocabulary for talking about these parts --- I have a hunch that some of the terms might get overloaded and have slightly different meanings i) colloquially, ii) in psychology, and iii) in computer science, so will need to be careful to define terms clearly.
+We should develop a common vocabulary for talking about these components. Some of the terms might get overloaded and have slightly different meanings i) colloquially, ii) in psychology, and iii) in computer science, so will need to be careful to define terms clearly.
 
-As a possible starting point:
+As a possible starting point, these are the components of a treatment we need to define:
 
-These are the components of a treatment we need to define:
-
-- `steps` are the components of an intervention. Key steps will be linked (by transitions) to form the core pathway of the intervention. However other steps may be 'islands' — individual, specific behaviours or tasks which a therapist may complete at any point during the intervention. We leave open what each step is for, and their scope: This is determined by the treatment developer as they write the llm prompts and associated actions for their intervention. However in most cass steps are likely to be a single 'logical unit' of therapy which can be achieved in a single LLM prompt (e.g. 'establish rapport at the opening of a session', or 'identify discrepancies to build motivation'). Simpler, 'island' steps might 'give health information' or 'take an affect measurement' from the client.
+- `steps` are th basic components of an intervention. Key steps will be linked by `transitions` to form the core pathway of the intervention. Other steps may be 'islands' --- individual, specific behaviours or tasks which a therapist may complete at any point during the intervention.  We leave open what each step is _for_, and their scope: This is determined by the treatment developer as they write the prompts and associated actions and define their intervention. However in most cases steps are likely to be a single 'logical unit' of therapy which can be achieved in a single LLM prompt (e.g. 'establish rapport at the opening of a session', or 'identify discrepancies to build motivation'). Simpler, 'island' steps might 'give health information' or 'take an affect measurement' from the client. Steps are implemented as templated llm prompts which are evaluated _in the context of the current conversation_. This means that, although the same step may be repeated multiple times, the response of the agent will change because the conversation context builds. Each time the client responds or a step is repeated, a `turn` occurs. 
+Logging of `turns` is important because it provides context for later step evaluation. All client inputs are recorded as a separate turn. Evaluating a `step` may create multiple texts or other metadata to log — for example, a prompt might specify multiple generations from the model, for a `[THOUGHT]`  and an `[OUTPUT]` which are both logged and available for later use in templated prompts.
 
 - `transitions` define the paths allowed between steps, and the conditions required for transitions to occur. In some cases we might explicitly define a transition to an 'unknown' target node. In this case we have conditions for moving to the next step, but no explicit target. This would be used for 'digressions' or 'measurements' which are not part of the main flow of the conversation. We can also attach `actions` to transitions which create side effects for the transition: for example, storing information in the database or triggering a 'supervision'.
 
+`actions` the system can take are defined by functions which take the current context as input. Actions can also be chained (so the result of one action might be to trigger additional actions). Standard actions will be provided for:
 
-`actions` the system can take are defined by functions which take the current context as input. Actions can also be chained (so the result of one action can be to trigger another action). Standard actions will be to:
+- `judgements`: i.e., a judgement about or evalution of the state of the system or the client, based on the conversation history or other data sources at a particular point in time. For example, we might want to evaluate whether the client is engaged in treatment at a given point in time, based on the conversation history and other data sources. A judgement is very similar to a note, but creates a structured classification task where the return values are known and can be defined by the treatment developer ahead of time. For example, we might want to evaluate whether the client is 'engaged' or 'disengaged' at a given point in time. This is a binary classification task, and the system would return a structured response (and perhaps also a textual explanation of the classification decision). Evaluations can be of both clients and therapists (or of the quality of the relationship). 
 
-- `evaluate`: i.e., make a judgement about the state of the system or the client, based on the conversation history or other data sources. For example, we might want to evaluate whether the client is engaged in treatment at a given point in time, based on the conversation history and other data sources. An evaluation is very similar to a note, but defines a classification task where the return value is more structured and the categories can be defined by the treatment developer ahead of time. For example, we might want to evaluate whether the client is 'engaged' or 'disengaged' at a given point in time. This would be a binary classification task, and the system would return a structured response to the treatment developer (although the structured response might also include textual explanation of the classification decision). Evaluations can be of both clients and therapists (or of the quality of the relationship). 
-Evaluations can trigger further evaluations or actions (either in all cases, or linked to specific classifications). For example, if the system evaluates that the client is disengaged, it might trigger a 'supervision' action to the therapist model to provide additional guidance or prompts. Evaluations are specified through an llm prompt to include context. They may specify a particular model to use. Evaluations are always logged, and the prompt or markdown file which specifies them includes the format for logging them.
+Judgements can trigger further judgements or actions. This may always happen, or be conditional on specific classification responses. For example, if the system judges that the client is 'disengaged', it might trigger an alert action to warn a human supervisor, or a 'supervision' action which induces the therapist model to provide additional guidance or prompts which is included in step templates. `judgements` are created by writing an llm prompt. They may specify a particular model to use. Judgements are always logged, and the prompt or markdown file which specifies them includes the format for logging, what data to save etc. A `judgement` template uses pydantic to define the acceptable return values from the model. Multiple fields can be requested in the return value, allowing for multiple judgements to be made in a single prompt. For example, a prompt might ask the model to evaluate the client's engagement, adherence, and affective state. The model would return a JSON object with these fields, and the system would log them for later analysis.
+
+- `note`: A note is a special case of a judgement and uses the same machinery, but is syntactic sugar for a judgement where the only return values requried are unstructured text. For example, the template might generate summaries of the recent conversation history. The `note` template would specify how to summarise conversations within a step before transitioning, or combine information from multiple sources to record a snapshot of the client's affective state.  Another special use of `notes` would be to summarise or comment on turn-by-turn utterances. E.g. on each turn we might process client talk and therpist replies to label what is happening in the conversation. 
+
+- `questions` Another special case of judgements would be to record client responses to direct questions to measure their mood or other states. In this case clients respond to questions defined in a step-like template and respon in freeform chat text. The question processing template would (like a judgement) validate/extract data from the response and store it. The schema for the return values might be defined in the 'question step' as a convenience. Alternatively, we might define questions using standard UI components like likert scales/radio buttons. In this case, the system would automatically validate the response and store it in the database.
 
 
-- `remember`: a special case of evaluations where the system is tasked with storing information. In some cases this would summarise the current context -- e.g. to summarise conversations within a step before moving on, or combining information from multiple sources to record a 'measurement' of the client's affective state. Most of the time the note function would be a simple templated prompt to the LLM, but could be more complex (e.g. psychophysical analysis). Another example might be to record client responses to 'measurements' of their mood or other states given in questions: Clients could respond in freeform text (defined in a step) and the note function/processing template would validate/extract data from the response and store it. Another special use of `notes` would be to record turn-by-turn utterances. E.g. on each turn we might store `client_speech`, `therapist_utterance`, `therapist_reasoning` (capturing hidden tokens). In some ways this is like a logging system, because we'd also store llm prompt chains and other system data in the database, perhaps under `meta` or `system` note types. 
+# Describing the therapy in markdown
+
+`steps`, `judgements`, `notes`, `questions` and other primitives that compose an `intervention` are defined in markdown files. These files use yaml header sections to specify metadata about the step. Metadata might include conditions for transitions, actions to take, or specify llm models to use for the prompt. 
+
+Transitions between steps are defined in a separate file, in mermaid format. 
+
+The body of the markdown file is the text of the prompt to be sent to the LLM, and includes special extension tags which are used to access the conversation history, system state, or other data sources.
+
+
+
+
+
+
+# Implementation notes
+
+## Validation rules for markdown/yaml files describing interventions
+
+- all files have a unique name and slug
+
+- all note templates includes at least one `[[NOTE]]` tag which is the completion that is saved as the note. If multiple `[[NOTE]]` tags are includes, multiple notes are saved in the database.
+
+- all `judgements` define a `return`  value in the yaml frontmatter (this is done in a serialised form of a pydantic model, which specifies the schema for the return value).
+ 
+- as a preflight check, it might be worth parsing and trying to render all templates with an empty context? This would catch any syntax errors in the templates, and also any missing/broken tags or other issues.
+
+
+
+## Logging and extraction of data
+
+
+
+
 
 Types of 'memories' we can make:
 
@@ -122,7 +154,6 @@ Each memory would store these fields:
 - `text` (the text content of the memory)
 - `audio` (any audio content of the memory)
 - `meta` (explanation or additional context to help interpret the memory. e.g. the chain of LLM prompts used to generate the memory with COT)
-
 
 
 

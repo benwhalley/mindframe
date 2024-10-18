@@ -1,11 +1,17 @@
 ---
-name: Build motivation by comparing present and future states
-slug: build-motivation-discrepancy
+slug: elicit-discrepancy
 transitions: 
     embed-motivation:
         conditions: 
-            - past-future-discrepancy('yes')
-            - past-future-discrepancy('partially') + step.turns > 30
+            - judgement('discrepancy', 'yes')
+            # OR
+            - judgement('discrepancy', 'partial') + step.turns > 30
+        actions:
+            - summarise-discrepancy.note
+
+    develop-goals:
+        conditions:
+            - judgement('discrepancy', 'partial') + 
 ---
 
 # Context
@@ -48,8 +54,8 @@ How can you build on what they have already said and reflect or amplify it?
 
 Now, summarise this thought in a sentence or two.
 
-<!-- this gets used later -->
 [[THOUGHT]]  
+<!-- this summary gets used later in prompt-context -->
 
 
 # Decide what to say
@@ -57,4 +63,5 @@ Now, summarise this thought in a sentence or two.
 Now, using the thinking above, continue the conversation as therapist. 
 
 {{turns:2}}
+
 THERAPIST:  [[RESPONSE]]
