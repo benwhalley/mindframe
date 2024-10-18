@@ -34,7 +34,6 @@ to help them with {{meta.client_problem | default("")}}.
 
 {% turns step='current', smalltalk=false, include_thoughts=true %}
 
-
 # Your task now as therapist
 
 We need to help the client identify a discrepancy between their current state and a future state they desire. This discrepancy can help build motivation for change.

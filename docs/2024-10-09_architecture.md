@@ -83,6 +83,171 @@ We should develop a common vocabulary for talking about these components. Some o
 
 As a possible starting point, these are the components of a treatment we need to define:
 
+`actions` the system can take are defined by functions which take the current context as input. Actions can also be chained (so the result of one action might be to trigger additional actions). Standard actions will be provided for:
+
+- `judgements`: i.e., a judgement about or evalution of the state of the system or the client, based on the conversation history or other data sources at a particular point in time. For example, we might want to evaluate whether the client is engaged in treatment at a given point in time, based on the conversation history and other data sources. A judgement is very similar to a note, but creates a structured classification task where the return values are known and can be defined by the treatment developer ahead of time. For example, we might want to evaluate whether the client is 'engaged' or 'disengaged' at a given point in time. This is a binary classification task, and the system would return a structured response (and perhaps also a textual explanation of the classification decision). Evaluations can be of both clients and therapists (or of the quality of the relationship). 
+
+Judgements can trigger further judgements or actions. This may always happen, or be conditional on specific classification responses. For example, if the system judges that the client is 'disengaged', it might trigger an alert action to warn a human supervisor, or a 'supervision' action which induces the therapist model to provide additional guidance or prompts which is included in step templates. `judgements` are created by writing an llm prompt. They may specify a particular model to use. Judgements are always logged, and the prompt or markdown file which specifies them includes the format for logging, what data to save etc. A `judgement` template uses pydantic to define the acceptable return values from the model. Multiple fields can be requested in the return value, allowing for multiple judgements to be made in a single prompt. For example, a prompt might ask the model to evaluate the client's engagement, adherence, and affective state. The model would return a JSON object with these fields, and the system would log them for later analysis.
+
+- `note`: A note is a special case of a judgement and uses the same machinery, but is syntactic sugar for a judgement where the only return values requried are unstructured text. For example, the template might generate summaries of the recent conversation history. The `note` template would specify how to summarise conversations within a step before transitioning, or combine information from multiple sources to record a snapshot of the client's affective state.  Another special use of `notes` would be to summarise or comment on turn-by-turn utterances. E.g. on each turn we might process client talk and therpist replies to label what is happening in the conversation. 
+
+- `questions` Another special case of judgements would be to record client responses to direct questions to measure their mood or other states. In this case clients respond to questions defined in a step-like template and respon in freeform chat text. The question processing template would (like a judgement) validate/extract data from the response and store it. The schema for the return values might be defined in the 'question step' as a convenience. Alternatively, we might define questions using standard UI components like likert scales/radio buttons. In this case, the system would automatically validate the response and store it in the database.
+
+
+# Describing the therapy in markdown
+
+`steps`, `judgements`, `notes`, `questions` and other primitives that compose an `intervention` are defined in markdown files. These files use yaml header sections to specify metadata about the step. Metadata might include conditions for transitions, actions to take, or specify llm models to use for the prompt. 
+
+Transitions between steps are defined in the yaml frontmatter.
+
+The body of the markdown file is the text of the prompt to be sent to the LLM, and includes special extension tags which are used to access the conversation history, system state, or other data sources.
+
+
+## Graphing the intervention 
+
+The intervention graph could be extracted from these files and shown in mermaid.
+
+`for file in docs/fit/* ; do printf "===== %s =====\n" "$file"; cat "$file"; done`
+
+Then copy to chatGPT with the instruction to:
+
+EXTRACT THE GRAPH FROM THIS TEXT AND SHOW IT IN MERMAID IN A FORMAT LIKE THIS:
+
+```
+graph TD;
+  A[elicit-discrepancy.step] -->|"discrepancy==yes"| B[embed-motivation.step];
+  A -->|"disrepancy==partial + step.turns > 30"| B;
+  B -->|step.minutes > 5 + step.turns > 5| C[end-intervention.step];
+```
+
+
+
+# Implementation notes
+
+## Validation rules for markdown/yaml files describing interventions
+
+- all files in an intervention have a unique `title`
+
+- all note templates includes at least one `[[NOTE]]` tag which is the completion that is saved as the note. If multiple `[[NOTE]]` tags are includes, multiple notes are saved in the database.
+
+- all `judgements` define a `return`  value in the yaml frontmatter (this is done in a serialised form of a pydantic model, which specifies the schema for the return value).
+ 
+- as a preflight check, it might be worth parsing and trying to render all templates with an empty context? This would catch any syntax errors in the templates, and also any missing/broken tags or other issues.
+
+
+
+# Starting an intervention episode
+
+A client starts using the system, and this creates an `episode` of therapy and a `session`.
+
+An intervention always has a 'root' step, where all clients start.
+
+Subsequent sessions can either start on the last step of the previous session, or at the root step, or at some other step. This is defined in `config.yaml`.
+
+
+# While on a step...
+
+The client is always 'on' a step.
+
+The system tries to move to the 'next' step, defined in the transitions section of the yaml header.
+
+To do this, it needs to evaluate the list of `conditions` in the yaml.
+The list is evaluated in order, and if any of them eval true then the transition occurs
+
+Conditions can be simple python expressions and have access to some variables (like the return values of judgements, and the current step and turn number)
+
+
+# Where to go next?
+
+Most of the time, a step will define a transition to the next step in the intervention along with conditions to meet.
+
+However there are some cases where the next step needs to be inferred.  For example, a "digression" is a step which users can jump to at any point, and  has no specific onward path.
+
+A "recap" step (at the start of a new session) would be an example of this. 
+
+In this instance, the system uses the history of which steps have been visited to infer the next step. 
+
+i.e. if a client completes a step with no specific transition step specified they will be returned to the 'last visited step'.
+
+
+
+
+# Recording turns
+
+Each time the client says something or the system responds, we need to record a Turn
+
+```python
+class Turn(models.Model):
+    timestamp = models.DateTimeField()
+    episode = models.ForeignKey(Episode)
+    text = models.TextField()
+    speaker = models.CharField(choices=['client', 'therapist', 'system'])
+```
+
+# Making `judgements`
+
+
+
+# Making `notes`
+
+Making notes involves:
+
+- using an llm prompt template
+- populating it with context
+- making completion(s) named by the `[[NAME]]` syntax in templates
+- saving each completion as `note`s in the database with a timestamp
+
+This can happen in parallel with other actions.
+
+
+
+
+# Defining and using `example`s
+
+Examples are used to provide additional context to the therapist model, and to provide examples of good practice for the therapist model to follow. We create them in markdown for convenience, but they are stored in the database and used for semantic search and RAG.
+
+The basic form is:
+
+- tags
+- commentary: explanation of why the speech good or bad practice example
+- is_positive_example: boolean, default true
+- text: the text of the example, normally in a `CLIENT: ... ; THERAPIST, ...` format
+
+The database stores embeddings for commentary, text, and all combined (including tags).
+
+We can lookup good or bad examples from within templates using the tag syntax defined below.
+
+
+
+
+```python
+class Note(object):
+    template = models.TextField()
+    
+    timestamp = models.DateTimeField() # time when template is populated with context
+    episode = models.ForeignKey(Episode)
+
+    prompt = models.TextField() # text of prompt with tags called and context filled in
+    text = models.JSONField() # dict, keys defined by names of `[[NOTE]]` tags in template, vals=completion text
+    meta = models.JSONField() # any additional metadata about the note like llm model used, API return data etc
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Logging and extraction of data
 
 Here is a list of the core **primitives** in the `mindframe` system, which structure the architecture of interventions:
 
@@ -92,16 +257,79 @@ Here is a list of the core **primitives** in the `mindframe` system, which struc
 
 - **Transitions**: Define pathways between steps and the conditions required for advancing from one step to another. **Digressions**: are temporary transitions to steps outside the primary intervention flow, with an intention to return to the main pathway.
 
+Types of 'memories' we can make:
+
+- turns (what each person said, and prior/hidden reasoning attached to the therapist's utterances)
+- evaluation (a structured judgement about the state of the system or the client)
+- notes (an unstructured record or summary of the state of the system or the client)
+
+Notes types can be namespaced to help general access and inclusion in templates later e.g. 
+
+- `turn.text`
+- `evaluation.affective`, `evaluation.adherence`, `evaluation.other`
+- `meta.user`, `meta.system`, `meta.other`
+- `system.log` or `system.log.llm_call`
+
+Each memory would store these fields:
+
+- `key` (a unique identifier for the memory)
+- `timestamp`
+- `category` (a dotted-string type identifier for the memory, e.g. 'turn', 'evaluation', 'note')
+- `name` (a human-readable slug-type identifier for the memory, not necessarily unique)
+- `text` (the text content of the memory)
+- `audio` (any audio content of the memory)
+- `meta` (explanation or additional context to help interpret the memory. e.g. the chain of LLM prompts used to generate the memory with COT)
+
+
+
+
+
+- `digress`: this means to temporarily move the client to a different step, outside the primary flow of the intervention, but with the intention of returning to the current step. For example, if the client asks a question which is off-topic, the system might digress to a 'information-giving' step and answer that question, and then return to the previous step. Similarly, we might want to 'measure' something about the client: we could achieve this by 'digressing' to a measurement step and then returning to the current step. This could be implemented by marking the current step as an 'exit' and then when digression steps are completed without a specified target the system returns to the 'last exit'.
+
+- `supervise`: i.e., provide additional guidance to the therapist model
+
+- `alert`: i.e., trigger an alert to the system developer or human supervisor. This could be used to flag up dangerous or unexpected responses from the client or therapist model. For example, if the client is asking for medical advice, the system might trigger an alert to the system developer or supervisor to intervene (i.e. if a 'digression' to a special-case step, to explain that the system can't offer medical advice, is insufficient).
+
+
+
+In addition, 
+
+
+
+intro.build_rapport
+intro.elicit_problem
+intro.elicit_goals
+motivate.identify_pros_cons
+motivate.elicit_change_talk
+motivate.elicit_importance
+practice.elicit_imagery
+practice.elicit_change_plan
+practice.set_homework
+
+
+
+
+
+
+
+
+
+
+
 - **Judgements**: Structured classification tasks where the system evaluates conversation state and returns defined responses. These are used to determine transitions or influence step behavior.
 
 - **Notes**: Free-text summaries or reflections, similar to judgements but unstructured. They provide insights into conversation progress for review or system reflection.
 
 - **Questions**: Direct prompts for the client, where responses are logged, processed, and stored. They can be designed to elicit structured or free-form inputs, similar to judgements.
 
+Step
+Transition
+Evaluation
 - **Actions**: Side effects or additional steps triggered when certain transitions or conditions are met (e.g., triggering a note or alert).
 
 - **Examples**: Snippets of good or bad therapeutic practice stored for semantic search or RAG retrieval during the conversation.
 
+Turn
 - **Theory**: Other background materials or standardized information made available in the intervention templates to maintain consistency across different templates.
 
 
