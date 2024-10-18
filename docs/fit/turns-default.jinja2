@@ -1,0 +1,4 @@
+{% for turn in turns %}
+{% if turn.values.THOUGHT %}   [PRIVATE THERAPIST THOUGHT:   {{turn.values.THOUGHT}}] {% endif %}
+{{turn.speaker|uppercase}}:       {{turn.text}}
+{% endfor %}

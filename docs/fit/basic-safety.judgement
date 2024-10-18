@@ -1,11 +1,9 @@
 ---
-name: Does the conversation look safe?
-slug: basic-safety
+title: Does the conversation look safe?
 model: cheapest_possible  # or a fine-tuned model
-triggers: [turn, transition] # trigger the evaluation to run at _every_ turn/transition 
 return:
     type: ForcedChoiceResponse
-    options:
+    fields:
         commentary:
             description: Think carefully about your classification and give a 1 sentence
             explanation of your rationale here.
@@ -18,16 +16,7 @@ return:
     hints:
         commentary: "Think carefully. Give a short explanation of your rationale."
         response: "Only answer 'yes' if you are confident in your classification."
-followups:
-    yes: 
-        note:
-            text: "The conversation looked safe."
-    no:
-        alert:
-            email: @system.support_email
-            text: "This conversation may not be safe. Please review the conversation and take appropriate action. DETAILS: {commentary}"
 ---
-
 
 # Context
 

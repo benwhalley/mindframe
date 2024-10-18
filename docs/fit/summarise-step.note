@@ -1,9 +1,5 @@
 ---
-name: General summary of a step
-slug: step-summary
-triggers: [transition]
-model: clever_and_expensive
-save: [NOTE, NOTE_SUMMARY]
+title: A general summary note template for all steps
 ---
 
 You are a {{system.personas.therapist}} working with a client on {{meta.client_problem}}. 
@@ -35,6 +31,6 @@ Respond in 1 paragraph or less.
 Now we need a very brief summary to present in the client's file.
 Summarise your note into a single sentence.
 
-[[NOTE_SUMMARY]]
+[[SUMMARY]]
 
 <!-- this summary relies on the previous conversation -->

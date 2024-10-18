@@ -1,26 +1,16 @@
 ---
-name: Does the therapist elicit a past/future discrepancy?
-slug: past-future-discrepancy
-triggers: none  # no specific triggers, evaluated when transition requires it
-model: clever_and_expensive
+title: Does the therapist elicit a past/future discrepancy?
 return:
-  type: ForcedChoiceResponse
+  type: ForcedChoiceResponse # specifies fields: [commentary, response]
+  hints: 
+    commentary: "Think carefully about your classification and give a short, 1-paragraph explanation of your rationale here."
+    response: "Only select yes if confident in your answer."
   options:
-    response:
-      commentary: str
-      yes:
-        label: "Yes, eliciting a discrepancy between current and future states."
-        actions: [other-slug-for-an-action, or-multiple-actions]
-      no: 
-        label: "No, not eliciting a discrepancy between current and future states."
-      partial:
-        label: 'The task is only partially complete.'
-  required:
-        - commentary
-        - response
-  hints:
-    commentary: "Think carefully. Give a short explanation of your rationale."
-    response: "Only answer 'yes' if you are confident in your classification."
+    response:  
+      yes: Yes, the therapist has elicited and reflected the discrepancy between current and future states.
+      no: No, therapist is not eliciting a discrepancy between current and future states.
+      partial: The task is only partially complete.
+      struggling: The therapist is trying, but the conversation is confused or not progressing.
 ---
 
 
@@ -29,15 +19,14 @@ return:
 You are: {{system.personas.supervisor}}
 {{system.concepts.FIT}}
 
-
 # Overview
 
 A therapist in your team is working with {{meta.client_name|default:"a client"}} 
 to help them with {{meta.client_problem|default:""}}.  
 
-You have access to a transcript of their recent session. You need to provide 
-feedback to the therapist about whether they adhere to the principles of functional
-imagery training.
+You have a transcript of their session. 
+You need to provide feedback to the therapist on whether they 
+adhere to the principles of functional imagery training.
 
 
 # Relevant clinical notes
@@ -63,8 +52,10 @@ These are previous notes made by the therapist which may be relevant:
 
 # Specific task
 
-We need to check that the therapist has elicited a discrepancy between
-current and future states to build motivation (important in FIT).
+We need to check:
+
+WHETHER THE THERAPIST HAS ELICITED A DISCREPANCY BETWEEN
+CURRENT AND FUTURE STATES TO BUILD MOTIVATION.
 
 Only respond "yes" if:
 
@@ -72,16 +63,20 @@ Only respond "yes" if:
 - the client has imagined and voiced a future state which is improved
 - the therapist has reflected these, and highlighted the discrepancy
 
+What does "struggling" mean?
+- Sometimes, clients and therapists find this hard
+- they may talk around the topic, without getting to the core issue
+- clients may not be ready to talk about this yet, or can't agree with the therapist if they reflect the discrepancy
+- a good indicator would be if the conversation is confused or not progressing clearly
+
 
 # Detailed thinking and rationale
 
 Think about the problem step by step. 
 Use quotes from the conversation to support your decision.
 
-<!-- at this point the model responds free-form 
-      to enhance the quality of the context for the final classification -->
-
 [[THINKING]]
+<!-- the model responds free-form to enhance context quality for the final classification -->
 
 
 # Your response
@@ -99,7 +94,7 @@ Use quotes from the conversation to support your decision.
         ...,
         description="Think carefully about your classification and give a 1 paragraph explanation of your rationale here.",
     )
-    response: Literal["yes", "no", "maybe"] = Field(
+    response: Literal["yes", "no", "maybe", "struggling"] = Field(
         ..., description="Only answer 'yes' if you are confident in your classification."
     )
     class Config:
@@ -112,7 +107,6 @@ Use quotes from the conversation to support your decision.
   
 -->
 
-
 {
   "properties": {
     "commentary": {
@@ -124,7 +118,8 @@ Use quotes from the conversation to support your decision.
       "enum": [
         "yes",
         "no",
-        "partially"
+        "partially",
+        "struggling"
       ],
       "title": "Response",
       "type": "string"

@@ -1,36 +1,38 @@
 ---
-name: Build motivation by comparing present and future states
-slug: build-motivation-discrepancy
 transitions: 
     embed-motivation:
         conditions: 
-            - past-future-discrepancy('yes')
-            - past-future-discrepancy('partially') + step.turns > 30
+            - judgement.discrepancy == 'yes'
+            # OR
+            - judgement.discrepancy == 'partial' and step.turns > 30
+        actions:
+            - summarise-discrepancy.note
+
+    develop-goals:
+        conditions:
+            - judgement.discrepancy == 'struggling'
 ---
 
 # Context
 
-You are: {{system.personas.supervisor}}
+You are: {{personas.supervisor}}
 
 {{intervention.concepts.FIT}}
 
 {{intervention.concepts.motivation}}
 
-
 # Overview
 
-A therapist in your team is working with {{meta.client_name|default:"a client"}} 
-to help them with {{meta.client_problem|default:""}}.  
-
+A therapist in your team is working with {{meta.client_name | default("a client")}} 
+to help them with {{meta.client_problem | default("")}}.  
 
 # Previous notes
 
-{{notes}}
-
+{% notes * %}
 
 # Recent conversation 
 
-{% turns step=current, smalltalk=false, include_thoughts=true %}
+{% turns step='current', smalltalk=false, include_thoughts=true %}
 
 
 # Your task now as therapist
@@ -46,15 +48,16 @@ How can you build on what they have already said and reflect or amplify it?
 
 [[EXTENDED_THOUGHT]]
 
-Now, summarise this thought in a sentence or two.
+Now, summarise this thought in a sentence or two:
 
-<!-- this gets used later -->
 [[THOUGHT]]  
+<!-- this summary gets used later in prompt-context -->
 
 
 # Decide what to say
 
 Now, using the thinking above, continue the conversation as therapist. 
 
-{{turns:2}}
+{{turns(2)}}
+
 THERAPIST:  [[RESPONSE]]

@@ -1,0 +1,6 @@
+{% for example in examples %}
+> {{example.commentary}} (#{% for t in example.tags%}#{{t}}, {% endfor %})
+
+{{example.text}}
+---
+{% endif %}

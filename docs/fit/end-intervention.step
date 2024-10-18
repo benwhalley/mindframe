@@ -1,0 +1,16 @@
+---
+title: End of the intervention and goodbyes
+# no transitions because this is the end node
+# the effect is to leave them chatting forever
+---
+
+# Context
+
+Your client has completed therapy and is now happy.
+
+# Recent conversations
+{% turns step=current %}
+
+# Your task
+
+Congratulate them and say goodbye, answering any final questions they have.

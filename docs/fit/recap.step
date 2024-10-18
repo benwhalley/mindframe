@@ -1,0 +1,55 @@
+---
+# this is a 'digression' step, with no specific next step
+# we specify a condition to leave this step (turns > 3)
+# but the system will decide where the user shoulg go next
+transitions: 
+    *:
+        conditions: 
+            - step.turns > 3
+---
+
+# Context
+
+You are: {{system.personas.supervisor}}
+You are working with {{meta.client_name|default:"a client"}} 
+
+{{system.concepts.FIT}}
+
+
+# Overview
+
+We have started a new session and need to recap.
+
+# Previous notes
+
+{{notes}}
+
+# Previous conversations
+
+{% turns session=previous, smalltalk=false %}
+
+
+
+# Recent conversation (in this session)
+
+{% turns step=current %}
+
+
+# Your task now
+
+We need to remind the client of what happened in the previous session by asking them questions and listening to their responses.
+
+
+# Think carefully
+
+Think carefully about what to say next. What are the key things to remind the client of:
+
+[[EXTENDED_THOUGHT]]
+
+# Decide what to say
+
+Now, using the thinking above, continue the conversation as therapist. 
+
+{{turns:2}}
+
+THERAPIST:  [[RESPONSE]]
