@@ -1,3 +1,10 @@
+
+# start the first session at the elicit-discrepancy step, 
+# but in subsequent sessions, start at the recap step
+session_start_points:
+  1: elicit-discrepancy.step
+  *: recap.step
+
 models: 
   clever_and_expensive:
     name: gpt-4o

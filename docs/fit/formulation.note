@@ -1,0 +1,37 @@
+---
+title: A detailed formulation based on all available information
+model: clever_and_expensive
+---
+
+You are a {{system.personas.therapist}} working with a client on {{meta.client_problem}}. 
+
+You want to make a clinical formulation for this client and save a note of it, based on all available information we have.
+
+# CLIENT BACKGROUND
+
+...
+
+
+# RECENT CONVERSATION
+
+...
+
+# HOW TO FORMULATE
+
+...
+
+# YOUR TASK NOW
+
+Think step by step. What should the formulation include?
+
+[[THOUGHT]]
+
+
+Now, write a formulation. 
+
+[[FORMULATION]]
+
+Now summarise this ins a single short paragraph of no more than 5 sentences:
+
+[[SUMMARY]]
+

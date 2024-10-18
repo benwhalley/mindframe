@@ -1,5 +1,4 @@
 ---
-slug: elicit-discrepancy
 transitions: 
     embed-motivation:
         conditions: 
@@ -28,16 +27,13 @@ You are: {{system.personas.supervisor}}
 A therapist in your team is working with {{meta.client_name|default:"a client"}} 
 to help them with {{meta.client_problem|default:""}}.  
 
-
 # Previous notes
 
 {{notes}}
 
-
 # Recent conversation 
 
 {% turns step=current, smalltalk=false, include_thoughts=true %}
-
 
 # Your task now as therapist
 

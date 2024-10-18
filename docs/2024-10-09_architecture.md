@@ -103,12 +103,27 @@ Judgements can trigger further judgements or actions. This may always happen, or
 
 `steps`, `judgements`, `notes`, `questions` and other primitives that compose an `intervention` are defined in markdown files. These files use yaml header sections to specify metadata about the step. Metadata might include conditions for transitions, actions to take, or specify llm models to use for the prompt. 
 
-Transitions between steps are defined in a separate file, in mermaid format. 
+Transitions between steps are defined in the yaml frontmatter.
 
 The body of the markdown file is the text of the prompt to be sent to the LLM, and includes special extension tags which are used to access the conversation history, system state, or other data sources.
 
 
+## Graphing the intervention 
 
+The intervention graph could be extracted from these files and shown in mermaid.
+
+`for file in docs/fit/* ; do printf "===== %s =====\n" "$file"; cat "$file"; done`
+
+Then copy to chatGPT with the instruction to:
+
+EXTRACT THE GRAPH FROM THIS TEXT AND SHOW IT IN MERMAID IN A FORMAT LIKE THIS:
+
+```
+graph TD;
+  A[elicit-discrepancy.step] -->|"discrepancy==yes"| B[embed-motivation.step];
+  A -->|"disrepancy==partial + step.turns > 30"| B;
+  B -->|step.minutes > 5 + step.turns > 5| C[end-intervention.step];
+```
 
 
 
@@ -116,13 +131,124 @@ The body of the markdown file is the text of the prompt to be sent to the LLM, a
 
 ## Validation rules for markdown/yaml files describing interventions
 
-- all files have a unique name and slug
+- all files in an intervention have a unique `title`
 
 - all note templates includes at least one `[[NOTE]]` tag which is the completion that is saved as the note. If multiple `[[NOTE]]` tags are includes, multiple notes are saved in the database.
 
 - all `judgements` define a `return`  value in the yaml frontmatter (this is done in a serialised form of a pydantic model, which specifies the schema for the return value).
  
 - as a preflight check, it might be worth parsing and trying to render all templates with an empty context? This would catch any syntax errors in the templates, and also any missing/broken tags or other issues.
+
+
+
+# Starting an intervention episode
+
+A client starts using the system, and this creates an `episode` of therapy and a `session`.
+
+An intervention always has a 'root' step, where all clients start.
+
+Subsequent sessions can either start on the last step of the previous session, or at the root step, or at some other step. This is defined in `config.yaml`.
+
+
+# While on a step...
+
+The client is always 'on' a step.
+
+The system tries to move to the 'next' step, defined in the transitions section of the yaml header.
+
+To do this, it needs to evaluate the list of `conditions` in the yaml.
+The list is evaluated in order, and if any of them eval true then the transition occurs
+
+Conditions can be simple python expressions and have access to some variables (like the return values of judgements, and the current step and turn number)
+
+
+# Where to go next?
+
+Most of the time, a step will define a transition to the next step in the intervention along with conditions to meet.
+
+However there are some cases where the next step needs to be inferred.  For example, a "digression" is a step which users can jump to at any point, and  has no specific onward path.
+
+A "recap" step (at the start of a new session) would be an example of this. 
+
+In this instance, the system uses the history of which steps have been visited to infer the next step. 
+
+i.e. if a client completes a step with no specific transition step specified they will be returned to the 'last visited step'.
+
+
+
+
+# Recording turns
+
+Each time the client says something or the system responds, we need to record a Turn
+
+```python
+class Turn(models.Model):
+    timestamp = models.DateTimeField()
+    episode = models.ForeignKey(Episode)
+    text = models.TextField()
+    speaker = models.CharField(choices=['client', 'therapist', 'system'])
+```
+
+# Making `judgements`
+
+
+
+# Making `notes`
+
+Making notes involves:
+
+- using an llm prompt template
+- populating it with context
+- making completion(s) named by the `[[NAME]]` syntax in templates
+- saving each completion as `note`s in the database with a timestamp
+
+This can happen in parallel with other actions.
+
+
+
+
+# Defining and using `example`s
+
+Examples are used to provide additional context to the therapist model, and to provide examples of good practice for the therapist model to follow. We create them in markdown for convenience, but they are stored in the database and used for semantic search and RAG.
+
+The basic form is:
+
+- tags
+- commentary: explanation of why the speech good or bad practice example
+- is_positive_example: boolean, default true
+- text: the text of the example, normally in a `CLIENT: ... ; THERAPIST, ...` format
+
+The database stores embeddings for commentary, text, and all combined (including tags).
+
+We can lookup good or bad examples from within templates using the tag syntax defined below.
+
+
+
+
+```python
+class Note(object):
+    template = models.TextField()
+    
+    timestamp = models.DateTimeField() # time when template is populated with context
+    episode = models.ForeignKey(Episode)
+
+    prompt = models.TextField() # text of prompt with tags called and context filled in
+    text = models.JSONField() # dict, keys defined by names of `[[NOTE]]` tags in template, vals=completion text
+    meta = models.JSONField() # any additional metadata about the note like llm model used, API return data etc
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
