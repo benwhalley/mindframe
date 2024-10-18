@@ -3,6 +3,11 @@ title: MindFrame Architecture
 ---
 
 
+<!-- 
+pandoc -f markdown -t pdf -o mindframe.pdf mindframe.md
+ -->
+
+
 ### Overview
 
 Our goal is to build a chatbot which leverages LLMs, but
