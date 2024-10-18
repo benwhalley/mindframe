@@ -3,11 +3,6 @@ title: MindFrame Architecture
 ---
 
 
-<!-- 
-pandoc -f markdown -t pdf -o mindframe.pdf mindframe.md
- -->
-
-
 ### Overview
 
 Our goal is to build a chatbot which leverages LLMs, but
@@ -48,7 +43,8 @@ A major goal is to generate a large corpus of high quality therapy to analyse. T
 On cost: prices have already fallen by an order of magnitude in the last 18 months. That won't continue for ever, but we can expect prices to fall. 
 Moreover, the price of even the most expensive therapist means LLMs will always be cheap.
 
-Back of envelope: 
+Back of envelope calculations: 
+
 - people speak at ~150 words per minute, so an hour of therapy = 9000 words per hour
 - two tokens are roughly 1 word
 - assume a 6:1 ratio of input tokens to output tokens for all llm prompts used
@@ -66,18 +62,20 @@ Even if we're out by a factor of 10, it's still only $20 per hour which is peanu
 
 # Humans who will use `mindframe`
 
-I envisage 4 primary roles for humans:
+I envisage 5 primary roles for humans:
 
-- system developer (i.e. Ali!)
-- intervention developer (i.e. Jackie or others who want to convert therapy manuals to chatbots)
-- clients (i.e. patients)
-- supervisors: human therapists or experts acting as supervisors to the system at runtime, or providing offline evaluations of performance
+- system developer
+- intervention developers (e.g. Jackie or others who want to convert therapy manuals to chatbots)
+- supervisors: human therapists or experts acting as supervisors to the system at runtime, or
+- trainers: human experts providing offline evaluations of performance
+- clients/patients
+
 
 I think we should avoid using the word "agent" because it's ambiguous whether we mean the system/server/chatbot or the human patient because usage differs in CS and Psy.
 
 Let's call the combined set of models and databases which produce output "the system" or the "chatbot".
 
-These user types each have different needs for UI to be met (see below).
+These user types each have different needs for UI to be met.
 
 
 # System 'primitives' and a common vocabulary
@@ -97,6 +95,18 @@ Judgements can trigger further judgements or actions. This may always happen, or
 - `note`: A note is a special case of a judgement and uses the same machinery, but is syntactic sugar for a judgement where the only return values requried are unstructured text. For example, the template might generate summaries of the recent conversation history. The `note` template would specify how to summarise conversations within a step before transitioning, or combine information from multiple sources to record a snapshot of the client's affective state.  Another special use of `notes` would be to summarise or comment on turn-by-turn utterances. E.g. on each turn we might process client talk and therpist replies to label what is happening in the conversation. 
 
 - `questions` Another special case of judgements would be to record client responses to direct questions to measure their mood or other states. In this case clients respond to questions defined in a step-like template and respon in freeform chat text. The question processing template would (like a judgement) validate/extract data from the response and store it. The schema for the return values might be defined in the 'question step' as a convenience. Alternatively, we might define questions using standard UI components like likert scales/radio buttons. In this case, the system would automatically validate the response and store it in the database.
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Describing the therapy in markdown
@@ -262,79 +272,16 @@ Here is a list of the core **primitives** in the `mindframe` system, which struc
 
 - **Transitions**: Define pathways between steps and the conditions required for advancing from one step to another. **Digressions**: are temporary transitions to steps outside the primary intervention flow, with an intention to return to the main pathway.
 
-Types of 'memories' we can make:
-
-- turns (what each person said, and prior/hidden reasoning attached to the therapist's utterances)
-- evaluation (a structured judgement about the state of the system or the client)
-- notes (an unstructured record or summary of the state of the system or the client)
-
-Notes types can be namespaced to help general access and inclusion in templates later e.g. 
-
-- `turn.text`
-- `evaluation.affective`, `evaluation.adherence`, `evaluation.other`
-- `meta.user`, `meta.system`, `meta.other`
-- `system.log` or `system.log.llm_call`
-
-Each memory would store these fields:
-
-- `key` (a unique identifier for the memory)
-- `timestamp`
-- `category` (a dotted-string type identifier for the memory, e.g. 'turn', 'evaluation', 'note')
-- `name` (a human-readable slug-type identifier for the memory, not necessarily unique)
-- `text` (the text content of the memory)
-- `audio` (any audio content of the memory)
-- `meta` (explanation or additional context to help interpret the memory. e.g. the chain of LLM prompts used to generate the memory with COT)
-
-
-
-
-
-- `digress`: this means to temporarily move the client to a different step, outside the primary flow of the intervention, but with the intention of returning to the current step. For example, if the client asks a question which is off-topic, the system might digress to a 'information-giving' step and answer that question, and then return to the previous step. Similarly, we might want to 'measure' something about the client: we could achieve this by 'digressing' to a measurement step and then returning to the current step. This could be implemented by marking the current step as an 'exit' and then when digression steps are completed without a specified target the system returns to the 'last exit'.
-
-- `supervise`: i.e., provide additional guidance to the therapist model
-
-- `alert`: i.e., trigger an alert to the system developer or human supervisor. This could be used to flag up dangerous or unexpected responses from the client or therapist model. For example, if the client is asking for medical advice, the system might trigger an alert to the system developer or supervisor to intervene (i.e. if a 'digression' to a special-case step, to explain that the system can't offer medical advice, is insufficient).
-
-
-
-In addition, 
-
-
-
-intro.build_rapport
-intro.elicit_problem
-intro.elicit_goals
-motivate.identify_pros_cons
-motivate.elicit_change_talk
-motivate.elicit_importance
-practice.elicit_imagery
-practice.elicit_change_plan
-practice.set_homework
-
-
-
-
-
-
-
-
-
-
-
 - **Judgements**: Structured classification tasks where the system evaluates conversation state and returns defined responses. These are used to determine transitions or influence step behavior.
 
 - **Notes**: Free-text summaries or reflections, similar to judgements but unstructured. They provide insights into conversation progress for review or system reflection.
 
 - **Questions**: Direct prompts for the client, where responses are logged, processed, and stored. They can be designed to elicit structured or free-form inputs, similar to judgements.
 
-Step
-Transition
-Evaluation
 - **Actions**: Side effects or additional steps triggered when certain transitions or conditions are met (e.g., triggering a note or alert).
 
 - **Examples**: Snippets of good or bad therapeutic practice stored for semantic search or RAG retrieval during the conversation.
 
-Turn
 - **Theory**: Other background materials or standardized information made available in the intervention templates to maintain consistency across different templates.
 
 
@@ -347,12 +294,13 @@ What follows is a short description of how these components might link together:
 
 In most cases steps are likely to be a 'logical unit' of therapy which can be achieved in a single LLM prompt (e.g. 'establish rapport at the opening of a session', or 'identify discrepancies to build motivation').  Simpler, 'island' steps might be used to create a `digression`, e.g. to 'give health information' or 'take an affect measurement' from the client (more on this below).
 
-'Techniques' within a psychological intervention might be implement within either single `step`, plus associated `judgement`, or by linking together multiple steps. For example, eliciting imagery in MI might be a single step with the goal to meet the judgement 'has patient generated an image of their problem?'. Or it might be a sequence of steps with multiple judgements, like: 'has patient generated an initial image of their problem', followed by an invitation to 'make it more concrete' and the judgement/goal 'has the patient described additional details for the image?'.
+*Techniques* within a psychological intervention might be implemented within either single `step`, plus associated `judgement`, or by linking together multiple steps. For example, eliciting imagery in MI might be a single step with the goal to meet the judgement 'has patient generated an image of their problem?'. Or it might be a sequence of steps with multiple judgements, like: 'has patient generated an initial image of their problem', followed by an invitation to 'make it more concrete' and the judgement/goal 'has the patient described additional details for the image?'.
 
 Steps are implemented as templated llm prompts which are evaluated _in the context of the current conversation_. Although the same step may be repeated multiple times, the response of the agent will change because the conversation context builds. Each time the client responds or a step is repeated, a `turn` occurs. 
 
 
 ##### Taking turns in conversation
+
 We envisage treatment as a chatbot (or spoken-word chatbot), that is inherently sequential.
 The system and client take turns to speak, and each turn is logged.
 
@@ -369,21 +317,21 @@ The conditions for a transition are defined by the treatment develop using simpl
 
 For example, before moving to the next step we might want to evaluate *whether the client is engaged in treatment*. 
 
-A `judgement` is very similar to a `note` (see below), but defines a structured classification task where the return values are known and can be set by the treatment developer ahead of time.  If we want to judge whether the client is 'engaged' or 'disengaged' at a given point in time this is a binary classification task, and the system would return a structured response. Because we are using llms for classification (or may do) the model could also return a textual explanation of the classification decision for introspection purposes.
-
-In future, 'judgements' might also be the trigger for further judgements or actions. This may always happen, or be conditional on specific classification responses. For example, if the system judges that the client is 'disengaged', it might trigger an alert action to warn a human supervisor, or a 'supervision' action which induces the therapist model to provide additional guidance or prompts which is included in subseuqent step templates. 
+A `judgement` is very similar to a `note` (see below), but defines a structured classification task where the return values are known and can be set by the treatment developer ahead of time.  If we want to judge whether the client is 'engaged' or 'disengaged' at a given point in time this is a binary classification task, and the system would return a structured response. Because we are (presently) using llms for classification (or may do) the model could also return a textual explanation of the classification decision for introspection purposes. 
 
 Both `notes` and `judgements` are created by writing an llm prompt. These may specify a particular llm model to use (e.g. cheap/expensive). 
+In future, if we use non-llm classifiers for judgement then their template would still need to define how system data and data from the conversation is presented to the model, and the schema for the return value.
 
-A `judgement` template uses objects inheriting from Pydantic BaseModel to define acceptable return values from the model. This means we can use `magentic` to guarantee structured data is returned from the model and we can rely on the schema of the return values.
-Multiple fields can be requested in the return value, allowing for multiple judgements to be made in a single prompt execution. For example, a prompt might ask the model to evaluate the client's 'engagement', 'adherence', and 'affective-state'. The model would return a JSON object with these in separate fields, and the system would log them for later use/analysis.
+Although not required, 'judgements' return values might be the trigger for further judgements or actions. This may always happen, or be conditional on specific classification responses. For example, if the system judges that the client is 'disengaged', it might trigger an alert action to warn a human supervisor, or a 'supervision' action which induces the therapist model to provide additional guidance or prompts which is included in subseuqent step templates. 
 
-We can also attach **`actions`** to transitions which create side effects for the transition. For example, we might want to trigger a clinical note to be made every time the client moves to a new step. This would be an action which is triggered by the transition.
+A `judgement` template uses objects inheriting from Pydantic BaseModel to define acceptable return values from the model. This means even when using llms we can use `magentic` to guarantee structured data is returned from the model, and we can rely on the schema of the return values. Multiple fields can be requested in the return value, allowing for multiple judgements to be made in a single prompt execution. For example, a prompt might ask the model to evaluate the client's 'engagement', 'adherence', and 'affective-state'. The model would return a JSON object with these in separate fields, and the system would log them for later use/analysis.
+
+We can attach **`actions`** to transitions which create side effects for the transition. For example, we might want to trigger a clinical note to be made every time the client moves to a new step. This would be an action which is triggered by the transition.
 
 
 ##### Keeping good notes and reflecting on progress
 
-In defining the intervention, the treatment developer can explicitly define ways in which the system should reflect and summarise on progress to inform it's practice. Notes can be very short and serve as a practical tool to compress the information provided to later steps (e.g. summarising the conversation in step A to inform step B). They can also be more detailed and serve as a record of the conversation for later review by a human supervisor, or for research purposes (e.g. to aid introspection about system behaviour and futher intervention development).
+In defining the intervention, the treatment developer can explicitly define ways in which the system should reflect and summarise on progress to inform it's practice. Notes can be very short and serve as a practical tool to compress the information provided to later steps (e.g. summarising the conversation in step A to inform step B). They could also be more detailed and serve as a record of the conversation for later review by a human supervisor, or for research purposes (e.g. to aid introspection about system behaviour and futher intervention development).
 
 A **`note`** is a special case of a judgement and uses the same machinery, but is syntactic sugar for a judgement where the only return values are *unstructured* text. 
 
@@ -393,13 +341,19 @@ Another special use of `notes` would be to summarise or comment on turn-by-turn 
 
 
 
-##### Eliciting structure inputs from the client
+##### Eliciting structured inputs from the client
 
-`questions` are another special case of judgements used to record client responses to direct/specific questions. For example: to measure clients mood or other states. In this case clients respond to questions defined in a `step`-like template, and respond in freeform chat text. The question-processing-template would (like a `judgement`) validate/extract data from the response and store it. The schema for the return values might be defined in the 'question step' as a convenience. Alternatively, we might define questions using standard UI components like likert scales/radio buttons. In this case, the system would automatically validate the response and store it in the database. See examples in the `fit/` directory for how this might be implemented.
+`questions` are another special case of judgements used to record client responses to direct/specific questions. For example: to measure clients mood or other states. In this case clients respond to questions defined in a `step`-like template, and respond in freeform chat text. 
+
+The question-processing-template would validate/extract data from the response and store it (same as for a `judgement`). 
+
+The schema for the return values might be defined in the 'question step' as a convenience. That is, `*.question` files would combine elements of  `.step` and `.judgement` files.
+
+Alternatively, we might define questions using standard UI components like likert scales/radio buttons. In this case, the system would automatically validate the response and store it in the database. See examples in the `fit/` directory for how this might be implemented.
 
 
 
-##### Responding to context: digressions
+##### Responding to client context but: digressions
 
 Sometimes we want to allow the system to `digress`: A digression means to temporarily move the client to a different step, outside the primary/happy flow of the intervention, but *with the intention of returning to the current step*. 
 
@@ -409,18 +363,16 @@ For example, if the client asks a question which is off-topic but important to a
 
 
 
-
-
-# Describing the therapy in markdown/jinja2
+# Describing the intervention in markdown/jinja2
 
 `steps`, `judgements`, `notes`, `questions` and other primitives that compose an `intervention` are defined in template files. 
 
-These files all use:
+Template files all use:
 
 - yaml header sections to specify metadata about the step. 
-- markdown body sections, with jinja2 tags to control templating
+- markdown body sections, with jinja2 tags to control the templated output
 
-This format is similar to existing Rmarkdown and quarto files, so fairly familiar to researchers and will be easy to collaborate on/version/track changes.
+This format is similar to existing Rmarkdown and Quarto files, so fairly familiar to researchers and will be easy to collaborate on/version/track changes.
 
 Tools exist to parse and validate them too, so we can use these to ensure the files are well-formed and consistent.
 
@@ -429,15 +381,14 @@ Metadata in `step` files will include transitions and conditions for transition,
 
 ### Template bodies become LLM prompts
  
-The body of the markdown files is the text of the prompt to be sent to the LLM.
+The body of the markdown files is the text of the prompt to be sent to the LLM (once variable substitutions have been made).
 
 This can include special extension tags which are used to access the conversation history, system state, or other data sources. We can use jinja2 syntax to specify control structure like loops, property access, or extension tags.
 
 We will provide some common 'context' to all step and judgement templates, to enable variable substitutions when they are rendered:
 
 
-
-### 'Theory' and 'intervention background'
+##### 'Theory' and 'intervention background'
 
 An intervention can define `.theory` files and make their body available as a dict of strings. This enables all templates to access standardised background information about the intervention and keep things DRY.
 
@@ -455,7 +406,7 @@ And finally, files which end with  `.persona` or the `personas` key from the `co
 `{{personas.therapist}}` 
 
 
-### System state
+##### System state
 
 Other system information is exposed in templates too:
 
@@ -465,19 +416,16 @@ Other system information is exposed in templates too:
 
 
 
-
-
-
-# Description of runtime behaviour
+# Description of runtime behaviour/operations
 
 This is intended as a rough sketch/definition of requirements for how the system would operate at runtime.
 
 
 ## Starting an intervention episode for a new client
 
-A client logs on and gains access to the system in some way.
+A client logs on and gains access to the system in some way, web based initially.
 
-This will need to be authenticated in some way. 
+This will need to be authenticated. 
 Initially we should just use email + magic links.
 
 [We can develop this later, but a lot of it would be needed for pilot studies anyway so worth considering early]
@@ -485,18 +433,20 @@ Initially we should just use email + magic links.
 
 ---
 
-The client starts using the system, and this creates an `episode` of therapy and a `session`. These are objects which are persisted in the db.
+The client starts interacting with the chatbot, and this creates an `episode` of therapy and a `session`. These are objects which are persisted in the db.
 
 An intervention always has a 'root' step, where all clients start, so the current_step of the session is set to this.
 
 If the client ends the session (explicitly or by timeout) then the session is closed.
 
-When they return, a new session is created. Subsequent sessions can either start on the last step of the previous session, or at the root step, or at some other step. This is defined in `config.yaml`.
+When they return, a new session is created. Subsequent sessions can either start on the last step of the previous session, or at the root step, or at some other step (this is defined in `config.yaml`).
 
 
 ## While the user is 'within' a step
 
 The client is always 'on' a step. This is saved as the `current_step` of the session.
+
+Step history is preserved as a linked list of steps visited.
 
 The system is always trying to move to the 'next' step, defined in the `transitions` section of the yaml header of the current step.
 
@@ -508,9 +458,10 @@ If no conditions eval true, then the system remains on the current step, and the
 Step templates always include a completion called `[REPLY]` which is the text that is sent back to the user.
 
 
----
 
-Evaluating conditions: Conditions in the yaml of a step can be simple python expressions and have access to similar variables as the template itself, as well as the return values of judgements.
+##### Evaluating conditions for transitions
+
+Conditions in the yaml of a step can be simple python expressions and have access to similar variables as the template itself, as well as the return values of judgements.
 
 A simple condition might be `step.turn > 5` to check if the client has been on the step for more than 5 turns.
 
@@ -548,6 +499,8 @@ Each time the client says something in the chat or the system responds, we need 
 - `speaker` (client, therapist, system)
 - `meta` (any additional data like the time taken to respond, the content of the response, etc)
 
+
+## Accessing turns in templates
 
 Turns can later be accessed in templates using the follwing jinja syntax/extension tags:
 
@@ -589,7 +542,6 @@ If we set a default window = 1 then we would include all of these lines in the o
 However, we'd also need to decide what order to return them in. The similarity scores alone wouldn't be a good guide, because line 9 might be more similar than line 8, but it would be better to return in conversational order to show the conversation. TODO: specify the searching and sorting algorithm for presentation.
 
 We should set a default for presenting turns in the template, but allow the user to override this with a `format` parameter (see `turns-default.jinja2` and the `format` parameter in the `examples` tag below).
-
 
 
 ##### Excluding smalltalk
@@ -671,17 +623,14 @@ Similarly for notes, we could write:
 `{{note.slug.all}}` to access all notes with a given slug in the current episode (this returns a list of dicts which NAMEs as keys)
 
 
-
-Alternative tag extension based syntax for notes:
+Alternative tag-based syntax for notes:
 
 
 `{% notes "*" %}` include all notes
 
-
 `{% notes 10 %}` include last 10 notes
 
 `{% notes 'formulation' %}` include all notes generated by the `formulation.note` template.
-
 
 
 
@@ -746,7 +695,6 @@ Parameters for the `examples` tag we might implement:
 - `method`: 'semantic' (cosine similarity) or 'hyde' or 'turns:N' (default N = 2)
 - `tags` to restrict search to
 - `template`: the format/template to output the examples in (default shown below) - accepts the name of a jinja template. See examples-default.jinja2 for the default template.
-
 
 
 
