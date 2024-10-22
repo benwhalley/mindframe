@@ -5,30 +5,28 @@ title: MindFrame Architecture
 
 ### Overview
 
-Our goal is to build a chatbot which leverages LLMs, but
-doesn't depend on a specific model for all interactions.
-
-We need to coordinate many models and orchestrate their ouptuts to create a coherent conversation with a client. This means coordinating multiple models, integrating them with a database that tracks the state of the client as they move through sessions, and the intervention as a whole.
+The goal of `mindframe` is to to build chatbots that leverage the power of LLMs to generate high-quality therapy, but remain introspectable and verifiable, even when implementing a complex intervention. We need to coordinate many models and orchestrate their ouptuts to create a coherent conversation with a client. This requires a database that tracks the state of the client as they move through sessions, and the intervention as a whole.
 
 
-We need this structure to do things like
+##### Why not just use Chatgpt?
 
-- reducing the 'load' on a single prompt/model to 'stay on track'
-- segment the implmentation of different components of the intervention
-- and so allow better testing/validation of individual components
-- integrate relevant examples and case studies
-- build and integrate knowledge about the client into later prompting
+We need this structure to:
+
+- Reduce the 'load' on a single prompt/model to 'stay on track', even in a complex intervention with multiple components.
+- Segment the implementation of different components of the intervention and so
+- Allow better testing/validation of individual components
+- Integrate relevant examples and case studies
+- Build and integrate knowledge about the client into later prompting
 
 There is quite a bit of 'plumbing' that needs to be written to 
 connect the different parts of the system and coordinate jobs etc.
-
 Although we'll build it incrementally, this document describes what is needed
 to enable intervention developers to create chatbots that are:
 
 - theory led 
-- introspectable/monitorable, rather than just a black box
-- safe (and verifiable)
-- 'guidable', so suitable for research and experimentation
+- introspectable and monitorable
+- safe and verifiable
+- 'guidable', and so suitable for research and experimentation
 
 
 
@@ -51,60 +49,44 @@ Back of envelope calculations:
 - lets assume we have to generate 10 hidden tokens for every token shown to clients
 - tokens cost $2.50 per million tokens on input and $10 per million tokens on output
 
+Some [chatgpt maths here](https://chatgpt.com/share/670e2135-1748-8001-a846-d1a470c0f5ef).
 
-Some chatgpt maths here: https://chatgpt.com/share/670e2135-1748-8001-a846-d1a470c0f5ef
-
-It's going to cost < $2 per hour even with the most expensive current models.
-
-Even if we're out by a factor of 10, it's still only $20 per hour which is peanuts for an on-demand therapist which scales to millions of users.
-
-
+In short, it should cost < $2 per hour even with the most expensive current models.
+Even if we're out by a factor of 10, it's still only $20 per hour which is peanuts for an on-demand therapist that scales to millions of users.
 
 # Humans who will use `mindframe`
 
-I envisage 5 primary roles for humans:
+There are 5 distinct roles for humans:
 
-- system developer
-- intervention developers (e.g. Jackie or others who want to convert therapy manuals to chatbots)
-- supervisors: human therapists or experts acting as supervisors to the system at runtime, or
-- trainers: human experts providing offline evaluations of performance
-- clients/patients
+- System developers/administrators
+- Intervention developers who work to implement therapy manuals within the system
+- Supervisors: human therapists or experts acting as supervisors to the system at runtime, or
+- Trainers: human experts providing offline evaluations of performance
+- Clients/patients
 
-
-I think we should avoid using the word "agent" because it's ambiguous whether we mean the system/server/chatbot or the human patient because usage differs in CS and Psy.
-
-Let's call the combined set of models and databases which produce output "the system" or the "chatbot".
-
-These user types each have different needs for UI to be met.
+We avoid using the word "agent". Usage differs in CS and Psy, and it's ambiguous whether we mean the system/server/chatbot or the human/patient. Let's call the combined set of models and databases which produce output "the system".
 
 
 # System 'primitives' and a common vocabulary
 
-In building the system, we need to think about what 'primitives' are needed for encoding a therapy manual into a system that interacts with clients.
+To build the system, we must define what 'primitives' are needed for encoding a therapy manual into a system that interacts with clients. Although LLM prompting will be a core mechanism for generating all output and processing all input, it's useful to have higher-level constructs to describe their organisation.
 
-We should develop a common vocabulary for talking about these components. Some of the terms might get overloaded and have slightly different meanings i) colloquially, ii) in psychology, and iii) in computer science, so will need to be careful to define terms clearly.
+We should develop a common vocabulary for talking about these components. Some of the terms might get overloaded and have slightly different meanings i) colloquially, ii) in psychology, and iii) in computer science. So will need to be careful to define terms clearly.
+
 
 As a possible starting point, these are the components of a treatment we need to define:
 
-`actions` the system can take are defined by functions which take the current context as input. Actions can also be chained (so the result of one action might be to trigger additional actions). Standard actions will be provided for:
+- `steps` are the components of an intervention. Key steps will be linked (by `transitions`) to form the main pathway of an intervention. However other steps may be 'islands':  individual, specific behaviours or tasks which a therapist may need to complete at any point during the intervention. 
 
-- `judgements`: i.e., a judgement about or evalution of the state of the system or the client, based on the conversation history or other data sources at a particular point in time. For example, we might want to evaluate whether the client is engaged in treatment at a given point in time, based on the conversation history and other data sources. A judgement is very similar to a note, but creates a structured classification task where the return values are known and can be defined by the treatment developer ahead of time. For example, we might want to evaluate whether the client is 'engaged' or 'disengaged' at a given point in time. This is a binary classification task, and the system would return a structured response (and perhaps also a textual explanation of the classification decision). Evaluations can be of both clients and therapists (or of the quality of the relationship). 
+We leave open what each step is for, and their scope: This is determined by the treatment developer as they write the llm prompts and associated actions to operationalise their intervention. However in most cases steps are likely to be a single 'logical unit' of therapy which can be achieved within a single LLM prompt (e.g. 'establish rapport at the opening of a session', or 'identify discrepancies to build motivation').
+
+- `judgements` are a classification task. A judgement can be an evalution of the state of the system or the client, based on the conversation history or other data sources at a particular point in time. For example, we might want to evaluate whether the client is 'engaged in treatment', based on the conversation history and other data sources. A `judgement` is very similar to a `note`, but defines a structured classification task where the return values are known and can be defined by the treatment developer ahead of time. For example, we might want to evaluate whether the client is 'engaged' or 'disengaged' at a given point in time. This is a binary classification task, and the system would return a structured response (and perhaps also a textual explanation of the classification decision). Evaluations can be of both clients and therapists (or of the quality of the relationship). 
 
 Judgements can trigger further judgements or actions. This may always happen, or be conditional on specific classification responses. For example, if the system judges that the client is 'disengaged', it might trigger an alert action to warn a human supervisor, or a 'supervision' action which induces the therapist model to provide additional guidance or prompts which is included in step templates. `judgements` are created by writing an llm prompt. They may specify a particular model to use. Judgements are always logged, and the prompt or markdown file which specifies them includes the format for logging, what data to save etc. A `judgement` template uses pydantic to define the acceptable return values from the model. Multiple fields can be requested in the return value, allowing for multiple judgements to be made in a single prompt. For example, a prompt might ask the model to evaluate the client's engagement, adherence, and affective state. The model would return a JSON object with these fields, and the system would log them for later analysis.
 
 - `note`: A note is a special case of a judgement and uses the same machinery, but is syntactic sugar for a judgement where the only return values requried are unstructured text. For example, the template might generate summaries of the recent conversation history. The `note` template would specify how to summarise conversations within a step before transitioning, or combine information from multiple sources to record a snapshot of the client's affective state.  Another special use of `notes` would be to summarise or comment on turn-by-turn utterances. E.g. on each turn we might process client talk and therpist replies to label what is happening in the conversation. 
 
 - `questions` Another special case of judgements would be to record client responses to direct questions to measure their mood or other states. In this case clients respond to questions defined in a step-like template and respon in freeform chat text. The question processing template would (like a judgement) validate/extract data from the response and store it. The schema for the return values might be defined in the 'question step' as a convenience. Alternatively, we might define questions using standard UI components like likert scales/radio buttons. In this case, the system would automatically validate the response and store it in the database.
-
-
-
-
-
-
-
-
-
-
 
 
 
