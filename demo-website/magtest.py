@@ -42,10 +42,46 @@ class Conversation(BaseModel):
 
 
 
-@prompt("""{transcript}\n\nTurn this into a conversation in JSON """)
+@prompt("""{transcript}\n\nTurn this into a conversation in JSON""")
 def parse_conversation(transcript: str) -> Conversation: ... 
 
 
-parse_conversation(annomi)
+
+
+def make_session_from_text(t):
+    cc = parse_conversation(t)
+    ss = TreatmentSession.objects.all().first()
+    ssn = TreatmentSession.objects.create(cycle=ss.cycle)
+    ssn.save()
+    tpst = CustomUser.objects.get(role="bot")
+    for u in cc.utterances:
+        tt = Turn.objects.create(text=u.text, speaker = u.speaker=="therapist" and tpst or ssn.cycle.client, session=ssn)
+        tt.save()
+    return ssn
+
+
+ns = make_session_from_text("""therapist	00:00:02	You did your values clarification handout, and that was part of what I wanted to go over with you today. I wanted to hear about your values and just talk to you a little bit more about that. Do-do you wanna tell me what some of your top five values are?
+client	00:00:17	Yes, um, my top value is family happiness, um, that's-
+therapist	00:00:23	That's number one?
+client	00:00:24	-that's number one to me, especially now. I usually do this values clarification sheet, like, every two to three months-
+therapist	00:00:33	Mm-hmm.
+client	00:00:34	#NAME?
+therapist	00:00:39	Oh. So, right now family value is the most important thing to you?
+client	00:00:43	Yes.
+therapist	00:00:43	Family happiness?
+client	00:00:45	Yes, it's the most important because it's a little lacking, so I know that that's something that is very important to me.
+therapist	00:00:55	Okay. Would you like to talk more about that?""")
+
+ns.id
+
+
+
+
+
+
+
+
+
+
 
 

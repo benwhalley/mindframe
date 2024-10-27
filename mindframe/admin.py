@@ -11,7 +11,8 @@ from .models import (
     Turn,
     Note,
     Example,    
-    Progress
+    Progress,
+    Judgement
 )
 
 @admin.register(CustomUser)
@@ -74,8 +75,11 @@ class NoteAdmin(admin.ModelAdmin):
     list_display = ('session', 'timestamp')
     list_filter = ('timestamp',)
     search_fields = ('session__cycle__client__username',)
+    autocomplete_fields=['session', ]
 
-
+@admin.register(Judgement)
+class JudgementAdmin(admin.ModelAdmin):
+    autocomplete_fields=['intervention', ]
 
 
 

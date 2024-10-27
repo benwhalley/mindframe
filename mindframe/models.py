@@ -5,6 +5,7 @@ from magentic.chat_model.litellm_chat_model import LitellmChatModel
 from magentic import OpenaiChatModel
 
 from autoslug import AutoSlugField
+from django.template import Template, Context
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -57,11 +58,14 @@ class Intervention(models.Model):
 
 
 class Example(models.Model):
-    intervention = models.ForeignKey(Intervention, on_delete=models.CASCADE)
+    intervention = models.ForeignKey(Intervention, on_delete=models.CASCADE, related_name="examples")
     title= models.CharField(max_length=255)
     text = models.TextField()
     def __str__(self):
         return self.title
+
+
+
 
 
 class Step(models.Model):
@@ -75,12 +79,22 @@ class Step(models.Model):
     prompt_template = models.TextField()
 
     def think_and_respond(self, session):
-        # returns and OrderedDict of completions (thougts and response)
-        history = "\n".join([f"{i.speaker}: {i.text}" for i in session.turns.all()])
-        pmpt = self.prompt_template.format(history=history)
+        # returns an OrderedDict of completions (thougts and response)
+        template = Template(self.prompt_template)
+        context = Context({
+                'turns': session.turns.all(),
+                'session': session,
+                'examples': session.cycle.intervention.examples.all(),
+                'session_notes': session.notes.all(),
+                'cycle_notes': Note.objects.filter(session__cycle=session.cycle).exclude(session=session),
+                'notes': Note.objects.filter(session__cycle=session.cycle)
+            })
+        pmpt = template.render(context)
         completions =  chatter(pmpt, model=expensive)
         tht = completions.get("THOUGHTS", None)
+        rsp = completions.get("RESPONSE", None)
         print(tht and tht.value or "???")
+        print(rsp and resp.value.upper() or "???")
         return  completions
     
     class Meta:
@@ -114,8 +128,12 @@ class Transition(models.Model):
 
 class Judgement(models.Model):
     intervention = models.ForeignKey("mindframe.Intervention", on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
     prompt_template = models.TextField()
     return_type = models.JSONField(default={}, help_text="A serialised PyDantic object")
+
+    def __str__(self):
+        return f"{self.title}"
 
 
 # Records made at runtime
@@ -180,7 +198,7 @@ class TreatmentSession(models.Model):
         ordering = ["-started"]
 
     def __str__(self):
-        return f"Session on {self.started} for {self.cycle.client.username} in Cycle {self.cycle.id}"
+        return f"<{self.pk}> Session on {self.started} for {self.cycle.client.username} in Cycle {self.cycle.id}"
 
 
 class Progress(models.Model):
@@ -240,4 +258,4 @@ class Note(models.Model):
     data = models.JSONField(default={})
 
     def __str__(self):
-        return f"Note by made at {self.timestamp}"
+        return f"Note made at {self.timestamp}: {self.data}"
