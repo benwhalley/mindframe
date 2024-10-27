@@ -1,5 +1,6 @@
 ---
 title: Does the therapist elicit a past/future discrepancy?
+model: cheap
 return:
   type: ForcedChoiceResponse # specifies fields: [commentary, response]
   hints: 

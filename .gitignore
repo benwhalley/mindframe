@@ -2,3 +2,7 @@ dist
 build
 docs/fit/.DS_Store
 .DS_Store
+demo-website/src/static
+demo-website/src/static
+demo-website/src/config/__pycache__
+__pycache__

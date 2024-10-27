@@ -1,0 +1,321 @@
+---
+title: MindFrame
+subtitle: Plumbing to use LLMs for psychologically informed interventions.
+format: revealjs
+author: Ben Whalley
+date: 15 Oct 2024
+
+---
+
+
+
+## `mindframe`: Architecture
+
+- **Goal**: Develop a flexible and scalable chatbot system to support psychologically-informed interventions (esp. FIT).
+
+## Key Features
+
+  - Coordinate multiple models and track state/provide persistence
+  - Modular design: break complex interventions into manageable components.
+  - Monitoring, evaluation, iterative improvement
+  - Scaffolding for **human supervision**, **intervention tracking**, and **testing**.
+  - Provides structured data for research purposes.
+
+## Roles
+
+Different UI/UX to support each type of user
+
+  - Client (chatbot)
+  - Supervisor (web/mobile)
+  - Intervention developer (text DSL; web)
+  - Clinical manager (web)
+  - System administrator (web; logs)
+
+
+---
+
+
+## Overview
+
+The biggest challenges are not technical
+(collaboration, introspection, validation).
+
+We need orchestration tools and ideas.
+
+
+
+## Therapy is a state-dependent directed graph
+
+Therapy is a directed graph of plans and state-dependent adaptation.
+
+State at each path is a path-dependent function:
+
+$f(v_i) = g(v_0, v_1, \dots, v_{i-1})$
+
+$g$ aggregates the history of the interactions to date.
+
+- Each node has it's own function $g$
+- Each node is an LLM prompt + deterministic function calling
+- We 'cycle' on each node for some time, until a transition occurs
+- 'Pacing' the therapy means managing these cycles and explicitly defining  transition rules
+
+
+## ...
+
+![](mermaid-diagram-2024-10-14-160723.png)
+
+
+
+## Key Primitives in the FIT-Chatbot System
+
+- Steps (nodes)
+- Turns (cycles on a node)
+- Transition conditions
+- Goals 
+- Indicators
+- Actions (side effects)
+
+
+
+## Nodes and edges
+
+**Steps** (nodes) in the intervention (e.g., establish_rapport, explore_goals). Therapist and client take **turns** to talk within each step.
+
+**Goals** define criteria for **transitions** between steps. To evaluate goals the system uses responses directly, along with other **indicators**.
+
+
+## Key 'state records'
+
+These can be saved and accessed during cycles on a given step
+
+- Turns (i.e. what client/therapist said)
+- Notes (classifications, summaries, internal thoughts of the therapist)
+- Measurements (data reported by or taken from the client)
+
+
+These provide *context* for therapist speech: real-time, client-specific adaptation.
+
+
+
+
+
+<!-- 
+- **Steps**: Defined points in the therapy process (e.g., `establish_rapport`).
+- **Turns**: Client or system utterances within a session.
+- **Goals**: Achievements required for therapy progress (e.g., `build_self_efficacy`).
+- **Transitions**: Moves between steps based on conditions or goal completions.
+- **Indicators**: Continuous assessments (e.g., `client_engaged`).
+- **Measurements**: Direct questions or sensor readings from clients.
+- **Actions**: Non-conversational system operations (e.g., logging, triggering supervision).
+- **Examples**: Case studies or few-shot learning examples pulled into prompts.
+
+. -->
+
+
+
+
+## Non-Linear progress
+
+Because the intervention is a **Directed Graph** there are multiple possible paths through the steps.
+
+Need to think more about implications of cycles between nodes (as well as on the same node).
+
+How do we manage transitions and ensure completion? Does this matter?
+
+
+
+## Templating prompts
+
+Requirements:
+
+- Collaboration
+- Explicitness
+- Modularity
+
+Trade-off between
+
+- Dynamism
+- Simple/predictable
+
+
+## Markdown
+
+Lightweight markup designed for human readability and structural simplicity.
+
+- common language to define prompts, transitions, steps, and goals
+- easy to read and write
+- machine-readable/parsable
+- extensible
+
+
+## `mindframe` extensions
+
+- `{turns:10}`: Inserts the last 10 turns.
+- `{notes:*}`: Retrieves relevant session notes.
+- `{meta:client_name}`: Fetches client metadata.
+- `{examples:"prompt"}`: Searches for and inserts examples based on specified topics.
+
+
+## Multi-step prompting
+
+Facilitate chain of thought/chain of reasoning (COT/COR)
+
+Use `[[DISCUSSION]]` and `[[RESPONSE]]` to break down the reasoning process.
+
+
+## Multistep promoting
+
+```
+You are a therapist treating a patient for anxiety. 
+They describe feeling overwhelmed by their workload. 
+
+These are the last few things the client said:
+
+CLIENT: "I have so much to do, and it feels like I’ll never get through it. 
+  I don’t even know where to start."
+
+Before responding, think step by step about the situation:
+
+1. What is the client feeling?  
+2. How does this relate to their anxiety?  
+3. What might be a helpful therapeutic response?
+
+[[DISCUSSION]]
+
+```
+
+
+
+## Multistep prompting (2)
+
+
+```
+2. How does this relate to their anxiety?  
+3. What might be a helpful therapeutic response?
+
+[[DISCUSSION]]
+
+Now, based on your reasoning, craft a response that 
+validates their feelings and helps them move forward.
+Be concise and respond in 1 or MAX 2 sentences.
+
+[[UTTERANCE]]
+```
+
+
+
+
+## Output filters
+
+> "It sounds like you're feeling really overwhelmed by everything you have on your plate right now, and it's completely understandable to feel that way when things seem so big and unmanageable. It’s okay to not know where to start sometimes. How about we break it down together? Maybe we can pick one small thing to focus on—something that feels a bit more doable. Taking things step by step might help you regain a sense of control, and I’ll be here to support you through it."
+
+
+
+## Output filters (prompt)
+
+
+```
+This is something a therapist said in an example manual. 
+In current form it's too complex and has too many parts. 
+No real therapist would say this much.
+Make this more spoken-like.  
+Make it fit into a more naturalistic dialogue.
+Use UK English idiom and colloquialisms
+Always use question marks for questions.
+Avoid any repetition (either directly, or where 2 sentences do the same job).
+Ideally only 2 or 3 sentences (MAX).
+```
+
+
+## Output filters (result)
+
+> "Sounds like you’ve got a lot going on, and that’s totally understandable. How about we focus on just one thing to start with? We’ll take it step by step and see how it goes."
+
+
+
+## Note taking
+
+We can attach actions to steps or transitions to make notes or perform other actions.
+
+E.g. on completing a step, we might use an LLM to summarise the conversation and store it in the client's record.
+
+
+## Notes prompt
+
+```
+You are a motivational interviewing expert helping a client 
+to {note:primary_problem}.
+We have just completed the "Elicit current/future discrepancy" step in FIT.
+We need to keep good notes of the conversation so we can remember later.
+This is the conversation from this step of the treatment:
+
+{turns:step:previous}
+{turns:step:current}
+
+Summarise this conversations. Make a note which will be useful later. 
+Focus on: what the client said and what the client's goals are.
+Respond in no more than 2 paragraphs:
+```
+
+
+## Costs
+
+Assume 
+
+- 150 words per minute
+- Input tokens are 6x output tokens
+- 20x as many 'hidden' tokens as visible tokens
+- Current OpenAI GPT4 costs (\$\$\$)
+
+**Worst case: $4.73 per hour**
+
+<!-- https://chatgpt.com/share/670e2135-1748-8001-a846-d1a470c0f5ef -->
+
+
+
+## Cost implications
+
+Optimise for quality first (token budget not important)
+
+Latency more of an issue but:
+
+- hardware getting faster (100s tokens/s)
+- paralelise 'thinking' and 'speaking'?
+
+
+
+
+
+
+
+
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+
+datarium::jobsatisfaction
+
+
+``````
+
+
+
+```{r}
+
+development %>% 
+  filter(year < 1960) %>% 
+  ggplot(aes(life_expectancy, gdp_per_capita)) + geom_smooth() + 
+  facet_grid(year ~ continent)
+
+```
+
+
+
+
+
+
+

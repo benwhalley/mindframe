@@ -8,9 +8,9 @@ title: MindFrame Architecture
 The goal of `mindframe` is to to build chatbots that leverage the power of LLMs to generate high-quality therapy, but remain introspectable and verifiable, even when implementing a complex intervention. We need to coordinate many models and orchestrate their ouptuts to create a coherent conversation with a client. This requires a database that tracks the state of the client as they move through sessions, and the intervention as a whole.
 
 
-##### Why not just use Chatgpt?
+##### Why not just use Chatgpt or a fine tuned model?
 
-We need this structure to:
+We need the additional structure mindframe offers to:
 
 - Reduce the 'load' on a single prompt/model to 'stay on track', even in a complex intervention with multiple components.
 - Segment the implementation of different components of the intervention and so
@@ -76,17 +76,28 @@ We should develop a common vocabulary for talking about these components. Some o
 
 As a possible starting point, these are the components of a treatment we need to define:
 
-- `steps` are the components of an intervention. Key steps will be linked (by `transitions`) to form the main pathway of an intervention. However other steps may be 'islands':  individual, specific behaviours or tasks which a therapist may need to complete at any point during the intervention. 
+
+##### `steps`
+
+`steps` are the components of an intervention. Key steps will be linked (by `transitions`) to form the main pathway of an intervention. However other steps may be 'islands':  individual, specific behaviours or tasks which a therapist may need to complete at any point during the intervention. 
 
 We leave open what each step is for, and their scope: This is determined by the treatment developer as they write the llm prompts and associated actions to operationalise their intervention. However in most cases steps are likely to be a single 'logical unit' of therapy which can be achieved within a single LLM prompt (e.g. 'establish rapport at the opening of a session', or 'identify discrepancies to build motivation').
 
-- `judgements` are a classification task. A judgement can be an evalution of the state of the system or the client, based on the conversation history or other data sources at a particular point in time. For example, we might want to evaluate whether the client is 'engaged in treatment', based on the conversation history and other data sources. A `judgement` is very similar to a `note`, but defines a structured classification task where the return values are known and can be defined by the treatment developer ahead of time. For example, we might want to evaluate whether the client is 'engaged' or 'disengaged' at a given point in time. This is a binary classification task, and the system would return a structured response (and perhaps also a textual explanation of the classification decision). Evaluations can be of both clients and therapists (or of the quality of the relationship). 
+##### `judgements`
+
+`judgements` are a classification task. A judgement can be an evalution of the state of the system or the client, based on the conversation history or other data sources at a particular point in time. For example, we might want to evaluate whether the client is 'engaged in treatment', based on the conversation history and other data sources. A `judgement` is very similar to a `note`, but defines a structured classification task where the return values are known and can be defined by the treatment developer ahead of time. For example, we might want to evaluate whether the client is 'engaged' or 'disengaged' at a given point in time. This is a binary classification task, and the system would return a structured response (and perhaps also a textual explanation of the classification decision). Evaluations can be of both clients and therapists (or of the quality of the relationship). 
 
 Judgements can trigger further judgements or actions. This may always happen, or be conditional on specific classification responses. For example, if the system judges that the client is 'disengaged', it might trigger an alert action to warn a human supervisor, or a 'supervision' action which induces the therapist model to provide additional guidance or prompts which is included in step templates. `judgements` are created by writing an llm prompt. They may specify a particular model to use. Judgements are always logged, and the prompt or markdown file which specifies them includes the format for logging, what data to save etc. A `judgement` template uses pydantic to define the acceptable return values from the model. Multiple fields can be requested in the return value, allowing for multiple judgements to be made in a single prompt. For example, a prompt might ask the model to evaluate the client's engagement, adherence, and affective state. The model would return a JSON object with these fields, and the system would log them for later analysis.
 
-- `note`: A note is a special case of a judgement and uses the same machinery, but is syntactic sugar for a judgement where the only return values requried are unstructured text. For example, the template might generate summaries of the recent conversation history. The `note` template would specify how to summarise conversations within a step before transitioning, or combine information from multiple sources to record a snapshot of the client's affective state.  Another special use of `notes` would be to summarise or comment on turn-by-turn utterances. E.g. on each turn we might process client talk and therpist replies to label what is happening in the conversation. 
 
-- `questions` Another special case of judgements would be to record client responses to direct questions to measure their mood or other states. In this case clients respond to questions defined in a step-like template and respon in freeform chat text. The question processing template would (like a judgement) validate/extract data from the response and store it. The schema for the return values might be defined in the 'question step' as a convenience. Alternatively, we might define questions using standard UI components like likert scales/radio buttons. In this case, the system would automatically validate the response and store it in the database.
+##### `notes`
+
+A `note` is a special case of a judgement and uses the same machinery, but is syntactic sugar for a judgement where the only return values requried are unstructured text. For example, the template might generate summaries of the recent conversation history. The `note` template would specify how to summarise conversations within a step before transitioning, or combine information from multiple sources to record a snapshot of the client's affective state.  Another special use of `notes` would be to summarise or comment on turn-by-turn utterances. E.g. on each turn we might process client talk and therpist replies to label what is happening in the conversation. 
+
+
+##### `questions` 
+
+Another special case of judgements would be to record client responses to direct questions to measure their mood or other states. In this case clients respond to questions defined in a step-like template and respon in freeform chat text. The question processing template would (like a judgement) validate/extract data from the response and store it. The schema for the return values might be defined in the 'question step' as a convenience. Alternatively, we might define questions using standard UI components like likert scales/radio buttons. In this case, the system would automatically validate the response and store it in the database.
 
 
 
@@ -98,6 +109,14 @@ Judgements can trigger further judgements or actions. This may always happen, or
 Transitions between steps are defined in the yaml frontmatter.
 
 The body of the markdown file is the text of the prompt to be sent to the LLM, and includes special extension tags which are used to access the conversation history, system state, or other data sources.
+
+Examples of llm prompts:
+
+- [elicit-discrepancy.step](fit/elicit-discrepancy.step)
+- [elicit-discrepancy.step](fit/elicit-discrepancy.step)
+- [elicit-discrepancy.step](fit/elicit-discrepancy.step)
+- [elicit-discrepancy.step](fit/elicit-discrepancy.step)
+- [elicit-discrepancy.step](fit/elicit-discrepancy.step)
 
 
 ## Graphing the intervention 

@@ -1,0 +1,10 @@
+{
+    "name": "mindframe-demo",
+    "description": "MindFrame Web Demo",
+    "scripts": {
+        "dokku": {
+            "predeploy": "src/manage.py collectstatic --noinput",
+            "postdeploy": "src/manage.py migrate"
+        }
+    }
+}

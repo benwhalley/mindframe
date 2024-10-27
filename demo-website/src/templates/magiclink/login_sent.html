@@ -1,0 +1,42 @@
+{% extends "layouts/index.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load humanize %}
+
+{% block title %}
+Request a login email
+{% endblock %}
+
+{% block body %}
+
+<div class="container mt-4">
+<div class="row">
+
+<div class="col-md-6">
+
+    <h1>Please check your email</h1>
+
+    <p>We have sent you a magic link to your email address</p>
+    <p>Please click the link to be logged in automatically.</p>
+
+</div>
+
+<div class="col-md-4 mt-3">
+    
+        <div class="card">
+        <div class="card-header">
+            <h5>Check your spam folder</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="alert alert-warning mb-0">
+            If you can't find the email, please check your Junk/Spam folder. Automated messages will often arrive there.
+            </div>
+        </div>
+</div>
+
+</div>
+
+</div>
+
+
+{% endblock %}

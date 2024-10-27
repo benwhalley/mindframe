@@ -5,9 +5,6 @@
 - `alert`: i.e., trigger an alert to the system developer or human supervisor. This could be used to flag up dangerous or unexpected responses from the client or therapist model. For example, if the client is asking for medical advice, the system might trigger an alert to the system developer or supervisor to intervene (i.e. if a 'digression' to a special-case step, to explain that the system can't offer medical advice, is insufficient).
 
 
-### `steps`
-
-`steps` are nodes in the DAG which represent a particular state in the therapy, and are likely to be achievable using a single LLM prompt. They may not be achievable in a single 'turn' of the conversation, but they are a single 'unit' of the intervention. A step is mostly concerned with defining the content of the conversation at a given point within the session, and not the broader structure of the conversation. A step could be simple a a single LLM prompt like "You are an MI therapist, establish rapport with the patient. Start by asking them about their day".
 
 'Techniques' within a psychological intervention might be implement within either single `step`, plus associated `goal`, or by linking together multiple steps. For example, eliciting imagery in MI might be a single step with the 'goal' of 'has patient generated an image of their problem'. Or it might be a sequence of steps with multiple goals, like 'has patient generated an initial image of their problem', followed by an invitation to make it more concrete and the goal 'has the patient described additional details for the image'.
 

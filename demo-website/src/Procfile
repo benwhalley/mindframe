@@ -1,0 +1,5 @@
+# web: uvicorn config.asgi:application --reload --host 0.0.0.0 --log-level warning
+web: ./manage.py runserver_plus 0.0.0.0:$PORT
+# worker: celery --app config worker --pool=gevent --concurrency=2 -E -l INFO
+# beat: celery --app config beat -l INFO
+chat: watchmedo auto-restart --patterns="*.py" --recursive -- python gradio_app.py

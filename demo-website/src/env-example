@@ -1,0 +1,15 @@
+# keys and details for Azure OpenAI models used by magentic
+AZURE_OPENAI_API_KEY="XXX"
+MAGENTIC_OPENAI_BASE_URL="https://aihubbrictest4274107704.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview"
+MAGENTIC_OPENAI_API_TYPE="azure"
+OPENAI_API_VERSION="2024-02-15-preview"
+MAGENTIC_OPENAI_MODEL="gpt-4o-mini"
+DATABASE_URL='postgres://localhost/mindframe'
+SECRET_KEY="XXX"
+EMAIL_HOST=""
+EMAIL_HOST_USER=""
+EMAIL_HOST_PASSWORD=""
+DEBUG=0
+COMPRESS_ENABLED=0
+COMPRESS_OFFLINE=0
+PORT=8000

@@ -1,4 +1,5 @@
 ---
+model: expensive
 transitions: 
     embed-motivation:
         conditions: 
