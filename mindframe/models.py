@@ -15,7 +15,7 @@ from django.utils.text import slugify
 from magentic import OpenaiChatModel
 
 from mindframe.multipart_llm import chatter
-
+from mindframe.structured_judgements import pydantic_model_from_schema, prompt_function_factory
 
 
 free = LitellmChatModel("ollama_chat/llama3.2", api_base="http://localhost:11434")
@@ -126,11 +126,27 @@ class Transition(models.Model):
         return f"{self.from_step} -> {self.to_step}"
 
 
+
+
 class Judgement(models.Model):
     intervention = models.ForeignKey("mindframe.Intervention", on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     prompt_template = models.TextField()
     return_type = models.JSONField(default={}, help_text="A serialised PyDantic object")
+
+    def process_inputs(self, session, inputs: dict):
+        
+        extraction_function = prompt_function_factory(
+           pydantic_model_from_schema(self.return_type), 
+        "{input_value}\nRespond in JSON"
+        )
+
+        newnote = Note.objects.create(judgement=self, 
+                                      session=session, 
+                                      inputs=inputs)
+        newnote.data = extraction_function(**newnote.inputs).model_dump()
+        newnote.save()
+        return newnote
 
     def __str__(self):
         return f"{self.title}"
@@ -251,11 +267,13 @@ class Note(models.Model):
     judgement = models.ForeignKey(Judgement, on_delete=models.PROTECT)
     timestamp = models.DateTimeField(default=timezone.now)
 
+    
+    inputs = models.JSONField(default={}, null=True, blank=True)
     # for clinical Note type records, save a 'text' key
     # for other return types, save multiple string keys
     # type of this values is Dict[str, str | int]
     # todo? add some validatio?
-    data = models.JSONField(default={})
+    data = models.JSONField(default={}, null=True, blank=True)
 
     def __str__(self):
         return f"Note made at {self.timestamp}: {self.data}"
