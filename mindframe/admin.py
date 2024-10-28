@@ -12,7 +12,9 @@ from .models import (
     Note,
     Example,    
     Progress,
-    Judgement
+    Judgement,
+    JudgementReturnType
+
 )
 
 @admin.register(CustomUser)
@@ -49,7 +51,7 @@ class TransitionInline(admin.TabularInline):
     model = Transition
     fk_name = 'from_step'  # Indicates that `from_step` in Transition is the foreign key to Step
     extra = 1  # Number of extra blank transitions to display in admin
-    autocomplete_fields = ('to_step',)
+    autocomplete_fields = ('to_step','judgements')
 
 
 @admin.register(Step)
@@ -72,15 +74,21 @@ class TurnAdmin(admin.ModelAdmin):
 
 @admin.register(Note)
 class NoteAdmin(admin.ModelAdmin):
-    list_display = ('session', 'timestamp')
+    list_display = ('session__id', 'judgement', 'val', 'timestamp')
     list_filter = ('timestamp',)
     search_fields = ('session__cycle__client__username',)
     autocomplete_fields=['session', ]
 
+@admin.register(JudgementReturnType)
+class JudgementReturnTypeAdmin(admin.ModelAdmin):
+    list_display=['title', 'schema']
+
+
+
 @admin.register(Judgement)
 class JudgementAdmin(admin.ModelAdmin):
     autocomplete_fields=['intervention', ]
-
+    search_fields=['title', 'intervention__title']
 
 
 

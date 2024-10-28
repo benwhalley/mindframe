@@ -1,26 +1,31 @@
 import re
 from enum import Enum
 
-from magentic.chat_model.litellm_chat_model import LitellmChatModel
-from magentic import OpenaiChatModel
-
 from autoslug import AutoSlugField
-from django.template import Template, Context
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.template import Context, Template
 from django.utils import timezone
 from django.utils.text import slugify
+import logging
+
+logger = logging.getLogger(__name__)
 
 from magentic import OpenaiChatModel
 
+from magentic.chat_model.litellm_chat_model import LitellmChatModel
+
 from mindframe.multipart_llm import chatter
-from mindframe.structured_judgements import pydantic_model_from_schema, prompt_function_factory
+from mindframe.structured_judgements import (
+    data_extraction_function_factory,
+    pydantic_model_from_schema,
+)
 
 
 free = LitellmChatModel("ollama_chat/llama3.2", api_base="http://localhost:11434")
-expensive=OpenaiChatModel("gpt-4o")
-cheap=OpenaiChatModel("gpt-4o-mini")
+expensive = OpenaiChatModel("gpt-4o")
+cheap = OpenaiChatModel("gpt-4o-mini")
 
 
 class RoleChoices(models.TextChoices):
@@ -54,18 +59,18 @@ class Intervention(models.Model):
         return self.title
 
     class Meta:
-        unique_together = ("title", ) #"version")
+        unique_together = ("title",)  # "version")
 
 
 class Example(models.Model):
-    intervention = models.ForeignKey(Intervention, on_delete=models.CASCADE, related_name="examples")
-    title= models.CharField(max_length=255)
+    intervention = models.ForeignKey(
+        Intervention, on_delete=models.CASCADE, related_name="examples"
+    )
+    title = models.CharField(max_length=255)
     text = models.TextField()
+
     def __str__(self):
         return self.title
-
-
-
 
 
 class Step(models.Model):
@@ -81,22 +86,26 @@ class Step(models.Model):
     def think_and_respond(self, session):
         # returns an OrderedDict of completions (thougts and response)
         template = Template(self.prompt_template)
-        context = Context({
-                'turns': session.turns.all(),
-                'session': session,
-                'examples': session.cycle.intervention.examples.all(),
-                'session_notes': session.notes.all(),
-                'cycle_notes': Note.objects.filter(session__cycle=session.cycle).exclude(session=session),
-                'notes': Note.objects.filter(session__cycle=session.cycle)
-            })
+        context = Context(
+            {
+                "turns": session.turns.all(),
+                "session": session,
+                "examples": session.cycle.intervention.examples.all(),
+                "session_notes": session.notes.all(),
+                "cycle_notes": Note.objects.filter(
+                    session__cycle=session.cycle
+                ).exclude(session=session),
+                "notes": Note.objects.filter(session__cycle=session.cycle),
+            }
+        )
         pmpt = template.render(context)
-        completions =  chatter(pmpt, model=expensive)
+        completions = chatter(pmpt, model=cheap)
         tht = completions.get("THOUGHTS", None)
         rsp = completions.get("RESPONSE", None)
         print(tht and tht.value or "???")
-        print(rsp and resp.value.upper() or "???")
-        return  completions
-    
+        print(rsp and rsp.value.upper() or "???")
+        return completions
+
     class Meta:
         unique_together = [("intervention", "title"), ("intervention", "slug")]
 
@@ -114,6 +123,7 @@ class Transition(models.Model):
         Step, on_delete=models.CASCADE, related_name="transitions_to"
     )
 
+    judgements = models.ManyToManyField("Judgement", related_name="transitions")
     conditions = models.JSONField(default={})
 
     def clean(self):
@@ -126,24 +136,59 @@ class Transition(models.Model):
         return f"{self.from_step} -> {self.to_step}"
 
 
+class JudgementReturnType(models.Model):
+    """A serialised Pydantic object representing the return type of a Judgement"""
+
+    title = models.CharField(max_length=255)
+    schema = models.JSONField(
+        default={
+            "properties": {"text": {"title": "Text", "type": "string"}},
+            "required": ["text"],
+            "title": "BriefNote",
+            "type": "object",
+        }
+    )
+
+    def __str__(self):
+        return f"{self.title}"# \n\n{self.schema}"
 
 
 class Judgement(models.Model):
     intervention = models.ForeignKey("mindframe.Intervention", on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     prompt_template = models.TextField()
-    return_type = models.JSONField(default={}, help_text="A serialised PyDantic object")
+    return_type = models.ForeignKey(JudgementReturnType, on_delete=models.PROTECT)
+
+    def make_judgement(self, session):
+        logger.debug(f"Making judgement {self.title} for {session}")
+        template = Template(self.prompt_template)
+        # extract this so DRY with Step.think_and_respond
+        context = Context(
+            {
+                "turns": session.turns.all(),
+                "session": session,
+                "examples": session.cycle.intervention.examples.all(),
+                "session_notes": session.notes.all(),
+                "cycle_notes": Note.objects.filter(
+                    session__cycle=session.cycle
+                ).exclude(session=session),
+                "notes": Note.objects.filter(session__cycle=session.cycle),
+            }
+        )
+        inputs = {'input': template.render(context)}
+        return self.process_inputs(session, inputs)
 
     def process_inputs(self, session, inputs: dict):
-        
-        extraction_function = prompt_function_factory(
-           pydantic_model_from_schema(self.return_type), 
-        "{input_value}\nRespond in JSON"
+
+        extraction_function = data_extraction_function_factory(
+            pydantic_model_from_schema(self.return_type.schema),
+            # remember, that other templating goes on prior, when generating {input}
+            # these templates are stored in Judgement model instances in the db
+            # this just adds the instruction to respond in JSON which is what we almost always want.
+            prompt_template="{input}\nRespond in JSON",
         )
 
-        newnote = Note.objects.create(judgement=self, 
-                                      session=session, 
-                                      inputs=inputs)
+        newnote = Note.objects.create(judgement=self, session=session, inputs=inputs)
         newnote.data = extraction_function(**newnote.inputs).model_dump()
         newnote.save()
         return newnote
@@ -168,7 +213,9 @@ class Cycle(models.Model):
     end_date = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.client} started {self.intervention.short_title}, {self.start_date}"
+        return (
+            f"{self.client} started {self.intervention.short_title}, {self.start_date}"
+        )
 
 
 class TreatmentSession(models.Model):
@@ -184,29 +231,37 @@ class TreatmentSession(models.Model):
             return self.progress.last().to_step
         else:
             p_ = Progress.objects.create(
-                session=self, 
-                to_step=self.cycle.intervention.steps.first()
+                session=self, to_step=self.cycle.intervention.steps.first()
             )
             p_.save()
             return p_.to_step
 
-    
     def listen(self, speaker, text):
         turn = Turn.objects.create(session=self, speaker=speaker, text=text)
         turn.save()
         return turn
 
     def respond(self):
-        
+
         bot = CustomUser.objects.filter(role=RoleChoices.BOT).first()
         step = self.current_step()
+
+        # make required judgements first
+        judgements_to_run = Judgement.objects.filter(pk__in=step.transitions_from.all().values
+        ("judgements"))
+        logger.debug(f"JUDGEMENTS TO RUN: {judgements_to_run}")
+        judgement_notes = []
+        for judgement in judgements_to_run:
+            judgement_notes.append(judgement.make_judgement(self))
+
+        print(judgement_notes)
+
         completions = step.think_and_respond(self)
-        
-        key, utterance =  next(reversed(completions.items()))
-        newturn = Turn.objects.create(session=self, 
-                                      speaker=bot, 
-                                      text=utterance.value, 
-                                      metadata=completions)
+
+        key, utterance = next(reversed(completions.items()))
+        newturn = Turn.objects.create(
+            session=self, speaker=bot, text=utterance.value, metadata=completions
+        )
         newturn.save()
         return utterance.value
 
@@ -223,7 +278,11 @@ class Progress(models.Model):
     )
     timestamp = models.DateTimeField(default=timezone.now)
     from_step = models.ForeignKey(
-        Step, on_delete=models.CASCADE, related_name="progress_from", null=True, blank=True
+        Step,
+        on_delete=models.CASCADE,
+        related_name="progress_from",
+        null=True,
+        blank=True,
     )
     to_step = models.ForeignKey(
         Step, on_delete=models.CASCADE, related_name="progress_to"
@@ -267,7 +326,6 @@ class Note(models.Model):
     judgement = models.ForeignKey(Judgement, on_delete=models.PROTECT)
     timestamp = models.DateTimeField(default=timezone.now)
 
-    
     inputs = models.JSONField(default={}, null=True, blank=True)
     # for clinical Note type records, save a 'text' key
     # for other return types, save multiple string keys
@@ -275,5 +333,8 @@ class Note(models.Model):
     # todo? add some validatio?
     data = models.JSONField(default={}, null=True, blank=True)
 
+    def val(self):
+        return self.data.get('text', None) or self.data
+    
     def __str__(self):
-        return f"Note made at {self.timestamp}: {self.data}"
+        return f"Note made at {self.timestamp}"
