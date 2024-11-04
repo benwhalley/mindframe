@@ -1,22 +1,30 @@
 import re
+
+import dotenv
+dotenv.load_dotenv('.env')
+
 from magentic import prompt
-from magentic import OpenaiChatModel
-from magentic.chat_model.litellm_chat_model import LitellmChatModel
 
 from pydantic import BaseModel
 from typing import List, Optional
 from collections import OrderedDict, namedtuple
+from django.conf import settings
+import tiktoken
 
-ChatResult = namedtuple('ChatResult', ['value', 'prompt'])
+encoding = tiktoken.encoding_for_model('gpt-4o-mini')
 
-free = LitellmChatModel("ollama_chat/llama3.2", api_base="http://localhost:11434")
-expensive=OpenaiChatModel("gpt-4o")
-cheap=OpenaiChatModel("gpt-4o-mini")
+class ChatResult(BaseModel):
+    value: str
+    prompt: str
+    input_tokens: int
+    output_tokens: int
+
 
 @prompt("""{prompt}""")
 def chat(prompt: str) -> str: ...
 
-# chat("say hello")
+# with settings.MINDFRAME_AI_MODELS.cheap:
+#     chat("say hello")
 
 # Function to split the document into an ordered dictionary by `[VARNAME]` blocks
 def split_multipart_prompt(text):
@@ -40,17 +48,21 @@ def split_multipart_prompt(text):
     return result
 
 
-def chatter(multipart_prompt, model=cheap):    
+def chatter(multipart_prompt, model=settings.MINDFRAME_AI_MODELS.cheap):    
     prompts_dict = split_multipart_prompt(multipart_prompt)
     results_dict = OrderedDict()  # Dictionary to hold accumulated results
     
     prompt_parts = []
+
     for key, value in prompts_dict.items():
         prompt_parts.append(value)
         prompt  = "\n".join(prompt_parts)
         with model:
             res = chat(prompt)
-        results_dict[key] = ChatResult(value= res, prompt= prompt )
+        results_dict[key] = ChatResult(value= res, 
+                                       prompt= prompt, 
+                                       input_tokens=len(encoding.encode(prompt)), output_tokens=len(encoding.encode(res)) 
+                                       )
         prompt_parts.append(res)
 
     return results_dict

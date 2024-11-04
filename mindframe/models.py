@@ -9,6 +9,7 @@ from django.template import Context, Template
 from django.utils import timezone
 from django.utils.text import slugify
 import logging
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +24,6 @@ from mindframe.structured_judgements import (
 )
 
 
-free = LitellmChatModel("ollama_chat/llama3.2", api_base="http://localhost:11434")
-expensive = OpenaiChatModel("gpt-4o")
-cheap = OpenaiChatModel("gpt-4o-mini")
 
 
 class RoleChoices(models.TextChoices):
@@ -98,12 +96,16 @@ class Step(models.Model):
                 "notes": Note.objects.filter(session__cycle=session.cycle),
             }
         )
+        print(context)
+        print("\n\n\n")
         pmpt = template.render(context)
-        completions = chatter(pmpt, model=cheap)
+        completions = chatter(pmpt, model=settings.MINDFRAME_AI_MODELS.cheap)
+        
         tht = completions.get("THOUGHTS", None)
         rsp = completions.get("RESPONSE", None)
         print(tht and tht.value or "???")
         print(rsp and rsp.value.upper() or "???")
+        print("\n\n\n")
         return completions
 
     class Meta:
@@ -124,7 +126,7 @@ class Transition(models.Model):
     )
 
     judgements = models.ManyToManyField("Judgement", related_name="transitions")
-    conditions = models.JSONField(default={})
+    conditions = models.JSONField(default=dict)
 
     def clean(self):
         if self.from_step.intervention != self.to_step.intervention:
@@ -154,8 +156,10 @@ class JudgementReturnType(models.Model):
 
 
 class Judgement(models.Model):
-    intervention = models.ForeignKey("mindframe.Intervention", on_delete=models.CASCADE)
+    intervention = models.ForeignKey("mindframe.Intervention", 
+                                     on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
+    variable_name = models.CharField(max_length=255)
     prompt_template = models.TextField()
     return_type = models.ForeignKey(JudgementReturnType, on_delete=models.PROTECT)
 
@@ -257,10 +261,12 @@ class TreatmentSession(models.Model):
         print(judgement_notes)
 
         completions = step.think_and_respond(self)
-
         key, utterance = next(reversed(completions.items()))
+        
         newturn = Turn.objects.create(
-            session=self, speaker=bot, text=utterance.value, metadata=completions
+            session=self, speaker=bot, 
+            text=utterance.value, 
+            metadata=completions
         )
         newturn.save()
         return utterance.value
@@ -326,12 +332,12 @@ class Note(models.Model):
     judgement = models.ForeignKey(Judgement, on_delete=models.PROTECT)
     timestamp = models.DateTimeField(default=timezone.now)
 
-    inputs = models.JSONField(default={}, null=True, blank=True)
+    inputs = models.JSONField(default=dict, null=True, blank=True)
     # for clinical Note type records, save a 'text' key
     # for other return types, save multiple string keys
     # type of this values is Dict[str, str | int]
     # todo? add some validatio?
-    data = models.JSONField(default={}, null=True, blank=True)
+    data = models.JSONField(default=dict, null=True, blank=True)
 
     def val(self):
         return self.data.get('text', None) or self.data

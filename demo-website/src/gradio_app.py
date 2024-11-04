@@ -2,9 +2,9 @@ import os
 import django
 import gradio as gr
 
-# Django setup
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
+
 
 from mindframe.models import TreatmentSession, CustomUser, RoleChoices
 
@@ -34,7 +34,6 @@ def chat_with_bot(history, user_input):
     print(session.pk)
     
     user = session.cycle.client
-    
     session.listen(speaker=user, text=user_input)
     bot_response = session.respond()
 
@@ -52,3 +51,4 @@ with gr.Blocks() as iface:
     user_input.submit(chat_with_bot, [chatbot, user_input], [chatbot, user_input])
 
 iface.launch()
+

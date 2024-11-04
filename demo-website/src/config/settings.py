@@ -9,6 +9,11 @@ from distutils.util import strtobool
 from pathlib import Path
 import dotenv
 import environ
+from types import SimpleNamespace
+
+
+from magentic import OpenaiChatModel
+from magentic.chat_model.litellm_chat_model import LitellmChatModel
 
 import dj_database_url
 
@@ -17,7 +22,6 @@ dotenv.load_dotenv('.env')
 print(os.environ)
 
 import logging
-
 logger = logging.getLogger(__name__)
 
 
@@ -390,3 +394,12 @@ MAGICLINK_EMAIL_STYLES = {
 
 MAGICLINK_EMAIL_SUBJECT = "Magic link to login to PsyBot"
 
+
+
+# MINDFRAME SPECIFIC SETTINGS
+
+MINDFRAME_AI_MODELS = SimpleNamespace(
+    free=LitellmChatModel("ollama_chat/llama3.2", api_base="http://localhost:11434"),
+    expensive=OpenaiChatModel("gpt-4o", api_type="azure"),
+    cheap=OpenaiChatModel("gpt-4o-mini", api_type="azure")
+)
