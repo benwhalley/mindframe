@@ -27,16 +27,17 @@ def chat(prompt: str) -> str: ...
 #     chat("say hello")
 
 # Function to split the document into an ordered dictionary by `[VARNAME]` blocks
-def split_multipart_prompt(text):
+def split_multipart_prompt(text) -> OrderedDict:
     
-    # this is gross to use regex
-    # we should use pandoc instead and traverse a tree nicely
+    # this is a bit gross to use regex
+    # we should maybe use pandoc instead and traverse a tree nicely, see
     # import pandoc
     # from pandoc.types import *
+    # it works fine for now though
 
-    varname_pattern = r'\[\s*(\w+)\s*\]'
+    varname_pattern = r'\[\[\s*(\w+)\s*\]\]'
     parts = re.split(varname_pattern, text)
-    # if we didn't explicitly include enough response variables, add one
+    # if we didn't explicitly include a final response variable, add one here
     if len(parts) % 2 == 0:
         parts.append("__RESPONSE__")
 
@@ -49,8 +50,10 @@ def split_multipart_prompt(text):
 
 
 def chatter(multipart_prompt, model=settings.MINDFRAME_AI_MODELS.cheap):    
+    """Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next."""
+
     prompts_dict = split_multipart_prompt(multipart_prompt)
-    results_dict = OrderedDict()  # Dictionary to hold accumulated results
+    results_dict = OrderedDict()  
     
     prompt_parts = []
 
