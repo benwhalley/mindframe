@@ -11,10 +11,9 @@ from .models import (
     Turn,
     Note,
     Example,    
-    Progress,
+    TreatmentSessionState,
     Judgement,
     JudgementReturnType
-
 )
 
 @admin.register(CustomUser)
@@ -101,7 +100,7 @@ class ExampleAdmin(admin.ModelAdmin):
 
 
 
-@admin.register(Progress)
-class ProgressAdmin(admin.ModelAdmin):
+@admin.register(TreatmentSessionState)
+class TreatmentSessionStateAdmin(admin.ModelAdmin):
     pass
 
