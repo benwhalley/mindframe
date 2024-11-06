@@ -83,6 +83,7 @@ As a possible starting point, these are the components of a treatment we need to
 
 We leave open what each step is for, and their scope: This is determined by the treatment developer as they write the llm prompts and associated actions to operationalise their intervention. However in most cases steps are likely to be a single 'logical unit' of therapy which can be achieved within a single LLM prompt (e.g. 'establish rapport at the opening of a session', or 'identify discrepancies to build motivation').
 
+
 ##### `judgements`
 
 `judgements` are a classification task. A judgement can be an evalution of the state of the system or the client, based on the conversation history or other data sources at a particular point in time. For example, we might want to evaluate whether the client is 'engaged in treatment', based on the conversation history and other data sources. A `judgement` is very similar to a `note`, but defines a structured classification task where the return values are known and can be defined by the treatment developer ahead of time. For example, we might want to evaluate whether the client is 'engaged' or 'disengaged' at a given point in time. This is a binary classification task, and the system would return a structured response (and perhaps also a textual explanation of the classification decision). Evaluations can be of both clients and therapists (or of the quality of the relationship). 
@@ -92,31 +93,68 @@ Judgements can trigger further judgements or actions. This may always happen, or
 
 ##### `notes`
 
-A `note` is a special case of a judgement and uses the same machinery, but is syntactic sugar for a judgement where the only return values requried are unstructured text. For example, the template might generate summaries of the recent conversation history. The `note` template would specify how to summarise conversations within a step before transitioning, or combine information from multiple sources to record a snapshot of the client's affective state.  Another special use of `notes` would be to summarise or comment on turn-by-turn utterances. E.g. on each turn we might process client talk and therpist replies to label what is happening in the conversation. 
+A `note` is a record made when a Judgement is enacted.
+
+The `judgement` template specifies what return values are valid when the judgement is made, and these can either be structured/categorical values or unstructured textual notes. For example, a judgement might be used to summarise all of the turns within a step before transitioning to the next, or to combine information from multiple sources to record a snapshot of the client's affective state at a particular point in time. Other judgements would create `notes` that summarise or comment-on turn-by-turn utterances. For example, on each turn we might process client talk and therpist replies to label what is happening in the conversation. 
 
 
-##### `questions` 
+##### `questions`  
 
-Another special case of judgements would be to record client responses to direct questions to measure their mood or other states. In this case clients respond to questions defined in a step-like template and respon in freeform chat text. The question processing template would (like a judgement) validate/extract data from the response and store it. The schema for the return values might be defined in the 'question step' as a convenience. Alternatively, we might define questions using standard UI components like likert scales/radio buttons. In this case, the system would automatically validate the response and store it in the database.
+Another special case of judgements would be to record client responses to direct questions (these might be to measure their mood or other states). 
+
+In this case clients respond to questions defined in a step-like template and respond in freeform chat text. The question processing template would (like a `judgement`) validate/extract data from the response and store it. The schema for the return values (and so implicitly the judgement task) might be defined in the 'question step' as a convenience. 
+
+Alternatively, we might define questions using standard UI components like likert scales/radio buttons. In this case, the system would automatically validate the response and store it in the database.
+
+Timeline: `#v2`
 
 
 
+# Describing the desired thought processes and responses in text
 
-# Describing the therapy in markdown
-
-`steps`, `judgements`, `notes`, `questions` and other primitives that compose an `intervention` are defined in markdown files. These files use yaml header sections to specify metadata about the step. Metadata might include conditions for transitions, actions to take, or specify llm models to use for the prompt. 
-
-Transitions between steps are defined in the yaml frontmatter.
+`steps`, `judgements`, `notes`, `questions` and other primitives that compose an `intervention` are defined in markdown files. We also need to specify `transitions` and the conditions which apply when moving between steps.
 
 The body of the markdown file is the text of the prompt to be sent to the LLM, and includes special extension tags which are used to access the conversation history, system state, or other data sources.
 
-Examples of llm prompts:
+- Examples of llm prompts can be found in the `docs/fit/` directory, in files ending in `.step` or `.judgement`.
 
-- [elicit-discrepancy.step](fit/elicit-discrepancy.step)
-- [elicit-discrepancy.step](fit/elicit-discrepancy.step)
-- [elicit-discrepancy.step](fit/elicit-discrepancy.step)
-- [elicit-discrepancy.step](fit/elicit-discrepancy.step)
-- [elicit-discrepancy.step](fit/elicit-discrepancy.step)
+- See also how we will [access the prior conversation in prompts](#accessing-turns)
+
+
+#### Multi-part or 'chain of thought' style prompts
+
+By default, the system will support multipart prompting, inspired by LMQL or Microsoft Guidance, although simplified for this application.
+
+Within a prompt, authors can specify 'output slots' which create interim completions that become part of the context for later completions. That is, a single prompt template can generate multiple calls to the LLM.
+
+For example:
+
+```
+You are a therapist working with a client.
+This is your recent conversation.
+
+{{turns 30}}
+
+Think about what is happening in this conversation. 
+Consider all the possible meanings in the context of CBT principles.
+
+[[POSSIBLE_MEANINGS]]
+
+Now, decide what to say to the client. 
+What is most important to address first? 
+What could be left to later?
+
+[[PRIORITIES]]
+
+Now, say something appropriate to the context.
+Give your answer in spoken UK English. 
+Never ask more than a single question at a time.
+
+[[RESPONSE]]
+```
+
+
+
 
 
 ## Graphing the intervention 
@@ -501,23 +539,48 @@ Each time the client says something in the chat or the system responds, we need 
 - `meta` (any additional data like the time taken to respond, the content of the response, etc)
 
 
-## Accessing turns in templates
+## Accessing turns in templates {#accessing-turns}
 
-Turns can later be accessed in templates using the follwing jinja syntax/extension tags:
+Turns can later be accessed in templates using the follwing django/jinja syntax, or by extension tags:
+
+`{{turns }}` -- this would (by default) include all the turns in the current session.
+
+`{% turns 3 %}` -- this shows last 3 turns in the session - i.e. equivalent to `session.turns()[-3:]`
 
 
-`{% turns 3 %}`  - shows last 3 turns
+The output format for turns would default to:
 
-`{% turns 'step' %}`  - shows all turns from current step
+```
+{% for t in turns %}
+{{t.speaker|uppercase}}: {{t.text}}
+{% endfor %}
+```
 
-`{% turns 'step' -1 %}` - turns from previous step
+So the output of `{% turns 3 %}` would look like:
 
-`{% turns 'step' -2: %}` - turns from current and previous 2 steps (python slicing)
+```
+CLIENT: I'm not sleeping well at the moment
+THERAPIST: I'm sorry to hear that. What's been happening?
+CLIENT: I'm just really stressed out
+```
 
+`step`, `session` and `cycle` objects will be available in the context, and each of these object types has a `turns()` method, so could be used with the turns tag to constrain which turns are included:
+
+`{% turns step %}`  -- shows all turns from current step, where `step` is the current step object
+
+`{% turns session %}`  -- shows all turns from current session 
+
+`{% turns cycle %}` -- shows all turns from current cycle
+
+`{% turns step.previous %}` - turns from previous step (`previous` is an attribute on step).
+
+
+
+#### Using RAG on turns
 
 We could also use RAG to search for previous turns which match a particular pattern, e.g. to find all turns where the client expresses a negative emotion, or where discussion was about alcohol use, to ensure it's possible to do callbacks and reflections effectively.
 
-`{% turns 'step' -1 filter="alcohol_use" method="similarity" %}`
+`{% turns cycle -1 filter="alcohol_use" method="similarity" %}`
 
 In future the lookups could use other variables available to templates, e.g. the `primary_problem`
 

@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 import logging
 from django.conf import settings
+from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
@@ -72,17 +73,24 @@ class Example(models.Model):
 
 
 class Step(models.Model):
-    """Each Step is a node in the intervention graph"""
+    """Each Step is a node in the intervention graph.
+    
+    This model handles the immediate response to the client in each turn.
+    """
 
     intervention = models.ForeignKey(
         Intervention, on_delete=models.CASCADE, related_name="steps"
     )
+    
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
     prompt_template = models.TextField()
 
-    def think_and_respond(self, session):
-        # returns an OrderedDict of completions (thougts and response)
+    def spoken_response(self, session) -> OrderedDict:
+        """Use an llm to create a spoken response to clients, 
+        using features of the session as context."""
+
+        
         template = Template(self.prompt_template)
         context = Context(
             {
@@ -101,11 +109,7 @@ class Step(models.Model):
         pmpt = template.render(context)
         completions = chatter(pmpt, model=settings.MINDFRAME_AI_MODELS.cheap)
         
-        tht = completions.get("THOUGHTS", None)
-        rsp = completions.get("RESPONSE", None)
-        print(tht and tht.value or "???")
-        print(rsp and rsp.value.upper() or "???")
-        print("\n\n\n")
+        # returns an OrderedDict of completions (intermediate 'thougts' and the __RESPONSE__)
         return completions
 
     class Meta:
@@ -166,7 +170,7 @@ class Judgement(models.Model):
     def make_judgement(self, session):
         logger.debug(f"Making judgement {self.title} for {session}")
         template = Template(self.prompt_template)
-        # extract this so DRY with Step.think_and_respond
+        # extract this so DRY with Step.spoken_response
         context = Context(
             {
                 "turns": session.turns.all(),
@@ -229,28 +233,36 @@ class TreatmentSession(models.Model):
     started = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(auto_now=True)
 
-    def current_step(self):
+    def state(self):
+        # the state of the TreatmentSession is defined by TreatmentSessionState records (the last one represents our current position in the intervention)
         prg = self.progress.all()
         if prg.count() > 0:
-            return self.progress.last().to_step
+            # return the step of the last progress record (i.e. the current step)
+            return self.progress.last()
         else:
-            p_ = Progress.objects.create(
-                session=self, to_step=self.cycle.intervention.steps.first()
+            # if there are no progress records, create one so we know we're on the first step
+            p_ = TreatmentSessionState.objects.create(
+                session=self, step=self.cycle.intervention.steps.first()
             )
             p_.save()
-            return p_.to_step
+            return p_
+
+    def current_step(self):
+        return self.state().step
 
     def listen(self, speaker, text):
+        """Record a Turn in the session when the client speaks"""
         turn = Turn.objects.create(session=self, speaker=speaker, text=text)
         turn.save()
         return turn
 
     def respond(self):
-
+        """Generate a response to the client's last utterance"""
         bot = CustomUser.objects.filter(role=RoleChoices.BOT).first()
         step = self.current_step()
 
-        # make required judgements first
+        # make any required judgements first
+        # these are defined by the possible transitions from the current step
         judgements_to_run = Judgement.objects.filter(pk__in=step.transitions_from.all().values
         ("judgements"))
         logger.debug(f"JUDGEMENTS TO RUN: {judgements_to_run}")
@@ -258,17 +270,26 @@ class TreatmentSession(models.Model):
         for judgement in judgements_to_run:
             judgement_notes.append(judgement.make_judgement(self))
 
-        print(judgement_notes)
+        # Now, decide if we should move to the next step or stay here
+        # if conditions for a transition are met, move to that step and make a
+        # new TreatmentSessionState instance
+        logger.warning("THIS BIT NOT IMPLEMENTED YET - NEED TO ADD TRANSITIONS")
 
-        completions = step.think_and_respond(self)
+        # Finally, generate a response to the client
+        completions = step.spoken_response(self)
         key, utterance = next(reversed(completions.items()))
         
+        # save the turn containing the response
         newturn = Turn.objects.create(
             session=self, speaker=bot, 
             text=utterance.value, 
             metadata=completions
         )
         newturn.save()
+
+        # return the response only (this gets used by the gradio app)
+        # perhaps we should return the Turn object and allow the gradio app to 
+        # use other attributes of it?
         return utterance.value
 
     class Meta:
@@ -278,31 +299,33 @@ class TreatmentSession(models.Model):
         return f"<{self.pk}> Session on {self.started} for {self.cycle.client.username} in Cycle {self.cycle.id}"
 
 
-class Progress(models.Model):
+class TreatmentSessionState(models.Model):
+    '''Tracks state within a session: which step we are at, and have come from.'''
+
     session = models.ForeignKey(
         TreatmentSession, on_delete=models.CASCADE, related_name="progress"
     )
     timestamp = models.DateTimeField(default=timezone.now)
-    from_step = models.ForeignKey(
+    previous_step = models.ForeignKey(
         Step,
         on_delete=models.CASCADE,
-        related_name="progress_from",
+        related_name="progressions_from",
         null=True,
         blank=True,
     )
-    to_step = models.ForeignKey(
-        Step, on_delete=models.CASCADE, related_name="progress_to"
+    step = models.ForeignKey(
+        Step, on_delete=models.CASCADE, 
     )
 
     class Meta:
         ordering = ["timestamp"]
 
     def __str__(self):
-        return f"{self.from_step} --> {self.to_step}"
+        return f"{self.previous_step} --> {self.step}"
 
 
 class Turn(models.Model):
-    """An individual utterance during a session"""
+    """An individual utterance during a session (either client or therapist)."""
 
     session = models.ForeignKey(
         TreatmentSession, on_delete=models.CASCADE, related_name="turns"
@@ -324,7 +347,7 @@ class Turn(models.Model):
 
 
 class Note(models.Model):
-    """Notes, preferences and other records created by Judgements during a TreatmentSession"""
+    """Clinical records created by exercuting a Judgement at a point in time"""
 
     session = models.ForeignKey(
         TreatmentSession, on_delete=models.CASCADE, related_name="notes"
