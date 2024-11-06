@@ -42,7 +42,7 @@ MindFrame organizes therapy sessions around several key primitives:
 
 - *Turns* are the basic unit of interaction between the client and the system. A conversation is made up of multiple turns, each of which is associated with a step.
 
-- *Judgements* are structured evaluations of the client state based on conversation history and other stored data. Judgements are used to determine the timing of transitions between steps, and to log progress against pre-defined goals.
+- *Judgements* are structured evaluations of the client state based on conversation history and other stored data. Judgements are used to determine the timing of transitions between steps, or to log progress against pre-defined goals.
 
 - *Notes* allow summaries of conversation history to be saved as unstructured text — for example as clinical notes — providing context used in later generation steps, or to help human supervisors track clients' progress through an intervetion.
 
