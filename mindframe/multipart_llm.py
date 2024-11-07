@@ -11,13 +11,22 @@ from collections import OrderedDict, namedtuple
 from django.conf import settings
 import tiktoken
 
+import logging
+logger = logging.getLogger(__name__)
+
 encoding = tiktoken.encoding_for_model('gpt-4o-mini')
+
+
 
 class ChatResult(BaseModel):
     value: str
     prompt: str
     input_tokens: int
     output_tokens: int
+
+# aa=ChatResult(value="s", prompt="sas", output_tokens=1, input_tokens=1)
+# import json
+# json.dumps(aa.json())
 
 
 @prompt("""{prompt}""")
@@ -38,7 +47,7 @@ def split_multipart_prompt(text) -> OrderedDict:
     varname_pattern = r'\[\[\s*(\w+)\s*\]\]'
     parts = re.split(varname_pattern, text)
     # if we didn't explicitly include a final response variable, add one here
-    if len(parts) % 2 == 0:
+    if len(parts) % 2 == 1:
         parts.append("__RESPONSE__")
 
     # iterate over tuples and return an ordered dictionary
@@ -61,6 +70,7 @@ def chatter(multipart_prompt, model=settings.MINDFRAME_AI_MODELS.cheap):
         prompt_parts.append(value)
         prompt  = "\n".join(prompt_parts)
         with model:
+            logger.debug(f"Calling LLM ({model}): {prompt[:30]}")
             res = chat(prompt)
         results_dict[key] = ChatResult(value= res, 
                                        prompt= prompt, 

@@ -18,6 +18,28 @@ class ComplexNote(BaseModel):
     patient_name_if_included: str = ''
 
 
+
+class CommentedBooleanResponse(BaseModel):
+    commentary: str = Field(
+        ...,
+        description="Think carefully about your classification and give a 1 or 2 sentence explanation of your rationale here."
+    )
+    response: bool = Field(
+        ..., description="Only return true if you are confident in your classification.")
+
+
+
+from mindframe.structured_judgements import (
+    data_extraction_function_factory,
+    pydantic_model_from_schema,
+)
+
+tt = TreatmentSession.objects.all().first()
+tt.respond()
+
+
+
+
 class JudgementTestCase(TestCase):
 
     @classmethod
@@ -95,3 +117,6 @@ therapist	00:00:55	Okay. Would you like to talk more about that?"""
         Cycle.objects.all().delete()
         Intervention.objects.all().delete()
         CustomUser.objects.all().delete()
+
+
+

@@ -1,3 +1,4 @@
+# Instructions for setting up a local copy of mindframe
 
 First pull the repo:
 

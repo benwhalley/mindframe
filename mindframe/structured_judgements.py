@@ -8,27 +8,31 @@ from magentic import prompt
 from pydantic import BaseModel, create_model, Field
 
 
-def pydantic_model_from_schema(schema):
-    type_mapping = {
-        "string": (str, None),
-        "integer": (
-            int,
-            Field(..., ge=0),
-        ),  # Example for integer fields with a minimum constraint
-        # Add more types as needed
-    }
-    fields = {}
-    for prop, config in schema["properties"].items():
-        field_type, field_info = type_mapping.get(
-            config["type"], (str, None)
-        )  # Default to str if type unknown
-        if prop in schema.get("required", []):
-            fields[prop] = (field_type, ...)
-        else:
-            fields[prop] = (field_type, field_info)
-    # Create the Pydantic model, specifying __module__ explicitly
-    DynamicModel = create_model(schema["title"], **fields, __module__=__name__)
-    return DynamicModel
+# TODO - THIS DOESN"T WORK YET BECAUSE OF PROBLEMS SERIALISING AND DESERIALISING THE SCHEMA
+# AT PRESENT WE USE A CHOICEFIELD FOR THE JUDGEMENT RETURN TYPE
+
+# def pydantic_model_from_schema(schema):
+#     type_mapping = {
+#         "string": (str, None),
+#         "integer": (
+#             int,
+#             Field(..., ge=0),
+#         ),  # Example for integer fields with a minimum constraint
+#         # Add more types as needed
+#     }
+#     fields = {}
+#     for prop, config in schema["properties"].items():
+#         field_type, field_info = type_mapping.get(
+#             config["type"], (str, None)
+#         )  # Default to str if type unknown
+#         if prop in schema.get("required", []):
+#             fields[prop] = (field_type, ...)
+#         else:
+#             fields[prop] = (field_type, field_info)
+#     # Create the Pydantic model, specifying __module__ explicitly
+#     DynamicModel = create_model(schema["title"], **fields, __module__=__name__)
+#     print("Created Pydantic model: ", DynamicModel, DynamicModel.schema())
+#     return DynamicModel
 
 
 def data_extraction_function_factory(

@@ -1,5 +1,3 @@
-# admin.py
-
 from django.contrib import admin
 from .models import (
     CustomUser,
@@ -80,9 +78,7 @@ class NoteAdmin(admin.ModelAdmin):
 
 @admin.register(JudgementReturnType)
 class JudgementReturnTypeAdmin(admin.ModelAdmin):
-    list_display=['title', 'schema']
-
-
+    list_display=['title', 'pydantic_model_name']
 
 @admin.register(Judgement)
 class JudgementAdmin(admin.ModelAdmin):

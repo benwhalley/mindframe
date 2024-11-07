@@ -20,10 +20,15 @@ from magentic.chat_model.litellm_chat_model import LitellmChatModel
 
 from mindframe.multipart_llm import chatter
 from mindframe.structured_judgements import (
-    data_extraction_function_factory,
-    pydantic_model_from_schema,
+    data_extraction_function_factory
+    # pydantic_model_from_schema,
 )
 
+from mindframe.return_type_models import JUDGEMENT_RETURN_TYPES
+
+
+def format_turns(turns):
+    return "\n".join([f"{t.speaker.role.upper()}: {t.text}" for t in turns])
 
 
 
@@ -86,15 +91,18 @@ class Step(models.Model):
     slug = models.SlugField(max_length=255)
     prompt_template = models.TextField()
 
+    
     def spoken_response(self, session) -> OrderedDict:
         """Use an llm to create a spoken response to clients, 
         using features of the session as context."""
 
-        
+        print("TURNS SO FAR:")
+        print("\n\n---\n\n".join(session.turns.all().values_list('text', flat=True)))
+
         template = Template(self.prompt_template)
         context = Context(
             {
-                "turns": session.turns.all(),
+                "turns": format_turns(session.turns.all()),
                 "session": session,
                 "examples": session.cycle.intervention.examples.all(),
                 "session_notes": session.notes.all(),
@@ -104,9 +112,8 @@ class Step(models.Model):
                 "notes": Note.objects.filter(session__cycle=session.cycle),
             }
         )
-        print(context)
-        print("\n\n\n")
         pmpt = template.render(context)
+        print(f"PROMPT:\n{pmpt}")
         completions = chatter(pmpt, model=settings.MINDFRAME_AI_MODELS.cheap)
         
         # returns an OrderedDict of completions (intermediate 'thougts' and the __RESPONSE__)
@@ -146,14 +153,19 @@ class JudgementReturnType(models.Model):
     """A serialised Pydantic object representing the return type of a Judgement"""
 
     title = models.CharField(max_length=255)
-    schema = models.JSONField(
-        default={
-            "properties": {"text": {"title": "Text", "type": "string"}},
-            "required": ["text"],
-            "title": "BriefNote",
-            "type": "object",
-        }
-    )
+    pydantic_model_name = models.CharField(choices = [(k, k) for k, v in JUDGEMENT_RETURN_TYPES.items()], max_length=255, default='BriefNote')
+
+    def pydantic_model(self):
+        return JUDGEMENT_RETURN_TYPES[self.pydantic_model_name]
+
+    # schema = models.JSONField(
+    #     default={
+    #         "properties": {"text": {"title": "Text", "type": "string"}},
+    #         "required": ["text"],
+    #         "title": "BriefNote",
+    #         "type": "object",
+    #     }
+    # )
 
     def __str__(self):
         return f"{self.title}"# \n\n{self.schema}"
@@ -167,13 +179,16 @@ class Judgement(models.Model):
     prompt_template = models.TextField()
     return_type = models.ForeignKey(JudgementReturnType, on_delete=models.PROTECT)
 
+    def __str__(self) -> str:
+        return f"{self.title} ({self.variable_name})"
+    
     def make_judgement(self, session):
         logger.debug(f"Making judgement {self.title} for {session}")
         template = Template(self.prompt_template)
         # extract this so DRY with Step.spoken_response
         context = Context(
             {
-                "turns": session.turns.all(),
+                "turns": format_turns(session.turns.all()),
                 "session": session,
                 "examples": session.cycle.intervention.examples.all(),
                 "session_notes": session.notes.all(),
@@ -185,19 +200,24 @@ class Judgement(models.Model):
         )
         inputs = {'input': template.render(context)}
         return self.process_inputs(session, inputs)
+    
 
     def process_inputs(self, session, inputs: dict):
 
         extraction_function = data_extraction_function_factory(
-            pydantic_model_from_schema(self.return_type.schema),
+            self.return_type.pydantic_model(),
             # remember, that other templating goes on prior, when generating {input}
             # these templates are stored in Judgement model instances in the db
             # this just adds the instruction to respond in JSON which is what we almost always want.
-            prompt_template="{input}\nRespond in JSON",
+            prompt_template="{input}\nRespond in JSON in the correct format",
         )
 
         newnote = Note.objects.create(judgement=self, session=session, inputs=inputs)
-        newnote.data = extraction_function(**newnote.inputs).model_dump()
+        llm_result = extraction_function(**newnote.inputs)
+        newnote.data = llm_result.model_dump()
+        
+        print(f"JUDGEMENT RESULT: {llm_result}")
+        
         newnote.save()
         return newnote
 
@@ -254,6 +274,7 @@ class TreatmentSession(models.Model):
         """Record a Turn in the session when the client speaks"""
         turn = Turn.objects.create(session=self, speaker=speaker, text=text)
         turn.save()
+        print(f"TURN SAVED: {turn}")
         return turn
 
     def respond(self):
@@ -263,30 +284,70 @@ class TreatmentSession(models.Model):
 
         # make any required judgements first
         # these are defined by the possible transitions from the current step
-        judgements_to_run = Judgement.objects.filter(pk__in=step.transitions_from.all().values
-        ("judgements"))
+        transitions = step.transitions_from.all()
+        
+        judgements_to_run = Judgement.objects.filter(pk__in=transitions.values("judgements"))
         logger.debug(f"JUDGEMENTS TO RUN: {judgements_to_run}")
         judgement_notes = []
         for judgement in judgements_to_run:
             judgement_notes.append(judgement.make_judgement(self))
 
-        # Now, decide if we should move to the next step or stay here
-        # if conditions for a transition are met, move to that step and make a
-        # new TreatmentSessionState instance
-        logger.warning("THIS BIT NOT IMPLEMENTED YET - NEED TO ADD TRANSITIONS")
 
-        # Finally, generate a response to the client
+        session_notes = self.notes.filter(data__response__isnull=False)
+        "\n\n".join(map(str, session_notes.values('data')))
+
+        # make a dictionary of the most recent note for each structured variable
+        notes_with_variables = dict(session_notes.filter(data__response__isnull=False).order_by('judgement__variable_name', '-timestamp').distinct('judgement__variable_name').values_list('judgement__variable_name', 'data__response'))
+        
+        # now, decide if we should move to the next step or stay here
+        # if conditions for a transition are met, then move to that step and make a
+        # new TreatmentSessionState instance
+        
+        # TODO - THE LOGIC HERE IS VERY BRITTLE AND NEEDS SOME THOUGHT
+        # CONSIDER THE CASE WHERE CONDITIONS NEED TO BE AND-ED TOGETHER
+        # ALSO THERE MAY BE EDGE CASES WHERE MULTIPLE TRANSITIONS COULD BE PERMITTED
+        # IN WHICH CASE WE SHOULD CHOOSE HOW???
+        exitflag = False
+        for t in transitions:
+            if exitflag:
+                break
+            for c in t.conditions:
+                if exitflag:
+                    break
+                # this is ANY condition, not ALL
+                try:
+                    passes_conditon = eval(c, {}, notes_with_variables)
+                except Exception as e:
+                    passes_conditon = False
+                    logger.debug(f"CONDITION FAILED: {c}")
+
+                if passes_conditon:
+                    print(f"PASSED CONDIITON: {c} so changing state")
+                    newstate = TreatmentSessionState.objects.create(
+                        session=self, previous_step=step, step=t.to_step
+                    )
+                    print(f"SAVED PROGRESS/STATE: {newstate}")
+                    
+                    # update this for code below to know where we are
+                    step = t.to_step
+                    newstate.save()
+                    exitflag = True
+                    break
+
+
+        # finally, generate a response to the client
         completions = step.spoken_response(self)
         key, utterance = next(reversed(completions.items()))
-        
+        # import pdb; pdb.set_trace()
         # save the turn containing the response
         newturn = Turn.objects.create(
             session=self, speaker=bot, 
             text=utterance.value, 
-            metadata=completions
+            metadata={k: i.json() for k, i in completions.items()}
         )
         newturn.save()
 
+        
         # return the response only (this gets used by the gradio app)
         # perhaps we should return the Turn object and allow the gradio app to 
         # use other attributes of it?
