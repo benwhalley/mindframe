@@ -5,13 +5,16 @@ import gradio as gr
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-
 from mindframe.models import TreatmentSession, CustomUser, RoleChoices
 
-def initialize_chat():
-    # todo - this should be passed in rather than looked up here?
-    session = TreatmentSession.objects.first()
-    print(session.pk)
+# get all session IDs and titles for dropdown
+def get_sessions():
+    sessions = TreatmentSession.objects.all()
+    return [(str(session), str(session.pk)) for session in sessions]  
+
+def initialize_chat(session_id):
+    session = TreatmentSession.objects.get(pk=int(session_id)) 
+    print(f"Selected session: {session.pk}")
     # prepopulate history from existing turns in this session
     history = []
     for turn in session.turns.all().order_by('timestamp'):
@@ -21,34 +24,44 @@ def initialize_chat():
         else:
             history.append(("", turn.text))
     
-    if session.turns.all().count()==0:
+    if session.turns.all().count() == 0:
         history.append(("", session.respond()))
     
     return history
 
-# Gradio handler for user input in chat
-def chat_with_bot(history, user_input):
-    # TODO retrieve a session from a URL param or create a new one for demo purposes
-    # Retrieve the session and assume `session.cycle.client` is the speaker
-    session = TreatmentSession.objects.first()
-    print(session.pk)
-    
+
+def chat_with_bot(session_id, history, user_input):
+    session = TreatmentSession.objects.get(pk=int(session_id))  # Convert session_id to integer    
     user = session.cycle.client
     session.listen(speaker=user, text=user_input)
     bot_response = session.respond()
-
     history.append((user_input, bot_response))
-    
-    return history, ""  # Return updated history and clear input box
+    return history, ""  # return updated history and clear input box
 
 
 with gr.Blocks() as iface:
+    chs = get_sessions()
+    session_dropdown = gr.Dropdown(
+        label="Select Treatment Session",
+        choices=chs,  
+        value=None
+    )
+    
     chatbot = gr.Chatbot()
     user_input = gr.Textbox(show_label=False, placeholder="Type your message here...")
     
-    # Load the initial chat history on page load
-    iface.load(initialize_chat, inputs=None, outputs=chatbot)
-    user_input.submit(chat_with_bot, [chatbot, user_input], [chatbot, user_input])
+    # update chat history when a session is selected
+    session_dropdown.change(
+        initialize_chat, 
+        inputs=session_dropdown, 
+        outputs=chatbot
+    )
+
+    # handle user input for the selected session
+    user_input.submit(
+        chat_with_bot, 
+        [session_dropdown, chatbot, user_input], 
+        [chatbot, user_input]
+    )
 
 iface.launch()
-
