@@ -209,12 +209,13 @@ class Judgement(models.Model):
             # remember, that other templating goes on prior, when generating {input}
             # these templates are stored in Judgement model instances in the db
             # this just adds the instruction to respond in JSON which is what we almost always want.
-            prompt_template="{input}\nRespond in JSON in the correct format",
+            prompt_template="{input}\nYou MUST use the tool calling functionality and respond in JSON in the correct format.",
         )
 
         newnote = Note.objects.create(judgement=self, session=session, inputs=inputs)
-        llm_result = extraction_function(**newnote.inputs)
-        newnote.data = llm_result.model_dump()
+        with settings.MINDFRAME_AI_MODELS.cheap:
+            llm_result = extraction_function(**newnote.inputs)
+            newnote.data = llm_result.model_dump()
         
         print(f"JUDGEMENT RESULT: {llm_result}")
         
