@@ -1,4 +1,0 @@
-web: uvicorn config.asgi:application --host 0.0.0.0 --port $WEB_PORT --log-level debug --reload
-chat: watchmedo auto-restart --patterns="*.py" --recursive -- python gradio_app.py --port $CHAT_PORT
-# worker: celery --app config worker --pool=gevent --concurrency=2 -E -l INFO
-# beat: celery --app config beat -l INFO
