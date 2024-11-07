@@ -64,4 +64,6 @@ with gr.Blocks() as iface:
         [chatbot, user_input]
     )
 
-iface.launch()
+
+iface.launch(server_port=int(os.environ.get("CHAT_PORT", 8001)))
+

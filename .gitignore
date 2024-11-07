@@ -6,3 +6,4 @@ demo-website/src/static
 demo-website/src/static
 demo-website/src/config/__pycache__
 __pycache__
+demo-website/src/.env
