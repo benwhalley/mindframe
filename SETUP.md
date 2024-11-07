@@ -3,7 +3,7 @@
 Using psql, make a database and user:
 
 ```
-create database mfexample;
+create database mindframe;
 CREATE USER mindframe_customuser WITH PASSWORD 'YOUR_PASSWORD';
 GRANT ALL PRIVILEGES ON DATABASE mfexample TO mindframe_customuser;
 ```
@@ -12,7 +12,9 @@ GRANT ALL PRIVILEGES ON DATABASE mfexample TO mindframe_customuser;
 Then load the example dataset
 
 ```bash
-export DATABASE_URL='postgres://localhost/mfexample'
+# edit .env to make sure access keys are set correcltly for LLM provider
+cp .env-example .env
+
 ./manage.py migrate
 ./manage.py loaddata  fixtures/exampledb.json  
 ./manage.py dumpdata --indent=2  fixtures/exampledb.json  
