@@ -2,24 +2,24 @@
 
 MindFrame is a Python package designed to help treatment developers implement psychologically informed chatbots that leverage the power of large language models (LLMs) to generate high-quality individual and group interventions. The system is developed to remain introspectable, verifiable, and adaptable to complex interventions.
 
-MindFrame coordinates multiple models, orchestrating their outputs into coherent, structured, conversations with clients. The system allows intervention developers to define therapy sessions as directed graphs, with nodes representing different stages of therapy. Complex interventions can be broken-down into smaller, more manageable components for development, testing and refinement, and the system can track client progress and adjust interventions based on historical data.
+MindFrame coordinates multiple models, orchestrating their outputs into coherent, structured, conversations with clients. The system allows intervention developers to define sessions as directed graphs, with nodes representing different stages of the intervention. Complex interventions can be broken-down into smaller, more manageable components for development, testing and refinement, and the system can track client progress and adjust interventions based on historical data.
 
 Using a graph-based representation of interventions, MindFrame allows for more control over the treatment flow, and for services to be more easily validated against guidelines and best pratice, tested for efficacy, and refined to suit the local context. Mindframe is not a 'black box': it is designed to ensure that services are grounded in psychological theory, are evidence-based, and can be properly supervised and audited by human clinicians.
 
 
 ### Key Features
 
-- Modular Structure: Allows intervetion developers to break down complex interventions into smaller components, making it easier to test and validate individual parts of a therapy.
+- *Modular Structure*: Allows intervetion developers to break down complex interventions into smaller components, making it easier to test and validate individual parts of an intervention.
 
-- Client Tracking: A database maintains a history of each client’s progression, including conversation history, and a record of internal (system) judgements, notes, and other session information.
+- *Client Tracking*: A database maintains a history of each client’s progression, including conversation history, and a record of internal (system) judgements, notes, and other session information.
 
-- Collaboation: Mindframe uses simple text-based templates to define an intervetion in terms of steps, transitions, judgements, notes, and actions. Each part of the intervention can be revised and reviewed by the intervention developer in consultation with clinicians.
+- *Collaboation*: Mindframe uses simple text-based templates to define an intervetion in terms of steps, transitions, judgements, notes, and actions. Each part of the intervention can be revised and reviewed by the intervention developer in consultation with clinicians.
 
-- Adaptable: Interventions can be tailored to particular client groups or local context; retrieval augmented generation allows clinicians and managers to incorporate their own examples, case studies, and local knowledge.
+- *Adaptable*: Interventions can be tailored to particular client groups or local context; retrieval augmented generation allows clinicians and managers to incorporate their own examples, case studies, and local knowledge.
 
-- Theory-Led: Mindframe is designed to ensure that interventions are grounded in psychological theory and are evidence-based. Although AI is used to interact with clients, the design ensures that the service follows intervention manuals and guidelines, and is transparent and verifiable.
+- *Theory-Led*: Mindframe is designed to ensure that interventions are grounded in psychological theory and are evidence-based. Although AI is used to interact with clients, the design ensures that the service follows intervention manuals and guidelines, and is transparent and verifiable.
 
-- Safety and Verification: Human supervisors or therapists can [will be able to] oversee interactions in real time, providing an extra layer of safety and ensuring that the models are operating as expected.
+- *Safety and Verification*: Human supervisors or therapists will oversee interactions in real time, providing an extra layer of safety and ensuring that the models are operating as expected.
 
 
 ### Graph-based interventions
@@ -51,6 +51,7 @@ MindFrame organizes therapy sessions around several key primitives:
 - *Examples* are short excepts from good or bad therapeutic practice, stored for semantic search and retrieval during conversations. Steps are templated in a way that allows treatment developers to dynamically insert relevant examples into the LLM prompt, leveraging the power of recent AI models to use 'few-shot' learning to generate high-quality responses.
 
 Each of these components is defined in a simple, declarative text-based format. 
+
 
 
 
