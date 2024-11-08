@@ -1,0 +1,9 @@
+/* Style for the conditions field in TransitionInline */
+.transition-conditions {
+    font-family: monospace;
+    color: #FF1493;
+    white-space: pre-wrap; /* Ensures line breaks are preserved */
+    background-color: #f5f5f5; /* Optional: light background for readability */
+    padding: 5px;
+    border-radius: 4px;
+}

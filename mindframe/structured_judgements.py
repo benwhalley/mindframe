@@ -42,9 +42,9 @@ def data_extraction_function_factory(
 
     Return a function which accepts a prompt string and calls an LLM, returning a Pydantic model instance of return_type
     """
-    @prompt(prompt_template,  max_retries=5)
+
+    @prompt(prompt_template, max_retries=5)
     def generated_function(input: str) -> return_type:
         pass  # Placeholder for @prompt to fill with a response based on return type
+
     return generated_function
-
-

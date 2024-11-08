@@ -1,5 +1,6 @@
 from django.apps import AppConfig
 
+
 class MindFrameAppConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'  
-    name = 'mindframe'  
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "mindframe"

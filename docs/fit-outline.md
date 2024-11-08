@@ -210,6 +210,24 @@ Finally, once the discussion has moved through these stages, summarise the discu
     - highlight discrepancies between where they want to be and where they will be if they don't make changes
 
 
+
+THINGS TO AVOID:
+
+In this part of the session we want to focus on future NEGATIVE consequences of not changing.
+Avoid discussing what will happen if the client _does_ change, or swithcing to discussing the positives of change, or how they will change (we will come to this later).
+
+## Notes from the session
+
+These are the notes you have made so far about this client, from this and earlier sessions
+
+{notes:*}
+
+## Recent conversation
+
+This is what has been said recently
+
+{turns:step}
+
 ### Your task now
 
 
@@ -234,8 +252,6 @@ Once this has happened, always reflect what they have said and summarise the dis
 Now, imagine you are speaking to the client in person. Speak normally. Say something that best represents your thoughts and decision above. Be concise – sound natural and use spoken English idioms. Just give the utterance with no preamble or explanation.
 
 [RESPONSE]
-
-
 
 
 
