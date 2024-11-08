@@ -34,8 +34,10 @@ from mindframe.structured_judgements import (
     pydantic_model_from_schema,
 )
 
-tt = TreatmentSession.objects.all().first()
-tt.respond()
+
+
+# tt = TreatmentSession.objects.all().first()
+# tt.respond()
 
 
 

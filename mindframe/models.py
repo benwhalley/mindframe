@@ -28,7 +28,7 @@ from mindframe.return_type_models import JUDGEMENT_RETURN_TYPES
 
 
 def format_turns(turns):
-    return "\n".join([f"{t.speaker.role.upper()}: {t.text}" for t in turns])
+    return "\n".join([f"{t.speaker.role.upper()}: {t.text}" for t in turns.order_by('timestamp')])
 
 
 
@@ -213,7 +213,7 @@ class Judgement(models.Model):
         )
 
         newnote = Note.objects.create(judgement=self, session=session, inputs=inputs)
-        with settings.MINDFRAME_AI_MODELS.cheap:
+        with settings.MINDFRAME_AI_MODELS.expensive:
             llm_result = extraction_function(**newnote.inputs)
             newnote.data = llm_result.model_dump()
         

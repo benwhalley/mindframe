@@ -1,10 +1,10 @@
 Metadata-Version: 2.1
 Name: mindframe
-Version: 0.1.0
+Version: 0.1.1
 Summary: A Python package for the Mindframe project
 Author: Ali Bidaran and Ben Whalley
 Author-email: ben.whalley@plymouth.ac.uk
 Classifier: Programming Language :: Python :: 3
 Classifier: Operating System :: OS Independent
-Requires-Python: >=3.6
+Requires-Python: >=3.11
 License-File: LICENSE

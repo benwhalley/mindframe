@@ -37,12 +37,29 @@ class CycleAdmin(admin.ModelAdmin):
     list_filter = ('start_date', 'end_date')
     search_fields = ('client__username', 'intervention__name')
 
+
+class NoteInline(admin.TabularInline):
+    model = Note
+    extra = 1
+    readonly_fields = [ 'judgement', 'timestamp', 'inputs', 'data']
+
+
+class TreatmentSessionStateInline(admin.TabularInline):
+    model = TreatmentSessionState
+    extra = 0
+    autocomplete_fields = ['step', 'previous_step']
+
+
 @admin.register(TreatmentSession)
 class TreatmentSessionAdmin(admin.ModelAdmin):
-    autocomplete_fields=['cycle']
-    list_display = ('id', 'cycle', 'started', 'last_updated')
+    save_on_top = True
+    autocomplete_fields = ['cycle']
+    inlines = [TreatmentSessionStateInline, NoteInline]
+    list_display = ('id',  'started', 'cycle', 'last_updated')
     list_filter = ('started', 'last_updated')
     search_fields = ('cycle__client__username',)
+    
+
 
 class TransitionInline(admin.TabularInline):
     model = Transition
@@ -98,5 +115,5 @@ class ExampleAdmin(admin.ModelAdmin):
 
 @admin.register(TreatmentSessionState)
 class TreatmentSessionStateAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('session', 'step', 'timestamp')
 
