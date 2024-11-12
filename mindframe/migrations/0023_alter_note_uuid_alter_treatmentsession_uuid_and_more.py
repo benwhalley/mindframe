@@ -11,7 +11,6 @@ def generate_short_uuid():
     return shortuuid.uuid().lower()
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [

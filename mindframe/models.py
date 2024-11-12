@@ -154,11 +154,7 @@ class Step(models.Model):
     prompt_template = models.TextField()
     judgements = models.ManyToManyField("Judgement", through="StepJudgement")
 
-    def spoken_response(self, session) -> OrderedDict:
-        """Use an llm to create a spoken response to clients,
-        using features of the session as context."""
-
-        template = Template(self.prompt_template)
+    def get_step_context(self, session):
         context = Context(
             {
                 "turns": format_turns(session.turns.all()),
@@ -172,6 +168,15 @@ class Step(models.Model):
                 "notes": Note.objects.filter(session__cycle=session.cycle),
             }
         )
+        return context
+
+    def spoken_response(self, session) -> OrderedDict:
+        """Use an llm to create a spoken response to clients,
+        using features of the session as context."""
+
+        template = Template(self.prompt_template)
+        context = self.get_step_context(session)
+
         pmpt = template.render(context)
         # logger.info(f"PROMPT:\n{pmpt}")
         completions = chatter(pmpt, model=settings.MINDFRAME_AI_MODELS.expensive)

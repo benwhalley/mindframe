@@ -182,7 +182,7 @@ class TreatmentSessionStateAdmin(admin.ModelAdmin):
 
 @admin.register(Intervention)
 class InterventionAdmin(admin.ModelAdmin):
-    list_display = ("title","slug", "short_title", "start_session_button")
+    list_display = ("title", "slug", "short_title", "start_session_button")
     search_fields = ("title",)
     inlines = [ExampleInline]
     readonly_fields = ["slug"]

@@ -1,5 +1,6 @@
 import re
 import dotenv
+
 dotenv.load_dotenv(".env")
 
 from magentic import prompt
@@ -44,11 +45,8 @@ def split_multipart_prompt(text) -> OrderedDict:
     # import pandoc
     # from pandoc.types import *
     # it works fine for now though
-
     varname_pattern = r"\[\[\s*(\w+)\s*\]\]"
-    parts = list(filter(bool, 
-                        map(str.strip, re.split(varname_pattern, text)
-                        )))
+    parts = list(filter(bool, map(str.strip, re.split(varname_pattern, text))))
     # if we didn't explicitly include a final response variable, add one here
     if len(parts) % 2 == 1:
         parts.append("__RESPONSE__")
@@ -56,18 +54,18 @@ def split_multipart_prompt(text) -> OrderedDict:
     result = OrderedDict(zip(parts[1::2], parts[::2]))
     for text_segment, varname in zip(parts[::2], parts[1::2]):
         result[varname.strip()] = text_segment.strip()
-    
+
     return result
 
 
 def chatter(multipart_prompt, model=settings.MINDFRAME_AI_MODELS.cheap):
     """Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next."""
-    
+
     prompts_dict = split_multipart_prompt(multipart_prompt)
     results_dict = OrderedDict()
-    
+
     prompt_parts = []
-    
+
     for key, value in prompts_dict.items():
         prompt_parts.append(value)
         prompt = "\n".join(prompt_parts)
@@ -85,14 +83,14 @@ def chatter(multipart_prompt, model=settings.MINDFRAME_AI_MODELS.cheap):
             output_tokens=len(encoding.encode(res)),
         )
         prompt_parts.append(res)
-       
-    # duplicate the last item as the __RESPONSE__ so we have a 
+
+    # duplicate the last item as the __RESPONSE__ so we have a
     # predictable key to access the final completion, but can still
     # also access the last key by names used in the template
     lastkey = next(reversed(results_dict))
     if lastkey != "__RESPONSE__":
         results_dict["__RESPONSE__"] = results_dict[lastkey]
-    
+
     return results_dict
 
 
