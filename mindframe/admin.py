@@ -1,3 +1,4 @@
+import pprint
 from django.contrib import admin
 from django.db import models
 from django.shortcuts import redirect
@@ -169,10 +170,20 @@ class TurnAdmin(admin.ModelAdmin):
 class NoteAdmin(admin.ModelAdmin):
     list_display = ("session_state", "judgement", "val", "timestamp")
     list_filter = ("timestamp", "judgement")
+    readonly_fields = ["session_state", "judgement", "timestamp", "pprint_inputs", "pprint_data"]
     search_fields = ("session_state__session__cycle__client__username",)
     autocomplete_fields = [
         "session_state",
     ]
+
+    def pprint_inputs(self, obj):
+        return format_html("<pre>{}</pre>", pprint.pformat(obj.inputs, compact=True))
+
+    def pprint_data(self, obj):
+        return format_html("<pre>{}</pre>", pprint.pformat(obj.data, compact=True))
+
+    pprint_inputs.short_description = "Inputs"
+    pprint_data.short_description = "Data"
 
 
 @admin.register(Judgement)
