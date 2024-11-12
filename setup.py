@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="mindframe",
-    version="0.1.4",
+    version="0.1.5",
     description="A Python package for the Mindframe project",
     author="Ali Bidaran and Ben Whalley",
     author_email="ben.whalley@plymouth.ac.uk",
