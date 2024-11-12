@@ -11,10 +11,10 @@ repos:
     hooks:
       - id: black
 
-  - repo: local
-    hooks:
-      - id: dephell-deps-convert
-        name: Convert pyproject.toml to setup.py
-        entry: dephell deps convert --from=pyproject.toml --to=setup.py
-        language: system
-        files: ^pyproject\.toml$
+  # - repo: local
+  #   hooks:
+  #     - id: dephell-deps-convert
+  #       name: Convert pyproject.toml to setup.py
+  #       entry: dephell deps convert --from=pyproject.toml --to=setup.py
+  #       language: system
+  #       files: ^pyproject\.toml$
