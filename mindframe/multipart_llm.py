@@ -70,7 +70,7 @@ def chatter(multipart_prompt, model=settings.MINDFRAME_AI_MODELS.cheap):
         prompt_parts.append(value)
         prompt = "\n".join(prompt_parts)
         with model:
-            logger.debug(f"Calling LLM ({model}): {prompt[:30]}")
+            logger.debug(f"Calling LLM ({model}): {prompt[:60]} ...")
             try:
                 res = chat(prompt)
             except Exception as e:
