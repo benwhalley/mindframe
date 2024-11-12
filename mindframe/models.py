@@ -285,9 +285,9 @@ class Judgement(models.Model):
 class Cycle(models.Model):
     """An Cycle of treatment linking multiple TreatmentSessions"""
 
-    client = models.ForeignKey(CustomUser, on_delete=models.PROTECT, related_name="cycles")
+    client = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="cycles")
     intervention = models.ForeignKey(
-        "mindframe.Intervention", on_delete=models.PROTECT, related_name="Cycles"
+        "mindframe.Intervention", on_delete=models.CASCADE, related_name="Cycles"
     )
     start_date = models.DateTimeField(default=timezone.now)
     end_date = models.DateTimeField(null=True, blank=True)
@@ -525,7 +525,7 @@ class Turn(models.Model):
     )
 
     timestamp = models.DateTimeField(default=timezone.now)
-    speaker = models.ForeignKey(CustomUser, on_delete=models.PROTECT, null=False, blank=False)
+    speaker = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=False, blank=False)
     text = models.TextField(blank=True, null=True)
 
     metadata = models.JSONField(
@@ -551,7 +551,7 @@ class Note(models.Model):
         related_name="notes",
     )
 
-    judgement = models.ForeignKey(Judgement, on_delete=models.PROTECT)
+    judgement = models.ForeignKey(Judgement, on_delete=models.CASCADE, related_name="notes")
     timestamp = models.DateTimeField(default=timezone.now)
 
     inputs = models.JSONField(default=dict, null=True, blank=True)
@@ -575,7 +575,7 @@ class ErrorLog(models.Model):
 
     timestamp = models.DateTimeField(default=timezone.now)
     session_state = models.ForeignKey(
-        TreatmentSessionState, on_delete=models.PROTECT, null=True, blank=True
+        TreatmentSessionState, on_delete=models.CASCADE, null=True, blank=True
     )
     message = models.TextField()
     metadata = models.JSONField(default=dict, null=True, blank=True)
