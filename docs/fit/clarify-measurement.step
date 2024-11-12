@@ -4,11 +4,11 @@ slug: clarify-measurement-response
 transitions: none
 ---
 
-<!-- 
-    we don't specify ANY transition targets or conditions, 
-    which means this step produces a therapist response and then 
-    immediately jumps back to the previous step (or back to the 
-    jumping off point of the digression) 
+<!--
+    we don't specify ANY transition targets or conditions,
+    which means this step produces a therapist response and then
+    immediately jumps back to the previous step (or back to the
+    jumping off point of the digression)
 -->
 
 # Context
@@ -25,4 +25,3 @@ You want to take information from a client about how they are doing.
 It wasn't clear from the client's answer how to interpret their response. Can you help them by clarifying what the question was asking and explaining how they can answer it?
 
 Respond as the therapist. Don't include a preamble.
-

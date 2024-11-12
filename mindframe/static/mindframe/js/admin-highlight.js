@@ -5,11 +5,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const codeBlock = document.createElement('code');
         codeBlock.className = 'language-python'; // Specify Python syntax
         codeBlock.textContent = element.value;
-        
+
         // Replace the textarea with a <pre><code> structure
         const pre = document.createElement('pre');
         pre.appendChild(codeBlock);
-        
+
         // Insert the highlighted code
         element.parentNode.replaceChild(pre, element);
 

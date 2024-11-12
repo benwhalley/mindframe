@@ -1,5 +1,5 @@
 
-# start the first session at the elicit-discrepancy step, 
+# start the first session at the elicit-discrepancy step,
 # but in subsequent sessions, start at the recap step
 intervention:
   title: Functional imagery training
@@ -14,13 +14,13 @@ session_start_points:
   1: elicit-discrepancy.step
   *: recap.step
 
-models: 
+models:
   clever_and_expensive:
     name: gpt-4o
   cheap_and_cheerful:
     name: gpt-4o-mini
     default: true
-  
+
 step_defaults:
   # set some defaults to push people through the steps if progress is very slow
   # the transition is forced to the FIRST in the list of transitions
@@ -53,9 +53,6 @@ transitions:
   - discuss-practice.step --> set-homework.step:
       evaluate_after_n_turns: 10  # override default
       conditions: [practice_discussed(yes)]
-    
+
   - set-homework.step --> end-session.step:
     conditions: [homework-set(yes)]
-      
-    
-

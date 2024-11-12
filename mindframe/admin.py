@@ -88,9 +88,7 @@ class TransitionInline(admin.TabularInline):
 
     formfield_overrides = {
         models.TextField: {
-            "widget": admin.widgets.AdminTextareaWidget(
-                attrs={"class": "transition-conditions"}
-            )
+            "widget": admin.widgets.AdminTextareaWidget(attrs={"class": "transition-conditions"})
         }
     }
 
@@ -220,6 +218,4 @@ class InterventionAdmin(admin.ModelAdmin):
             '<a class="button" href="{}">Start New Session</a>',
             f"../start_session/{object_id}/",
         )
-        return super().change_view(
-            request, object_id, form_url, extra_context=extra_context
-        )
+        return super().change_view(request, object_id, form_url, extra_context=extra_context)

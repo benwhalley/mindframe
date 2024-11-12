@@ -20,9 +20,9 @@
 
 ### `transitions`
 
-`transitions` are the edges in the therapy DAG, which represent the possible transitions between `steps`. 
+`transitions` are the edges in the therapy DAG, which represent the possible transitions between `steps`.
 
-Transitions are associated with a set of conditions which must be met for the transition to be valid/occur. These conditions are defined by `goals` which have been achieved, and potentially also other data (e.g. the time or the number of turns taken in the step, or client metadata).  When transitions are evaluated, they may have side effects and pass information back to the next `turn`, or implement other logic in `actions`. 
+Transitions are associated with a set of conditions which must be met for the transition to be valid/occur. These conditions are defined by `goals` which have been achieved, and potentially also other data (e.g. the time or the number of turns taken in the step, or client metadata).  When transitions are evaluated, they may have side effects and pass information back to the next `turn`, or implement other logic in `actions`.
 
 For example, consider a transition between nodes for 'establish_rapport' and 'elicit_problem'. The transition might require that the patient meets the goal 'is_engaged'. If the patient is not engaged, the transition might fail, and the system could either simply allow more turns to happen within the 'establish_rapport' step, or inject additional system information into the chat history/prompt (not seen by the client), e.g. to say "Client does not seem engaged yet, keep trying." or "Client does not seem engaged yet, try strategy X.". That is, providing additional online `supervision` to the therapist to supplement the initial prompt and help them get across the transition boundary.
 
@@ -31,9 +31,9 @@ For example, consider a transition between nodes for 'establish_rapport' and 'el
 
 `indicators` are related to goals, but are a representation of some state of the client or the conversation/dyad at a particular time, evaluated on the basis of data available to the system (but not specific questions asked of the client... those are `measurements`, see below)
 
-We can think of them as a single continuous measurement, rather than an *evaluation* of state of the whole system at a single point in time (which goals are). 
+We can think of them as a single continuous measurement, rather than an *evaluation* of state of the whole system at a single point in time (which goals are).
 
-`indicators` and `measurements` both feed into goal evaluation. For example, we might have a continuous indicator of 'client engagement' or of 'negative arousal' which are updated at each step of the conversation and stored as metadata with 'turns' (see below). Indicators could be defined in various ways and use different data sources, but could be entirely text based (e.g. from last N turns). We should be able to define indicators in a declarative way, and then have the system automatically update them based on the conversation and other inputs. 
+`indicators` and `measurements` both feed into goal evaluation. For example, we might have a continuous indicator of 'client engagement' or of 'negative arousal' which are updated at each step of the conversation and stored as metadata with 'turns' (see below). Indicators could be defined in various ways and use different data sources, but could be entirely text based (e.g. from last N turns). We should be able to define indicators in a declarative way, and then have the system automatically update them based on the conversation and other inputs.
 
 Indicators might have various return 'types'. For example binary indicators (e.g. 'client is engaged') or continuous indicators (e.g. 'emotional arousal'), or categorical indicators (e.g. 'dominant emotion').  Initially, I'd expect indicators to be implemented in a fairly brute-force way as templated prompts to the LLM (like `steps`). This has the advantage that we can use explcit prompting to define them and update them easily in development. But later we might want to be more subtle and train specific models to do these categorisation tasks (e.g. to save time/cost).
 
@@ -90,7 +90,7 @@ Is the client engaged in the conversation? Respond 'yes', 'no', or 'unclear'
 
 A `measurement` is taken when the client is explicitly asked a question, or when other sensors are used to gather data about the client. Measurements are not part of the treatment definition, but are used to update `indicators` and `goals`.  Measurements are typed or at least have a constrained set of expected values.
 
-For example, a measurement might be made by inserting a UI for a likert question into the chat window and asking: "How are you feeling right now?" on a 1-7 scale. 
+For example, a measurement might be made by inserting a UI for a likert question into the chat window and asking: "How are you feeling right now?" on a 1-7 scale.
 
 Measurements are used to update `indicators` and `goals` in the system, and are stored in the database for later analysis. We might want to think about whether `measurements` and `indicators` are really distinct in this architecture. I think they are conceptually a bit different because an indicator can be a kind of latent measurement, generated by the system from the conversation or other sensors which are always on, whereas a measurement is a direct question asked of the client or a sensor reading taken as a snapshop. But in practice, I guess we might want to treat them the same way in the system?
 
@@ -98,7 +98,7 @@ Measurements are used to update `indicators` and `goals` in the system, and are 
 
 ### `actions`
 
-`actions` are things the system does, but which are not directly related to the content of the conversation in turns. 
+`actions` are things the system does, but which are not directly related to the content of the conversation in turns.
 
 `actions` can be triggered by:
 
@@ -107,7 +107,7 @@ Measurements are used to update `indicators` and `goals` in the system, and are 
 
 Actions might include logging data, triggering the updating of `indicators` (e.g. 'check the client emotional arousal now'), or triggering `supervision` (e.g. inserting extra system messages to the therapist model), or triggering an `evaluation` by a human therapist.
 
-Actions are a way to implement side effects from transitions or transition-evaluation. For example, on transitioning between steps, an action might summarise and store information in the patients' `notes` (a long-term store of information about treatment and progress in treatment).  To give a concrete example, when the client transitions past the 'elicit_imagery' step, the system might store the content of the imagery in the `notes` for later reference. This could be a summary of all the turns used to elicit and refine the imagery, and would make for efficient retrieval later.  
+Actions are a way to implement side effects from transitions or transition-evaluation. For example, on transitioning between steps, an action might summarise and store information in the patients' `notes` (a long-term store of information about treatment and progress in treatment).  To give a concrete example, when the client transitions past the 'elicit_imagery' step, the system might store the content of the imagery in the `notes` for later reference. This could be a summary of all the turns used to elicit and refine the imagery, and would make for efficient retrieval later.
 
 Another example might be actions which trigger a 'GOTO' to a special-case `step` in the DAG, or which triggers `supervision` to the therapist model and provides additional guidance or prompts for the therapy output llm.
 
@@ -119,7 +119,7 @@ Another example might be actions which trigger a 'GOTO' to a special-case `step`
 
 `supervision` is online coaching/support/guidance to the therapist llm. We'd want this to enable treatment developers to anticipate common failure modes or difficulties and provide additional guidance to the therapist model to get past them. Supervision prompts might be implemented as templated llm prompts which can access the conversation history and system state, and generate output that is only seen by the therapist model. For example, if the system detects that the client is not engaged, it might trigger a supervision prompt to the therapist model which says "Client does not seem engaged yet, try strategy X." or "Client does not seem engaged yet, keep trying.".
 
-One use for `indicators` might be to implement these 'consitutional' or supervisory' models we discussed -- i.e., to track the progress of the therapy session against broader principles, or filter out dangerous responses from the patient or therapist. For example, we might have an `indicator` for 'client is asking for medical advice' which is updated continuously, and which could be used to trigger additional guidance/prompts to the therapist model, or to trigger an interrupt action which transitions the system into a special-case step (e.g. on in which the system explains that it can't offer medical advice). 
+One use for `indicators` might be to implement these 'consitutional' or supervisory' models we discussed -- i.e., to track the progress of the therapy session against broader principles, or filter out dangerous responses from the patient or therapist. For example, we might have an `indicator` for 'client is asking for medical advice' which is updated continuously, and which could be used to trigger additional guidance/prompts to the therapist model, or to trigger an interrupt action which transitions the system into a special-case step (e.g. on in which the system explains that it can't offer medical advice).
 
 
 
@@ -129,7 +129,7 @@ One use for `indicators` might be to implement these 'consitutional' or supervis
 
 Often, when defining `steps` or goals treatment developers will expect to be able to include examples for few-shot learning.
 
-However, we won't always want to hard-code examples within the prompt itself. 
+However, we won't always want to hard-code examples within the prompt itself.
 
 To make the system more dynamic and responsive to the conversation, we might want to store examples in a separate database and then retrieve them as needed using search/RAG type techniques.
 
@@ -168,7 +168,7 @@ Or if we got really fancy we could specify what search strategy to use  like hyd
 
 `{examples:"a therapist giving information about alcohol use", method: "hyde"}`
 
-Here, the search string is used to generate 'hypothetical' examples which are then used to match against a corpus of known-good examples using cosine similarity. The `n_examples` parameter would limit the number of examples returned. 
+Here, the search string is used to generate 'hypothetical' examples which are then used to match against a corpus of known-good examples using cosine similarity. The `n_examples` parameter would limit the number of examples returned.
 
 
 It would be really neat if the search strings could be dynamic:
@@ -182,7 +182,7 @@ Another common/special case would be to just use the previous dialog to find exa
 
 `{examples, method:'turns', n:5}`
 
-This would create a text string of the past 5 turns from the conversation and use cosine similarity to find similar interactions from good examples in the database. 
+This would create a text string of the past 5 turns from the conversation and use cosine similarity to find similar interactions from good examples in the database.
 
 
 
@@ -206,15 +206,15 @@ This would create a text string of the past 5 turns from the conversation and us
 
 The system will naturally log all interactions between client and therapist, all measurements, actions etc and everything will be timestamped.
 
-However, in defining the llm prompts for `steps` it's likely that we will want to use RAG and related memory techniques to include information from previous steps in the conversation. 
+However, in defining the llm prompts for `steps` it's likely that we will want to use RAG and related memory techniques to include information from previous steps in the conversation.
 
 One option would be brute-force this and include large amounts of the previous conversation verbatim. However, it seems likely to me that this would be inefficient and would not scale well. It might also miss opporunities to use signal in the conversation history in a more sophisticated way.
 
-For example, imagine a long series of turns/steps in which the client defines the problem they want to work on and their personal goals for behaviour change. This conversation might be quite long and complex, and include missteps or dead-ends. Rather than including it verbatim, we could create special summaries which would be more informative for the therapist model in later steps. 
+For example, imagine a long series of turns/steps in which the client defines the problem they want to work on and their personal goals for behaviour change. This conversation might be quite long and complex, and include missteps or dead-ends. Rather than including it verbatim, we could create special summaries which would be more informative for the therapist model in later steps.
 
 For example this conversation shows how we might summarise notes from a single or multiple `steps`: https://chatgpt.com/share/67065e0a-3c48-8001-89fd-0d1c21af0358  We might save this in a note called `problem_primary`
 
-In our llm prompt templating DSL we could have special tags like `{notes:*}` or `{notes:problem_primary}` or `{notes:problem_*}` to retrieve notes by name and insert them as system prompts into the context. 
+In our llm prompt templating DSL we could have special tags like `{notes:*}` or `{notes:problem_primary}` or `{notes:problem_*}` to retrieve notes by name and insert them as system prompts into the context.
 
 We could also have search syntax like `{notes:"alcohol"}` for more RAG-like techniques which use semantic search. The tag might have other params like  `{notes:"barriers to change", n_tokens:300}`  would do something like
 
@@ -228,7 +228,7 @@ And then those previous turns are dumped as a text string into the prompt for th
 
 ##### `formulations`
 
-This is definitely not part of the initial product, but another possible use for `notes` is to create and update a `formulation` for a client which is essentially a summary of the client's problems, goals, and other relevant information. This could be used to provide a summary of the client's situation to the therapist model in later steps. 
+This is definitely not part of the initial product, but another possible use for `notes` is to create and update a `formulation` for a client which is essentially a summary of the client's problems, goals, and other relevant information. This could be used to provide a summary of the client's situation to the therapist model in later steps.
 
 ----
 
@@ -248,7 +248,7 @@ Preferences might control things like:
 - language
 - assumed prior knowledge
 - reading age and complexity of text the patient is comfortable with
-- the level of detail in the therapist's responses 
+- the level of detail in the therapist's responses
 
 
 
@@ -256,7 +256,7 @@ Preferences might control things like:
 
 As we discussed, we need to define special syntax to allow the system to access the conversation history and other data sources to generate prompts for the therapist model.
 
-We could use a markdown-like syntax for this, or some variant on python string formatting. 
+We could use a markdown-like syntax for this, or some variant on python string formatting.
 I'm not bothered about the exact syntax provided it's not too hard to implment and isn't too ugly. I guess we also need to consider ease of writing and debugging when therapists are developing.
 
 
@@ -316,7 +316,7 @@ As a nice to have, summarising could be included within the rag template too, So
 
 Some system data would be exposed in all templates, e.g.:
 
-- {meta: time_of_day} 
+- {meta: time_of_day}
 - {meta: client_name}
 - {meta: client_location}
 - {meta: client_age}
@@ -328,7 +328,7 @@ Some system data would be exposed in all templates, e.g.:
 ### Multistep prompting
 
 The special syntax `[[FOO]]` would allow us to define a multi-step prompt where the model
-responds to some output, and then incorporates this output with additional instructions to make a final response.  
+responds to some output, and then incorporates this output with additional instructions to make a final response.
 
 This is useful because we can:
 
@@ -346,7 +346,7 @@ The client has recently said this:
 
 {turns:10}
 
-Consider several possible interpretations of what they are saying. Think about how you might respond to this in accordance with MI principles. 
+Consider several possible interpretations of what they are saying. Think about how you might respond to this in accordance with MI principles.
 
 [[DISCUSSION]]
 
@@ -356,7 +356,7 @@ Now, think of several different topics for open questions which would be suitabl
 [[TOPICS]]
 
 
-Now, summarise this into a single response for the client. You need to say something that fits nearly into the existing conversation and is not too complex. 
+Now, summarise this into a single response for the client. You need to say something that fits nearly into the existing conversation and is not too complex.
 Always be polite, empathetic and professional.
 
 {turns:2}
@@ -369,14 +369,14 @@ THERAPIST: [[NEXT_UTTERANCE]]
 
 ### Includes/inheritance  within templates
 
-Note that the final part of this prompt described in the multistep prompting section might be 'inherited' from a standard "make the next move" template for stylistic consistency. 
+Note that the final part of this prompt described in the multistep prompting section might be 'inherited' from a standard "make the next move" template for stylistic consistency.
 
 E.g. we could define a standard output prompt like this:
 
 
 ```{#make_next_utterance}
-Now, summarise this thinking into a single response for the client. 
-You need to say something that fits nearly into the existing conversation 
+Now, summarise this thinking into a single response for the client.
+You need to say something that fits nearly into the existing conversation
 and is not too complex.  Always be polite, empathetic and professional.
 
 {turns:n_turns}
@@ -407,16 +407,16 @@ In the `step` "elicit_imagery" we might have a prompt like:
 ```
 You are a FIT therapist [etc etc].
 
-You are in the middle of a treatment session and have got to know your clients' problem and their goals for therapy. You have been discussing their problem with them for a while now. 
+You are in the middle of a treatment session and have got to know your clients' problem and their goals for therapy. You have been discussing their problem with them for a while now.
 
 - The client's primary problem is: {notes:primary_problem}
 - The client's name is: {notes:client_name}
 
-Here is a summary of what they have said about their problem so far: 
+Here is a summary of what they have said about their problem so far:
 
 {notes:problem_summary}
 
-Now, you want to elicit an image of the problem from the client. You might say something like   
+Now, you want to elicit an image of the problem from the client. You might say something like
 
 > 'Can you imagine yourself in the situation you've been describing? What do you see, hear, feel?'
 
@@ -465,8 +465,8 @@ focus on:
 - any potential barriers
 - any potential solutions
 
-Write in the first person, past tense. 
-Don't include a preamble. 
+Write in the first person, past tense.
+Don't include a preamble.
 Refer to the client as {notes:client_name}.
 
 
@@ -489,18 +489,18 @@ An example of this sort of prompt is here: https://chatgpt.com/share/670672cd-7c
 
 We need a format (perhaps yaml because easier to read than json?) to define the connections in the DAG. Ultimately this might need a GUI, but not now.
 
-Maybe it would look something like below. 
+Maybe it would look something like below.
 
 ```yaml
-nodes: 
+nodes:
     establish_rapport:
         # specify which other nodes we can transition-to, and dependencies/pre-requisites
-        transitions: 
+        transitions:
             - eliciting_problem:
                 dependencies: [client_wants_to_change]
         # specify which notes templates to use on transition
-        take_notes: [general, summarise_rapport] 
-                
+        take_notes: [general, summarise_rapport]
+
     eliciting_problem:
         transitions:
             - elicit_imagery:
@@ -509,7 +509,7 @@ nodes:
             - break_down_problem:
                 dependencies: [problem_too_complex]
         take_notes: [problem_primary, problem_summary]
-        
+
 
     break_down_problem:
         transitions:
@@ -564,9 +564,9 @@ We will probably need to expend some effort to make sure templating errors (e.g.
 
 Sometimes we might want to summarise where the client is at within the intervention, taking into account all the metadata and notes we have stored.
 
-A `review` is conceptually similar to a `note`, but is generated by the system on demand rather than saved in a transition or other action. 
+A `review` is conceptually similar to a `note`, but is generated by the system on demand rather than saved in a transition or other action.
 
-A review might be a summary of the conversation, of the goals achieved and include information about indicators. 
+A review might be a summary of the conversation, of the goals achieved and include information about indicators.
 
 A `review` could be used for human review of the system performance, or for generating a summary of the session for the client.
 
@@ -574,7 +574,7 @@ A review could be templated in the same way as a note:
 
 
 ```
-{notes:client_name} is currently working on {notes:problem_primary} 
+{notes:client_name} is currently working on {notes:problem_primary}
 as part of their therapy.
 
 This is their entire conversation so far:
@@ -583,7 +583,7 @@ This is their entire conversation so far:
 
 ## Summaries of the conversation
 
-{notes:client_name} is currently working on {notes:problem_primary} 
+{notes:client_name} is currently working on {notes:problem_primary}
 as part of their therapy.
 
 The therapist has made the folling notes:
@@ -600,7 +600,7 @@ They have not yet achieved the following goals: {goals:unachieved}
 
 ## Other data
 
-The following indicator data is available: 
+The following indicator data is available:
 
 {indicators:active}
 
@@ -628,7 +628,7 @@ The system presents different interfaces for:
 
 - supervisors: via a web interface which allows them to see the conversation history and provide evalutions on the quality of the conversation. Or perhaps also to manually add notes and hints to be included in system llm prompts.
 
-- the intervention developer: 
+- the intervention developer:
     - via a web interface or API which allows them to update the primitives described above, see the conversation histories, and also see stats on the performance of the system, e.g. how many goals were achieved, how many transitions were made, etc, time to achieve transitions etc.
     - via sandbox chat with the system to test the system in real time, and to see how the system is responding to prompts. This could be useful for debugging and for understanding how the system is working in real time. This sandbox view would allow intervention developers to create a 'session' and tweak the system in real time to see how it responds. E.g. they could edit the content of notes, or the content of the conversation history, or the state of goals, and then 'jump' the current position of the bot in the DAG.
 

@@ -97,8 +97,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="step",
             name="judgements",
-            field=models.ManyToManyField(
-                related_name="steps", to="mindframe.stepjudgement"
-            ),
+            field=models.ManyToManyField(related_name="steps", to="mindframe.stepjudgement"),
         ),
     ]

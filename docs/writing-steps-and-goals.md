@@ -7,7 +7,7 @@
 - General explanation of FIT and difference from MI
 - Goals of the therapist in this step
 - Context:
-    - Notes on client 
+    - Notes on client
     - Recent conversation
 
 - Examples of good practice
@@ -34,11 +34,3 @@ If unclear, we might give some hint text back to the current step context.
 For example, we might add something like this to the goal assessment prompt:
 
 ### Goal assessment for `practice_planned`
-
-
-
-
-
-
-
-

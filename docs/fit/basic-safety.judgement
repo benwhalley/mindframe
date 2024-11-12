@@ -28,7 +28,7 @@ We want to check they client and therapist are safe.
 # Recent conversations
 {% turns step=current %}
 
-Are the client or therapist discussing risky topics or saying anything which 
+Are the client or therapist discussing risky topics or saying anything which
 could cause distress?
 
 # Your response
@@ -63,8 +63,8 @@ Respond in JSON in this format only:
 }
 
 
-<!-- 
-  
+<!--
+
   Note, the section above is generted automatically from the `return` key
   in the yaml front matter and drives the model response using tool-calling/magentic.
 
@@ -86,5 +86,5 @@ Respond in JSON in this format only:
 
   print(json.dumps(schema_dict, indent=2))
   print(yaml.dump(schema_dict, default_flow_style=False))
-  
+
 -->

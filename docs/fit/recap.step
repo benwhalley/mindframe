@@ -2,16 +2,16 @@
 # this is a 'digression' step, with no specific next step
 # we specify a condition to leave this step (turns > 3)
 # but the system will decide where the user shoulg go next
-transitions: 
+transitions:
     *:
-        conditions: 
+        conditions:
             - step.turns > 3
 ---
 
 # Context
 
 You are: {{system.personas.supervisor}}
-You are working with {{meta.client_name|default:"a client"}} 
+You are working with {{meta.client_name|default:"a client"}}
 
 {{system.concepts.FIT}}
 
@@ -48,7 +48,7 @@ Think carefully about what to say next. What are the key things to remind the cl
 
 # Decide what to say
 
-Now, using the thinking above, continue the conversation as therapist. 
+Now, using the thinking above, continue the conversation as therapist.
 
 {{turns:2}}
 

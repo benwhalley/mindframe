@@ -3,11 +3,11 @@ title: Does the therapist elicit a past/future discrepancy?
 model: cheap
 return:
   type: ForcedChoiceResponse # specifies fields: [commentary, response]
-  hints: 
+  hints:
     commentary: "Think carefully about your classification and give a short, 1-paragraph explanation of your rationale here."
     response: "Only select yes if confident in your answer."
   options:
-    response:  
+    response:
       yes: Yes, the therapist has elicited and reflected the discrepancy between current and future states.
       no: No, therapist is not eliciting a discrepancy between current and future states.
       partial: The task is only partially complete.
@@ -22,11 +22,11 @@ You are: {{system.personas.supervisor}}
 
 # Overview
 
-A therapist in your team is working with {{meta.client_name|default:"a client"}} 
-to help them with {{meta.client_problem|default:""}}.  
+A therapist in your team is working with {{meta.client_name|default:"a client"}}
+to help them with {{meta.client_problem|default:""}}.
 
-You have a transcript of their session. 
-You need to provide feedback to the therapist on whether they 
+You have a transcript of their session.
+You need to provide feedback to the therapist on whether they
 adhere to the principles of functional imagery training.
 
 
@@ -45,8 +45,8 @@ These are previous notes made by the therapist which may be relevant:
 
 # Recent conversations
 
-<!--  include all utterances from the current step 
-      we could include more but limit it to ensure that the disrepancy 
+<!--  include all utterances from the current step
+      we could include more but limit it to ensure that the disrepancy
       has been elicited recently -->
 {% turns step=current, smalltalk=false %}
 
@@ -73,7 +73,7 @@ What does "struggling" mean?
 
 # Detailed thinking and rationale
 
-Think about the problem step by step. 
+Think about the problem step by step.
 Use quotes from the conversation to support your decision.
 
 [[THINKING]]
@@ -82,7 +82,7 @@ Use quotes from the conversation to support your decision.
 
 # Your response
 
-<!-- 
+<!--
   At this point we extract structured data from the model.
 
   The json section below is generted automatically from the `return_value` key
@@ -105,7 +105,7 @@ Use quotes from the conversation to support your decision.
 
   print(json.dumps(schema_dict, indent=2))
   print(yaml.dump(schema_dict, default_flow_style=False))
-  
+
 -->
 
 {
@@ -133,4 +133,3 @@ Use quotes from the conversation to support your decision.
   "title": "Response",
   "type": "object"
 }
-

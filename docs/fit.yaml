@@ -68,9 +68,9 @@ steps:
   - check_initial_confidence:
     step_type: measurement
     title: Check client's confidence in the initial plan
-    edges: 
+    edges:
       - strengthen_plan_self_efficacy:
-          required: [confident_in_plan] 
+          required: [confident_in_plan]
       - build_discrepancy:
           required: [not_confident_in_plan]
 
@@ -79,15 +79,15 @@ steps:
       step_type: conversational
       title: Strengthen client's self-efficacy in the plan
       description: Have you tried something like this before? Or succeeded at something else that was difficult? Use imagery to develop
-    
+
     - elicit_barriers:
       step_type: conversational
       title: Elicit barriers to implementing plan
       description: What are the potential barriers to making this change?
-      edges: 
+      edges:
         - overcome_barriers:
             required: [barriers_elicited|no_real_barriers]
-    
+
     - overcome_barriers:
       step_type: conversational
       title: Use imagery to develop strategies to overcome barriers
@@ -98,7 +98,7 @@ steps:
         - check_plan_confidence:
           # note that barriers_mitigated_with_imagery would have to check that _all_ barriers had been addressed, or that the client was generally confident in their ability to overcome barriers
           required: [barriers_mitigated_with_imagery]
-        
+
     - summarise_and_reflect_plan:
       step_type: conversational
       title: Summarise and reflect on the plan based on the conversation to date
@@ -111,10 +111,10 @@ steps:
       title: Check client's confidence in the developed plan
       edges:
         - strengthen_plan_self_efficacy:
-            required: [not_confident_in_plan] 
+            required: [not_confident_in_plan]
         - find_daily_cue_for_imagery:
             required: [confident_in_plan]
-        
+
     # training imagery use outside the session
     - find_daily_cue_for_imagery:
         title: Reiterate the importance of practice, find a cue to trigger imagery use in daily life
@@ -145,10 +145,10 @@ steps:
         edges:
           - followup:
               required: [session_wrapped_up]
-    
+
     # 'island' steps for 'excursions'
     # these are not part of the 'happy path', but can be triggered by indicators (e.g. low mood) or by other measurements
-  
+
     - medical_misconception:
         title: A client expresses a medical misconception
         edges: none

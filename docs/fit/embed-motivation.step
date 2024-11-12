@@ -1,9 +1,9 @@
 ---
-transitions: 
+transitions:
     end-intervention:
         # we don't have specific conditions here yet... just a time based one
         # we might want to write more explcit conditions later
-        conditions: 
+        conditions:
             - step.minutes > 5 + step.turns > 5
 ---
 
@@ -33,7 +33,3 @@ Now respond in a short reply, as though spoken by the therapist to the client:
 {{turns:2}}
 
 THERAPIST: [[RESPONSE]]
-
-
-
-

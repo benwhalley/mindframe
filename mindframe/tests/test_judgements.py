@@ -48,7 +48,6 @@ from mindframe.structured_judgements import (
 
 
 class JudgementTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         # Example data for testing
@@ -67,9 +66,7 @@ therapist	00:00:55	Okay. Would you like to talk more about that?"""
         # Create mock intervention and session
         cls.intervention = Intervention.objects.create(title="Test Intervention")
         cls.client = CustomUser.objects.create(username="joe")
-        cls.cycle = Cycle.objects.create(
-            intervention=cls.intervention, client=cls.client
-        )
+        cls.cycle = Cycle.objects.create(intervention=cls.intervention, client=cls.client)
 
         cls.session = TreatmentSession.objects.create(cycle=cls.cycle)
 
@@ -94,9 +91,7 @@ therapist	00:00:55	Okay. Would you like to talk more about that?"""
             return_type=self.brief_judgement_return_type,
         )
         # Process the input through the judgement
-        newnote = jj.process_inputs(
-            session=self.session, inputs={"input": self.anno_eg}
-        )
+        newnote = jj.process_inputs(session=self.session, inputs={"input": self.anno_eg})
 
         # Assert that the result is in expected format and fields
         self.assertIn("text", newnote.data)
@@ -111,9 +106,7 @@ therapist	00:00:55	Okay. Would you like to talk more about that?"""
         )
 
         # Process the input through the judgement
-        newnote = jj.process_inputs(
-            session=self.session, inputs={"input": self.anno_eg}
-        )
+        newnote = jj.process_inputs(session=self.session, inputs={"input": self.anno_eg})
 
         # Assert that the result includes the expected complex fields
         self.assertIn("text", newnote.data)

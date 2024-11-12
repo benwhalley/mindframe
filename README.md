@@ -27,7 +27,7 @@ For developers looking to setup a local instance of mindframe, see: https://gith
 
 ### Graph-based interventions
 
-What makes mindframe different from other chatbot systems based on fine-tuning with large datasets is its ability to represent therapy as a directed graph. This allows for complex interventions to be broken down into smaller, more manageable components, and for the system to track client progress and adjust interventions based on historical data.  Defining interventions in this way also makes the system more flexible, and rapidly adaptable to new research, or to local guidelines and requirements. 
+What makes mindframe different from other chatbot systems based on fine-tuning with large datasets is its ability to represent therapy as a directed graph. This allows for complex interventions to be broken down into smaller, more manageable components, and for the system to track client progress and adjust interventions based on historical data.  Defining interventions in this way also makes the system more flexible, and rapidly adaptable to new research, or to local guidelines and requirements.
 
 Unlike systems which fine-tune language models to produce output similar in tone of style to that of a therapist, mindframe focusses on the structure of the therapy itself. This allows for more control over the therapy flow, and for interventions to be more easily validated and tested.
 
@@ -53,11 +53,4 @@ MindFrame organizes therapy sessions around several key primitives:
 
 - *Examples* are short excepts from good or bad therapeutic practice, stored for semantic search and retrieval during conversations. Steps are templated in a way that allows treatment developers to dynamically insert relevant examples into the LLM prompt, leveraging the power of recent AI models to use 'few-shot' learning to generate high-quality responses.
 
-Each of these components is defined in a simple, declarative text-based format. 
-
-
-
-
-
-
-
+Each of these components is defined in a simple, declarative text-based format.

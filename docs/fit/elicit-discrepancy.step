@@ -1,8 +1,8 @@
 ---
 model: expensive
-transitions: 
+transitions:
     embed-motivation:
-        conditions: 
+        conditions:
             - judgement.discrepancy == 'yes'
             # OR
             - judgement.discrepancy == 'partial' and step.turns > 30
@@ -24,14 +24,14 @@ You are: {{personas.supervisor}}
 
 # Overview
 
-A therapist in your team is working with {{meta.client_name | default("a client")}} 
-to help them with {{meta.client_problem | default("")}}.  
+A therapist in your team is working with {{meta.client_name | default("a client")}}
+to help them with {{meta.client_problem | default("")}}.
 
 # Previous notes
 
 {% notes * %}
 
-# Recent conversation 
+# Recent conversation
 
 {% turns step='current', smalltalk=false, include_thoughts=true %}
 
@@ -42,7 +42,7 @@ We need to help the client identify a discrepancy between their current state an
 # Think carefully
 
 Think carefully about what to say next.
-Has this process already started? 
+Has this process already started?
 How can you encourage the client to identify a discrepancy?
 How can you build on what they have already said and reflect or amplify it?
 
@@ -50,13 +50,13 @@ How can you build on what they have already said and reflect or amplify it?
 
 Now, summarise this thought in a sentence or two:
 
-[[THOUGHT]]  
+[[THOUGHT]]
 <!-- this summary gets used later in prompt-context -->
 
 
 # Decide what to say
 
-Now, using the thinking above, continue the conversation as therapist. 
+Now, using the thinking above, continue the conversation as therapist.
 
 {{turns(2)}}
 

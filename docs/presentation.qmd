@@ -71,7 +71,7 @@ $g$ aggregates the history of the interactions to date.
 - Steps (nodes)
 - Turns (cycles on a node)
 - Transition conditions
-- Goals 
+- Goals
 - Indicators
 - Actions (side effects)
 
@@ -99,7 +99,7 @@ These provide *context* for therapist speech: real-time, client-specific adaptat
 
 
 
-<!-- 
+<!--
 - **Steps**: Defined points in the therapy process (e.g., `establish_rapport`).
 - **Turns**: Client or system utterances within a session.
 - **Goals**: Achievements required for therapy progress (e.g., `build_self_efficacy`).
@@ -166,18 +166,18 @@ Use `[[DISCUSSION]]` and `[[RESPONSE]]` to break down the reasoning process.
 ## Multistep promoting
 
 ```
-You are a therapist treating a patient for anxiety. 
-They describe feeling overwhelmed by their workload. 
+You are a therapist treating a patient for anxiety.
+They describe feeling overwhelmed by their workload.
 
 These are the last few things the client said:
 
-CLIENT: "I have so much to do, and it feels like I’ll never get through it. 
+CLIENT: "I have so much to do, and it feels like I’ll never get through it.
   I don’t even know where to start."
 
 Before responding, think step by step about the situation:
 
-1. What is the client feeling?  
-2. How does this relate to their anxiety?  
+1. What is the client feeling?
+2. How does this relate to their anxiety?
 3. What might be a helpful therapeutic response?
 
 [[DISCUSSION]]
@@ -190,12 +190,12 @@ Before responding, think step by step about the situation:
 
 
 ```
-2. How does this relate to their anxiety?  
+2. How does this relate to their anxiety?
 3. What might be a helpful therapeutic response?
 
 [[DISCUSSION]]
 
-Now, based on your reasoning, craft a response that 
+Now, based on your reasoning, craft a response that
 validates their feelings and helps them move forward.
 Be concise and respond in 1 or MAX 2 sentences.
 
@@ -215,10 +215,10 @@ Be concise and respond in 1 or MAX 2 sentences.
 
 
 ```
-This is something a therapist said in an example manual. 
-In current form it's too complex and has too many parts. 
+This is something a therapist said in an example manual.
+In current form it's too complex and has too many parts.
 No real therapist would say this much.
-Make this more spoken-like.  
+Make this more spoken-like.
 Make it fit into a more naturalistic dialogue.
 Use UK English idiom and colloquialisms
 Always use question marks for questions.
@@ -243,7 +243,7 @@ E.g. on completing a step, we might use an LLM to summarise the conversation and
 ## Notes prompt
 
 ```
-You are a motivational interviewing expert helping a client 
+You are a motivational interviewing expert helping a client
 to {note:primary_problem}.
 We have just completed the "Elicit current/future discrepancy" step in FIT.
 We need to keep good notes of the conversation so we can remember later.
@@ -252,7 +252,7 @@ This is the conversation from this step of the treatment:
 {turns:step:previous}
 {turns:step:current}
 
-Summarise this conversations. Make a note which will be useful later. 
+Summarise this conversations. Make a note which will be useful later.
 Focus on: what the client said and what the client's goals are.
 Respond in no more than 2 paragraphs:
 ```
@@ -260,7 +260,7 @@ Respond in no more than 2 paragraphs:
 
 ## Costs
 
-Assume 
+Assume
 
 - 150 words per minute
 - Input tokens are 6x output tokens
@@ -306,16 +306,9 @@ datarium::jobsatisfaction
 
 ```{r}
 
-development %>% 
-  filter(year < 1960) %>% 
-  ggplot(aes(life_expectancy, gdp_per_capita)) + geom_smooth() + 
+development %>%
+  filter(year < 1960) %>%
+  ggplot(aes(life_expectancy, gdp_per_capita)) + geom_smooth() +
   facet_grid(year ~ continent)
 
 ```
-
-
-
-
-
-
-

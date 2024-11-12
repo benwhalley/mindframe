@@ -55,9 +55,7 @@ def generate_short_uuid():
 
 
 def format_turns(turns):
-    return "\n".join(
-        [f"{t.speaker.role.upper()}: {t.text}" for t in turns.order_by("timestamp")]
-    )
+    return "\n".join([f"{t.speaker.role.upper()}: {t.text}" for t in turns.order_by("timestamp")])
 
 
 class CustomUser(AbstractUser):
@@ -113,9 +111,7 @@ class StepJudgement(models.Model):
     judgement = models.ForeignKey(
         "Judgement", related_name="stepjudgements", on_delete=models.CASCADE
     )
-    step = models.ForeignKey(
-        "Step", related_name="stepjudgements", on_delete=models.CASCADE
-    )
+    step = models.ForeignKey("Step", related_name="stepjudgements", on_delete=models.CASCADE)
     when = models.CharField(
         choices=StepJudgementFrequencyChoices.choices,
         default=StepJudgementFrequencyChoices.TURN,
@@ -145,9 +141,7 @@ class Step(models.Model):
     def natural_key(self):
         return slugify(f"{self.intervention.title}__{self.title}")
 
-    intervention = models.ForeignKey(
-        Intervention, on_delete=models.CASCADE, related_name="steps"
-    )
+    intervention = models.ForeignKey(Intervention, on_delete=models.CASCADE, related_name="steps")
 
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
@@ -162,9 +156,9 @@ class Step(models.Model):
                 "intervention": session.cycle.intervention,
                 "examples": session.cycle.intervention.examples.all(),
                 "session_notes": session.notes.all(),
-                "cycle_notes": Note.objects.filter(
-                    session__cycle=session.cycle
-                ).exclude(session=session),
+                "cycle_notes": Note.objects.filter(session__cycle=session.cycle).exclude(
+                    session=session
+                ),
                 "notes": Note.objects.filter(session__cycle=session.cycle),
             }
         )
@@ -194,12 +188,8 @@ class Step(models.Model):
 class Transition(models.Model):
     """An edge between two Step nodes"""
 
-    from_step = models.ForeignKey(
-        Step, on_delete=models.CASCADE, related_name="transitions_from"
-    )
-    to_step = models.ForeignKey(
-        Step, on_delete=models.CASCADE, related_name="transitions_to"
-    )
+    from_step = models.ForeignKey(Step, on_delete=models.CASCADE, related_name="transitions_from")
+    to_step = models.ForeignKey(Step, on_delete=models.CASCADE, related_name="transitions_to")
 
     conditions = models.TextField(
         blank=True,
@@ -208,16 +198,13 @@ class Transition(models.Model):
 
     def clean(self):
         if self.from_step.intervention != self.to_step.intervention:
-            raise ValidationError(
-                "from_step and to_step must belong to the same intervention."
-            )
+            raise ValidationError("from_step and to_step must belong to the same intervention.")
 
     def __str__(self):
         return f"{self.from_step} -> {self.to_step}"
 
 
 class Judgement(models.Model):
-
     def natural_key(self):
         return slugify(f"{self.variable_name}")
 
@@ -251,9 +238,9 @@ class Judgement(models.Model):
                 "session": session,
                 "examples": session.cycle.intervention.examples.all(),
                 "session_notes": session.notes.all(),
-                "cycle_notes": Note.objects.filter(
-                    session__cycle=session.cycle
-                ).exclude(session=session),
+                "cycle_notes": Note.objects.filter(session__cycle=session.cycle).exclude(
+                    session=session
+                ),
                 "notes": Note.objects.filter(session__cycle=session.cycle),
             }
         )
@@ -296,9 +283,7 @@ class Judgement(models.Model):
 class Cycle(models.Model):
     """An Cycle of treatment linking multiple TreatmentSessions"""
 
-    client = models.ForeignKey(
-        CustomUser, on_delete=models.PROTECT, related_name="cycles"
-    )
+    client = models.ForeignKey(CustomUser, on_delete=models.PROTECT, related_name="cycles")
     intervention = models.ForeignKey(
         "mindframe.Intervention", on_delete=models.PROTECT, related_name="Cycles"
     )
@@ -306,9 +291,7 @@ class Cycle(models.Model):
     end_date = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return (
-            f"{self.client} started {self.intervention.short_title}, {self.start_date}"
-        )
+        return f"{self.client} started {self.intervention.short_title}, {self.start_date}"
 
 
 class TreatmentSession(models.Model):
@@ -317,9 +300,7 @@ class TreatmentSession(models.Model):
     def natural_key(self):
         return self.uuid
 
-    uuid = models.CharField(
-        unique=True, default=generate_short_uuid, editable=False, null=False
-    )
+    uuid = models.CharField(unique=True, default=generate_short_uuid, editable=False, null=False)
 
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name="sessions")
     started = models.DateTimeField(default=timezone.now)
@@ -348,9 +329,7 @@ class TreatmentSession(models.Model):
 
     def listen(self, speaker, text):
         """Record a Turn in the session when the client speaks"""
-        turn = Turn.objects.create(
-            session_state=self.state(), speaker=speaker, text=text
-        )
+        turn = Turn.objects.create(session_state=self.state(), speaker=speaker, text=text)
         turn.save()
         logger.info(f"TURN SAVED: {turn}")
         return turn
@@ -373,12 +352,8 @@ class TreatmentSession(models.Model):
             stepjudgements__once=True, notes_count__gt=0
         )
         # log which ones we skipped
-        for i in potential_judgements_to_run.filter(
-            stepjudgements__once=True, notes_count__gt=0
-        ):
-            nts = Note.objects.filter(judgement=i, session__cycle=self.cycle).values(
-                "data"
-            )
+        for i in potential_judgements_to_run.filter(stepjudgements__once=True, notes_count__gt=0):
+            nts = Note.objects.filter(judgement=i, session__cycle=self.cycle).values("data")
             logger.debug(f"SKIPPED JUDGEMENT: {i} - Existing Notes: {nts}")
 
         return judgements_to_run
@@ -389,9 +364,9 @@ class TreatmentSession(models.Model):
         client_data = defaultdict(lambda: None)
         client_data.update(
             dict(
-                session_notes.order_by(
-                    "judgement__variable_name", "-timestamp"
-                ).distinct("judgement__variable_name")
+                session_notes.order_by("judgement__variable_name", "-timestamp").distinct(
+                    "judgement__variable_name"
+                )
                 # data__value is a magic field name - see return_type_models.py
                 .values_list("judgement__variable_name", "data__value")
             )
@@ -420,17 +395,13 @@ class TreatmentSession(models.Model):
                 t,
                 [
                     (c, eval(c, {}, client_data))
-                    for c in list(
-                        map(str.strip, filter(bool, t.conditions.split("\n")))
-                    )
+                    for c in list(map(str.strip, filter(bool, t.conditions.split("\n"))))
                 ],
             )
             for t in transitions
         ]
 
-        transition_results = [
-            (i, all([r for c, r in l]), l) for i, l in transition_results
-        ]
+        transition_results = [(i, all([r for c, r in l]), l) for i, l in transition_results]
         logger.debug(f"TRANSITION RESULTS: {transition_results}")
 
         # Find transitions that passed (if any)
@@ -476,9 +447,7 @@ class TreatmentSession(models.Model):
         transitions = step.transitions_from.all()
 
         # for now, just get all the judgements that are run on every turn
-        turn_jgmnts = step.stepjudgements.filter(
-            when=StepJudgementFrequencyChoices.TURN
-        )
+        turn_jgmnts = step.stepjudgements.filter(when=StepJudgementFrequencyChoices.TURN)
         judgements_to_run = self.get_judgements_to_run(step, turn_jgmnts)
 
         # do the judgements we need now
@@ -517,9 +486,7 @@ class TreatmentSession(models.Model):
 class TreatmentSessionState(models.Model):
     """Tracks state within a session: which step we are at, and have come from."""
 
-    session = models.ForeignKey(
-        TreatmentSession, on_delete=models.CASCADE, related_name="progress"
-    )
+    session = models.ForeignKey(TreatmentSession, on_delete=models.CASCADE, related_name="progress")
     timestamp = models.DateTimeField(default=timezone.now)
     previous_step = models.ForeignKey(
         Step,
@@ -543,9 +510,7 @@ class TreatmentSessionState(models.Model):
 class Turn(models.Model):
     """An individual utterance during a session (either client or therapist)."""
 
-    uuid = models.CharField(
-        unique=True, default=generate_short_uuid, editable=False, null=False
-    )
+    uuid = models.CharField(unique=True, default=generate_short_uuid, editable=False, null=False)
 
     session_state = models.ForeignKey(
         TreatmentSessionState,
@@ -560,9 +525,7 @@ class Turn(models.Model):
         return self.session_state.session
 
     timestamp = models.DateTimeField(default=timezone.now)
-    speaker = models.ForeignKey(
-        CustomUser, on_delete=models.PROTECT, null=False, blank=False
-    )
+    speaker = models.ForeignKey(CustomUser, on_delete=models.PROTECT, null=False, blank=False)
     text = models.TextField(blank=True, null=True)
 
     metadata = models.JSONField(
@@ -578,13 +541,9 @@ class Turn(models.Model):
 class Note(models.Model):
     """Clinical records created by exercuting a Judgement at a point in time"""
 
-    uuid = models.CharField(
-        unique=True, default=generate_short_uuid, editable=False, null=False
-    )
+    uuid = models.CharField(unique=True, default=generate_short_uuid, editable=False, null=False)
 
-    session = models.ForeignKey(
-        TreatmentSession, on_delete=models.CASCADE, related_name="notes"
-    )
+    session = models.ForeignKey(TreatmentSession, on_delete=models.CASCADE, related_name="notes")
     judgement = models.ForeignKey(Judgement, on_delete=models.PROTECT)
     timestamp = models.DateTimeField(default=timezone.now)
 

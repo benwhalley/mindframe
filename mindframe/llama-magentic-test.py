@@ -17,7 +17,7 @@ class NestedStoryModel(BaseModel):
 
 
 @prompt(
-    """Pick a random number less than {n} and  tell me a story about it. 
+    """Pick a random number less than {n} and  tell me a story about it.
     Respond in JSON in the format specified."""
 )
 def story(n: int) -> StoryModel: ...
@@ -29,7 +29,7 @@ with local:
 
 
 @prompt(
-    """Pick a random number less than {n} and  tell me a story about it. 
+    """Pick a random number less than {n} and  tell me a story about it.
     Do this {k} times and return a list of stories.
     Respond in JSON in the format specified.
     """

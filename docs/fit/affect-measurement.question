@@ -9,7 +9,7 @@ model: cheap_and_cheerful
 return:
   type: NumericResponse  # i.e. a pydantic model object
   fields:
-    response: 
+    response:
         type: Optional[int]
         min_value: 1
         max_value: 10

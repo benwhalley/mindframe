@@ -15,6 +15,4 @@ class Migration(migrations.Migration):
         ("mindframe", "0008_treatmentsession_uuid"),
     ]
 
-    operations = [
-        migrations.RunPython(populate_uuids, reverse_code=migrations.RunPython.noop)
-    ]
+    operations = [migrations.RunPython(populate_uuids, reverse_code=migrations.RunPython.noop)]

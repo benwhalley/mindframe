@@ -2,7 +2,7 @@
 title: A general summary note template for all steps
 ---
 
-You are a {{system.personas.therapist}} working with a client on {{meta.client_problem}}. 
+You are a {{system.personas.therapist}} working with a client on {{meta.client_problem}}.
 
 You have just completed a step in the therapy and want to make a clinical note to remind yourself later.
 

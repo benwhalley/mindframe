@@ -7,7 +7,7 @@ from magentic import prompt
 """
 Important note
 
-`value` is a semi-magic field name for these models. It is currently used in 
+`value` is a semi-magic field name for these models. It is currently used in
 Session.get_judgements() to decide which judgements have already been completed
 successfully, and excluded if they only needed to be run once.
 
@@ -81,7 +81,7 @@ if False:
     CLIENT: ss
     CLIENT: s
     CLIENT: sa
-    CLIENT: I&#x27;m ready to start now 
+    CLIENT: I&#x27;m ready to start now
 
     Is the client ready to start now?
     Respond in JSON
