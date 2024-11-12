@@ -14,24 +14,17 @@ from django.template import Context, Template
 from django.utils import timezone
 from django.utils.text import slugify
 from pydantic import BaseModel
+from pgvector.django import VectorField, HnswIndex
+import shortuuid
+
+from mindframe.multipart_llm import chatter
+from mindframe.return_type_models import JUDGEMENT_RETURN_TYPES
+from mindframe.structured_judgements import data_extraction_function_factory
+from mindframe.settings import MINDFRAME_AI_MODELS, MINDFRAME_SHORTUUID_ALPHABET
 
 logger = logging.getLogger(__name__)
 
-import shortuuid
-from magentic import OpenaiChatModel
-
-from magentic.chat_model.litellm_chat_model import LitellmChatModel
-
-# 24 chars in alphapbet and 22 long = 24^22 so still very large for guessing but easier to read for humans
-shortuuid.set_alphabet("abcdefghjkmnpqrstuvwxyz")
-
-from mindframe.multipart_llm import chatter
-
-from mindframe.return_type_models import JUDGEMENT_RETURN_TYPES
-from mindframe.structured_judgements import (
-    data_extraction_function_factory,
-    # pydantic_model_from_schema,
-)
+shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
 
 
 class RoleChoices(models.TextChoices):
@@ -46,10 +39,6 @@ class StepJudgementFrequencyChoices(models.TextChoices):
     TURN = "turn", "Each turn"
     ENTER = "enter", "When entering the step"
     EXIT = "exit", "When exiting the step"
-
-
-def generate_short_uuid():
-    return shortuuid.uuid().lower()
 
 
 def format_turns(turns):
@@ -98,7 +87,18 @@ class Example(models.Model):
     title = models.CharField(max_length=255)
     text = models.TextField()
 
+    embedding = VectorField(dimensions=384, null=True, blank=True)
+
     class Meta:
+        indexes = [
+            HnswIndex(
+                name="example_embedding_index",
+                fields=["embedding"],
+                m=16,
+                ef_construction=64,
+                opclasses=["vector_l2_ops"],
+            ),
+        ]
         unique_together = [("intervention", "title")]
 
     def __str__(self):
@@ -183,7 +183,7 @@ class Step(models.Model):
 
         pmpt = template.render(context)
         # logger.info(f"PROMPT:\n{pmpt}")
-        completions = chatter(pmpt, model=settings.MINDFRAME_AI_MODELS.expensive)
+        completions = chatter(pmpt, model=MINDFRAME_AI_MODELS.expensive)
 
         # returns an OrderedDict of completions (intermediate 'thougts' and the __RESPONSE__)
         return completions
@@ -268,7 +268,7 @@ class Judgement(models.Model):
         )
 
         newnote = Note.objects.create(judgement=self, session_state=session.state, inputs=inputs)
-        with settings.MINDFRAME_AI_MODELS.expensive:
+        with MINDFRAME_AI_MODELS.expensive:
             llm_result = extraction_function(**newnote.inputs)
             newnote.data = llm_result.model_dump()
 
@@ -302,7 +302,7 @@ class TreatmentSession(models.Model):
     def natural_key(self):
         return self.uuid
 
-    uuid = models.CharField(unique=True, default=generate_short_uuid, editable=False, null=False)
+    uuid = models.CharField(unique=True, default=shortuuid.uuid, editable=False, null=False)
 
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name="sessions")
     started = models.DateTimeField(default=timezone.now)
@@ -514,7 +514,7 @@ class TreatmentSessionState(models.Model):
 class Turn(models.Model):
     """An individual utterance during a session (either client or therapist)."""
 
-    uuid = models.CharField(unique=True, default=generate_short_uuid, editable=False, null=False)
+    uuid = models.CharField(unique=True, default=shortuuid.uuid, editable=False, null=False)
 
     session_state = models.ForeignKey(
         TreatmentSessionState,
@@ -541,7 +541,7 @@ class Turn(models.Model):
 class Note(models.Model):
     """Clinical records created by exercuting a Judgement at a point in time"""
 
-    uuid = models.CharField(unique=True, default=generate_short_uuid, editable=False, null=False)
+    uuid = models.CharField(unique=True, default=shortuuid.uuid, editable=False, null=False)
 
     session_state = models.ForeignKey(
         TreatmentSessionState,

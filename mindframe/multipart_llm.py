@@ -12,6 +12,8 @@ import tiktoken
 
 import logging
 
+from mindframe.settings import MINDFRAME_AI_MODELS
+
 logger = logging.getLogger(__name__)
 
 encoding = tiktoken.encoding_for_model("gpt-4o-mini")
@@ -33,7 +35,7 @@ class ChatResult(BaseModel):
 def chat(prompt: str) -> str: ...
 
 
-# with settings.MINDFRAME_AI_MODELS.cheap:
+# with MINDFRAME_AI_MODELS.cheap:
 #     chat("say hello")
 
 
@@ -58,7 +60,7 @@ def split_multipart_prompt(text) -> OrderedDict:
     return result
 
 
-def chatter(multipart_prompt, model=settings.MINDFRAME_AI_MODELS.cheap):
+def chatter(multipart_prompt, model=MINDFRAME_AI_MODELS.cheap):
     """Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next."""
 
     prompts_dict = split_multipart_prompt(multipart_prompt)

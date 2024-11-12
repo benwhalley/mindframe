@@ -1,3 +1,4 @@
+import logging
 import pprint
 from django.contrib import admin
 from django.db import models
@@ -8,8 +9,9 @@ from django.utils import timezone
 from django.conf import settings
 from django.forms import Textarea
 from django.utils.html import format_html, format_html_join
+from django.urls import reverse
 
-
+import shortuuid
 from django.contrib import admin
 from .models import (
     CustomUser,
@@ -25,6 +27,12 @@ from .models import (
     Judgement,
     StepJudgement,
 )
+
+from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
+
+shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
+
+logger = logging.getLogger(__name__)
 
 
 @admin.register(CustomUser)
@@ -50,55 +58,15 @@ class CycleAdmin(admin.ModelAdmin):
 class TreatmentSessionStateInline(admin.TabularInline):
     model = TreatmentSessionState
     extra = 0
-    autocomplete_fields = ["step", "previous_step"]
+    max_num = 0
+    readonly_fields = ["timestamp", "previous_step", "step", "start_again_button"]
 
+    def start_again_button(self, obj):
+        """Button to duplicate the session and start again from this state."""
+        url = reverse("admin:start_again", args=[obj.session.pk, obj.pk])
+        return format_html('<a class="button" href="{}">Restart Chat from here</a>', url)
 
-@admin.register(TreatmentSession)
-class TreatmentSessionAdmin(admin.ModelAdmin):
-    save_on_top = True
-    autocomplete_fields = ["cycle"]
-    list_display = (
-        "id",
-        "cycle__id",
-        "state",
-        "chatbot_link",
-        "started",
-        "last_updated",
-        "uuid",
-        # "clinical_notes",  # Add this to display related notes in the list view
-    )
-    list_filter = ("cycle__intervention__short_title", "started", "last_updated")
-    search_fields = ("cycle__client__username",)
-    inlines = [TreatmentSessionStateInline]
-    readonly_fields = ["cycle", "uuid", "started", "last_updated", "clinical_notes"]
-
-    # Override to add `clinical_notes` in the change view
-    fieldsets = (
-        (
-            None,
-            {
-                "fields": ["cycle", "uuid", "started", "last_updated", "clinical_notes"],
-            },
-        ),
-    )
-
-    def clinical_notes(self, obj):
-        notes = Note.objects.filter(session_state__session=obj)
-        if not notes.exists():
-            return "No notes available"
-        return format_html_join(
-            "\n",
-            "<p><strong>{}</strong>: {} ({})</p>",
-            ((note.judgement.variable_name, note.val(), note.timestamp) for note in notes),
-        )
-
-    clinical_notes.short_description = "Clinical Notes/Judgements"
-
-    def chatbot_link(self, obj):
-        url = f"{settings.CHATBOT_URL}/?session_id={obj.uuid}"
-        return format_html('<a href="{}" target="_blank">Continue</a>', url)
-
-    chatbot_link.short_description = "Chat"
+    start_again_button.short_description = "Actions"
 
 
 class TransitionInline(admin.TabularInline):
@@ -251,3 +219,173 @@ class InterventionAdmin(admin.ModelAdmin):
             f"../start_session/{object_id}/",
         )
         return super().change_view(request, object_id, form_url, extra_context=extra_context)
+
+
+from django.contrib import admin, messages
+from django.utils import timezone
+
+
+@admin.register(TreatmentSession)
+class TreatmentSessionAdmin(admin.ModelAdmin):
+    save_on_top = True
+    autocomplete_fields = ["cycle"]
+    list_display = (
+        "id",
+        "cycle__id",
+        "state",
+        "chatbot_link",
+        "started",
+        "last_updated",
+        "uuid",
+        # "clinical_notes",  # Add this to display related notes in the list view
+    )
+    list_filter = ("cycle__intervention__short_title", "started", "last_updated")
+    search_fields = ("cycle__client__username",)
+    inlines = [TreatmentSessionStateInline]
+    readonly_fields = ["cycle", "uuid", "started", "last_updated", "clinical_notes"]
+
+    # Override to add `clinical_notes` in the change view
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ["cycle", "uuid", "started", "last_updated", "clinical_notes"],
+            },
+        ),
+    )
+
+    def clinical_notes(self, obj):
+        notes = Note.objects.filter(session_state__session=obj)
+        if not notes.exists():
+            return "No notes available"
+        return format_html_join(
+            "\n",
+            "<p><strong>{}</strong>: {} ({})</p>",
+            ((note.judgement.variable_name, note.val(), note.timestamp) for note in notes),
+        )
+
+    clinical_notes.short_description = "Clinical Notes/Judgements"
+
+    def chatbot_link(self, obj):
+        url = f"{settings.CHATBOT_URL}/?session_id={obj.uuid}"
+        return format_html('<a href="{}" target="_blank">Continue</a>', url)
+
+    chatbot_link.short_description = "Chat"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "start_again/<int:session_id>/<int:state_id>/",
+                self.admin_site.admin_view(self.start_again_from_state),
+                name="start_again",
+            ),
+        ]
+        return custom_urls + urls
+
+    def start_again_from_state(self, request, session_id, state_id):
+        try:
+            # Original session and state
+            original_session = TreatmentSession.objects.get(id=session_id)
+            original_state = TreatmentSessionState.objects.get(id=state_id)
+
+            # 1. Duplicate the Cycle
+            original_cycle = original_session.cycle
+            new_cycle = Cycle.objects.create(
+                client=original_cycle.client,
+                intervention=original_cycle.intervention,
+                start_date=original_session.cycles.start_date,
+            )
+
+            # 2. Duplicate the TreatmentSession
+            new_session = TreatmentSession.objects.create(cycle=new_cycle, started=timezone.now())
+
+            # 3. Duplicate relevant TreatmentSessionStates
+            TreatmentSessionState.objects.filter(
+                session=original_session, timestamp__lte=original_state.timestamp
+            ).order_by("timestamp").update(session=new_session)
+
+            # 4. Duplicate Turns and Notes before `state_id`
+            turns_to_duplicate = Turn.objects.filter(
+                session_state__session__cycle=original_session.cycle,
+                session_state__timestamp__lte=original_state.timestamp,
+            )
+            for turn in turns_to_duplicate:
+                turn.pk = None  # Reset primary key to create new object
+                turn.session_state = new_session.state  # Attach to new session
+                turn.save()
+
+            notes_to_duplicate = Note.objects.filter(
+                session_state__session__cycle=original_session.cycle,
+                session_state__timestamp__lte=original_state.timestamp,
+            )
+            for note in notes_to_duplicate:
+                note.pk = None
+                note.session_state = new_session.state
+                note.save()
+
+            logging.warning(f"DUPLICATED SESSION {original_session} FROM STATE {original_state}")
+            return redirect(f"{settings.CHATBOT_URL}/?session_id={new_session.uuid}")
+
+        except Exception as e:
+            self.message_user(
+                request, f"An error occurred while starting again: {e}", level=messages.ERROR
+            )
+            return redirect("admin:app_treatmentsession_change", original_session.pk)
+
+    def start_again_from_state(self, request, session_id, state_id):
+        try:
+            # Original session and state
+            original_session = TreatmentSession.objects.get(id=session_id)
+            original_state = TreatmentSessionState.objects.get(id=state_id)
+
+            # 1. Duplicate the Cycle
+            original_cycle = original_session.cycle
+            new_cycle = Cycle.objects.create(
+                client=original_cycle.client,
+                intervention=original_cycle.intervention,
+                start_date=timezone.now(),
+            )
+
+            # 2. Duplicate the TreatmentSession
+            new_session = TreatmentSession.objects.create(cycle=new_cycle, started=timezone.now())
+
+            # 3. Duplicate relevant TreatmentSessionStates
+            tss_to_dupe = TreatmentSessionState.objects.filter(
+                session=original_session, timestamp__lte=original_state.timestamp
+            ).order_by("timestamp")
+            for i in tss_to_dupe:
+                i.pk = None
+                i.session = new_session
+                i.save()
+
+            # 4. Duplicate Turns and Notes before `state_id`
+            turns_to_duplicate = Turn.objects.filter(
+                session_state__session=original_session,
+                session_state__timestamp__lte=original_state.timestamp,
+            )
+            for turn in turns_to_duplicate:
+                turn.pk = None  # Reset primary key to create new object
+                turn.uuid = shortuuid.uuid()
+                turn.session_state = new_session.state  # Attach to new session
+                turn.save()
+
+            notes_to_duplicate = Note.objects.filter(
+                session_state__session=original_session,
+                session_state__timestamp__lte=original_state.timestamp,
+            )
+            for note in notes_to_duplicate:
+                note.pk = None
+                note.uuid = shortuuid.uuid()
+                note.session_state = new_session.state
+                note.save()
+
+            # Redirect to chatbot interface for the new session
+            return redirect(f"{settings.CHATBOT_URL}/?session_id={new_session.uuid}")
+
+        except Exception as e:
+            logger.error(f"An error occurred while starting again: {e}")
+            self.message_user(
+                request, f"An error occurred while starting again: {e}", level=messages.ERROR
+            )
+            return redirect("admin:mindframe_treatmentsession_change", original_session.pk)
