@@ -343,9 +343,9 @@ class TreatmentSession(models.Model):
             pk__in=(judgements.values_list("judgement", flat=True))
         ).annotate(
             notes_count=Count(
-                "note",
-                filter=Q(note__session_state__session__cycle=self.cycle)
-                & ~Q(note__data__value=None),
+                "notes",
+                filter=Q(notes__session_state__session__cycle=self.cycle)
+                & ~Q(notes__data__value=None),
             )
         )
 
