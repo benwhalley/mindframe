@@ -1,0 +1,2 @@
+[console_scripts]
+mindframe-bot = mindframe.chatbot:main
