@@ -1,3 +1,8 @@
+# this is a demo of how to use embedding to identify
+# relevant examples based on a query
+# we need to do a lot more work on how we expose RAG features to users
+# through prompt templates
+
 from mindframe.models import Example
 from sentence_transformers import SentenceTransformer
 from pgvector.django import L2Distance
