@@ -1,11 +1,8 @@
 import re
-
 import dotenv
-
 dotenv.load_dotenv(".env")
 
 from magentic import prompt
-
 from pydantic import BaseModel
 from typing import List, Optional
 from collections import OrderedDict, namedtuple
@@ -49,27 +46,28 @@ def split_multipart_prompt(text) -> OrderedDict:
     # it works fine for now though
 
     varname_pattern = r"\[\[\s*(\w+)\s*\]\]"
-    parts = re.split(varname_pattern, text)
+    parts = list(filter(bool, 
+                        map(str.strip, re.split(varname_pattern, text)
+                        )))
     # if we didn't explicitly include a final response variable, add one here
     if len(parts) % 2 == 1:
         parts.append("__RESPONSE__")
-
     # iterate over tuples and return an ordered dictionary
     result = OrderedDict(zip(parts[1::2], parts[::2]))
     for text_segment, varname in zip(parts[::2], parts[1::2]):
         result[varname.strip()] = text_segment.strip()
-
+    
     return result
 
 
 def chatter(multipart_prompt, model=settings.MINDFRAME_AI_MODELS.cheap):
     """Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next."""
-
+    
     prompts_dict = split_multipart_prompt(multipart_prompt)
     results_dict = OrderedDict()
-
+    
     prompt_parts = []
-
+    
     for key, value in prompts_dict.items():
         prompt_parts.append(value)
         prompt = "\n".join(prompt_parts)
@@ -87,11 +85,25 @@ def chatter(multipart_prompt, model=settings.MINDFRAME_AI_MODELS.cheap):
             output_tokens=len(encoding.encode(res)),
         )
         prompt_parts.append(res)
-
+       
+    # duplicate the last item as the __RESPONSE__ so we have a 
+    # predictable key to access the final completion, but can still
+    # also access the last key by names used in the template
+    lastkey = next(reversed(results_dict))
+    if lastkey != "__RESPONSE__":
+        results_dict["__RESPONSE__"] = results_dict[lastkey]
+    
     return results_dict
 
 
-# results_dict = chatter("""Think about mammals[THOUGHTS] Now tell me a joke[JOKE]""")
+# pmpt = """Think about mammals[[THOUGHTS]] Now tell me a joke[[JOKE]]"""
+# results_dict = chatter(pmpt)
 # results_dict.keys()
 # results_dict['THOUGHTS'].value
-# results_dict['JOKE'].value
+# results_dict['__RESPONSE__'].value == results_dict['JOKE'].value
+
+
+# pmpt = """Think about mammals[[THOUGHTS]] Now tell me a joke"""
+# results_dict = chatter(pmpt)
+# list(results_dict.keys()) == ['THOUGHTS', '__RESPONSE__']
+# results_dict['__RESPONSE__'].value
