@@ -1,39 +1,37 @@
+import logging
 import re
+from collections import defaultdict, OrderedDict
 from enum import Enum
 
 import shortuuid
 from autoslug import AutoSlugField
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Count, Q
 from django.template import Context, Template
-from pydantic import BaseModel
 from django.utils import timezone
 from django.utils.text import slugify
-import logging
-from django.conf import settings
-from collections import OrderedDict, defaultdict
-from django.db.models import Count, Q
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+import shortuuid
 from magentic import OpenaiChatModel
 
 from magentic.chat_model.litellm_chat_model import LitellmChatModel
-
-
-import shortuuid
 
 # 24 chars in alphapbet and 22 long = 24^22 so still very large for guessing but easier to read for humans
 shortuuid.set_alphabet("abcdefghjkmnpqrstuvwxyz")
 
 from mindframe.multipart_llm import chatter
+
+from mindframe.return_type_models import JUDGEMENT_RETURN_TYPES
 from mindframe.structured_judgements import (
     data_extraction_function_factory,
     # pydantic_model_from_schema,
 )
-
-from mindframe.return_type_models import JUDGEMENT_RETURN_TYPES
 
 
 class RoleChoices(models.TextChoices):
@@ -149,17 +147,29 @@ class Step(models.Model):
     judgements = models.ManyToManyField("Judgement", through="StepJudgement")
 
     def get_step_context(self, session):
+
+        all_notes = Note.objects.filter(session_state__session__cycle=session.cycle)
+        all_turns = Turn.objects.filter(session_state__session__cycle=session.cycle)
+
         context = Context(
             {
-                "turns": format_turns(session.turns.all()),
                 "session": session,
                 "intervention": session.cycle.intervention,
-                "examples": session.cycle.intervention.examples.all(),
-                "session_notes": session.notes.all(),
-                "cycle_notes": Note.objects.filter(session__cycle=session.cycle).exclude(
-                    session=session
+                # "examples": session.cycle.intervention.examples.all(),
+                # just for this step
+                "turns": format_turns(
+                    all_turns.filter(session_state__session=session).filter(
+                        session_state__step=self
+                    )
                 ),
-                "notes": Note.objects.filter(session__cycle=session.cycle),
+                "session_turns": format_turns(all_turns.filter(session_state__session=session)),
+                "all_turns": format_turns(all_turns),
+                # just for this step -- note, this is done a different way than for turns
+                "notes": all_notes.filter(session_state__session=session).filter(
+                    timestamp__gt=session.progress.last().timestamp
+                ),
+                "session_notes": all_notes.filter(session_state__session=session),
+                "all_notes": all_notes,
             }
         )
         return context
@@ -232,18 +242,7 @@ class Judgement(models.Model):
         logger.debug(f"Making judgement {self.title} for {session}")
         template = Template(self.prompt_template)
         # extract this so DRY with Step.spoken_response
-        context = Context(
-            {
-                "turns": format_turns(session.turns.all()),
-                "session": session,
-                "examples": session.cycle.intervention.examples.all(),
-                "session_notes": session.notes.all(),
-                "cycle_notes": Note.objects.filter(session__cycle=session.cycle).exclude(
-                    session=session
-                ),
-                "notes": Note.objects.filter(session__cycle=session.cycle),
-            }
-        )
+        context = session.current_step().get_step_context(session)
         inputs = {"input": template.render(context)}
         try:
             return self.process_inputs(session, inputs)
@@ -266,12 +265,15 @@ class Judgement(models.Model):
             prompt_template="{input}\nYou MUST use the tool calling functionality and respond in JSON in the correct format.",
         )
 
-        newnote = Note.objects.create(judgement=self, session=session, inputs=inputs)
+        newnote = Note.objects.create(
+            judgement=self, session_state=session.progress.last(), inputs=inputs
+        )
         with settings.MINDFRAME_AI_MODELS.expensive:
             llm_result = extraction_function(**newnote.inputs)
             newnote.data = llm_result.model_dump()
 
         logger.info(f"JUDGEMENT RESULT: {llm_result}")
+        logger.warning(f"NEW NOTE: {newnote}")
 
         newnote.save()
         return newnote
@@ -341,11 +343,10 @@ class TreatmentSession(models.Model):
         ).annotate(
             notes_count=Count(
                 "note",
-                filter=Q(note__session__cycle=self.cycle) & ~Q(note__data__value=None),
+                filter=Q(note__session_state__session__cycle=self.cycle)
+                & ~Q(note__data__value=None),
             )
         )
-        # potential_judgements_to_run.values('title', "notes_count")
-        # Note.objects.filter(judgement__variable_name='preferred_name').filter(data__value=None).count()
 
         # exclude ones where we already have a note and we only want to run once
         judgements_to_run = potential_judgements_to_run.exclude(
@@ -353,14 +354,16 @@ class TreatmentSession(models.Model):
         )
         # log which ones we skipped
         for i in potential_judgements_to_run.filter(stepjudgements__once=True, notes_count__gt=0):
-            nts = Note.objects.filter(judgement=i, session__cycle=self.cycle).values("data")
+            nts = Note.objects.filter(judgement=i, session_state__session__cycle=self.cycle).values(
+                "data"
+            )
             logger.debug(f"SKIPPED JUDGEMENT: {i} - Existing Notes: {nts}")
 
         return judgements_to_run
 
     def build_client_data_dict(self, step):
         """Make a dictionary of the MOST RECENT note for each judgement variable plus metadata"""
-        session_notes = self.notes.filter(data__isnull=False)
+        session_notes = Note.objects.filter(session_state__session=self).filter(data__isnull=False)
         client_data = defaultdict(lambda: None)
         client_data.update(
             dict(
@@ -520,10 +523,6 @@ class Turn(models.Model):
         related_name="turns",
     )
 
-    @property
-    def session(self):
-        return self.session_state.session
-
     timestamp = models.DateTimeField(default=timezone.now)
     speaker = models.ForeignKey(CustomUser, on_delete=models.PROTECT, null=False, blank=False)
     text = models.TextField(blank=True, null=True)
@@ -543,7 +542,14 @@ class Note(models.Model):
 
     uuid = models.CharField(unique=True, default=generate_short_uuid, editable=False, null=False)
 
-    session = models.ForeignKey(TreatmentSession, on_delete=models.CASCADE, related_name="notes")
+    session_state = models.ForeignKey(
+        TreatmentSessionState,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notes",
+    )
+
     judgement = models.ForeignKey(Judgement, on_delete=models.PROTECT)
     timestamp = models.DateTimeField(default=timezone.now)
 

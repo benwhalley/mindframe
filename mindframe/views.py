@@ -1,9 +1,12 @@
+from django.utils.text import slugify
 from django.shortcuts import redirect
 from django.utils import timezone
 from .models import Intervention, Cycle, TreatmentSession, CustomUser
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 import shortuuid
+from mindframe.silly import silly_name
+import random
 
 
 def create_public_session(request, intervention_slug):
@@ -11,8 +14,13 @@ def create_public_session(request, intervention_slug):
     intervention = get_object_or_404(Intervention, slug=intervention_slug)
 
     # Create a temporary or anonymous client (could be a placeholder user, if needed)
+    sn = silly_name()
+    f, l = sn.split(" ")
     client = CustomUser.objects.create(
-        username=f"Anonymous{shortuuid.uuid().upper()[:5]}", is_active=False
+        username=f"{slugify(sn)}{random.randint(1e4, 1e5)}",
+        first_name=f,
+        last_name=l,
+        is_active=False,
     )
 
     # Generate a new cycle and session

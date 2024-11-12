@@ -6,6 +6,8 @@ from django.utils.html import format_html
 from django.utils import timezone
 from django.conf import settings
 from django.forms import Textarea
+from django.utils.html import format_html, format_html_join
+
 
 from django.contrib import admin
 from .models import (
@@ -44,12 +46,6 @@ class CycleAdmin(admin.ModelAdmin):
     search_fields = ("client__username", "intervention__name")
 
 
-class NoteInline(admin.TabularInline):
-    model = Note
-    extra = 1
-    readonly_fields = ["judgement", "timestamp", "inputs", "data"]
-
-
 class TreatmentSessionStateInline(admin.TabularInline):
     model = TreatmentSessionState
     extra = 0
@@ -68,10 +64,34 @@ class TreatmentSessionAdmin(admin.ModelAdmin):
         "started",
         "last_updated",
         "uuid",
+        # "clinical_notes",  # Add this to display related notes in the list view
     )
     list_filter = ("cycle__intervention__short_title", "started", "last_updated")
     search_fields = ("cycle__client__username",)
-    inlines = [TreatmentSessionStateInline, NoteInline]
+    inlines = [TreatmentSessionStateInline]
+    readonly_fields = ["cycle", "uuid", "started", "last_updated", "clinical_notes"]
+
+    # Override to add `clinical_notes` in the change view
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ["cycle", "uuid", "started", "last_updated", "clinical_notes"],
+            },
+        ),
+    )
+
+    def clinical_notes(self, obj):
+        notes = Note.objects.filter(session_state__session=obj)
+        if not notes.exists():
+            return "No notes available"
+        return format_html_join(
+            "\n",
+            "<p><strong>{}</strong>: {} ({})</p>",
+            ((note.judgement.variable_name, note.val(), note.timestamp) for note in notes),
+        )
+
+    clinical_notes.short_description = "Clinical Notes/Judgements"
 
     def chatbot_link(self, obj):
         url = f"{settings.CHATBOT_URL}/?session_id={obj.uuid}"
@@ -147,11 +167,11 @@ class TurnAdmin(admin.ModelAdmin):
 
 @admin.register(Note)
 class NoteAdmin(admin.ModelAdmin):
-    list_display = ("session__id", "judgement", "val", "timestamp")
+    list_display = ("session_state", "judgement", "val", "timestamp")
     list_filter = ("timestamp", "judgement")
-    search_fields = ("session__cycle__client__username",)
+    search_fields = ("session_state__session__cycle__client__username",)
     autocomplete_fields = [
-        "session",
+        "session_state",
     ]
 
 
@@ -176,6 +196,7 @@ class ExampleAdmin(admin.ModelAdmin):
 @admin.register(TreatmentSessionState)
 class TreatmentSessionStateAdmin(admin.ModelAdmin):
     list_display = ("session", "step", "timestamp")
+    search_fields = ("session__cycle__client__username", "step__title")
 
 
 @admin.register(Intervention)
