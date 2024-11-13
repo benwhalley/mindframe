@@ -15,6 +15,23 @@ Problems to solve:
 
 
 
+
+## Performance metrics
+
+
+##### Synthetic data + semantic similarity with established datasets
+
+Generate synthetic data, then use semantic similarity with high-quality vs low-quality MI in the AnnoMI dataset. E.g.:
+
+- Embed each utterance in annomi
+- For each Turn, calculate embedding
+- Find similarity score between each Turn and closest match in annomi high quality Repeat for low quality utterances in annomi.
+
+We expect similarity with high-quality to be higher than for low quality. This gap should grow over time.
+
+
+
+
 ## Training data and fine tuning
 
 As we use the system, it would be nice to be able to mark Judgements and Turns as being particularly good or bad examples of their type. This could be used to fine tune the model.

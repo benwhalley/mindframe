@@ -75,16 +75,16 @@ def chatter(multipart_prompt, model=MINDFRAME_AI_MODELS.cheap):
             logger.debug(f"Calling LLM ({model}): {prompt[:60]} ...")
             try:
                 res = chat(prompt)
+                results_dict[key] = ChatResult(
+                    value=res,
+                    prompt=prompt,
+                    input_tokens=len(encoding.encode(prompt)),
+                    output_tokens=len(encoding.encode(res)),
+                )
+                prompt_parts.append(res)
             except Exception as e:
                 logger.error(f"Error calling LLM: {e}")
                 logger.error(f"Prompt: {prompt}")
-        results_dict[key] = ChatResult(
-            value=res,
-            prompt=prompt,
-            input_tokens=len(encoding.encode(prompt)),
-            output_tokens=len(encoding.encode(res)),
-        )
-        prompt_parts.append(res)
 
     # duplicate the last item as the __RESPONSE__ so we have a
     # predictable key to access the final completion, but can still

@@ -10,6 +10,8 @@ from django.conf import settings
 from django.forms import Textarea
 from django.utils.html import format_html, format_html_join
 from django.urls import reverse
+from django.contrib import admin, messages
+from django.utils import timezone
 
 import shortuuid
 from django.contrib import admin
@@ -26,6 +28,7 @@ from .models import (
     TreatmentSessionState,
     Judgement,
     StepJudgement,
+    SyntheticConversation,
 )
 
 from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
@@ -45,6 +48,11 @@ class CustomUserAdmin(admin.ModelAdmin):
 class ExampleInline(admin.TabularInline):
     model = Example
     extra = 1
+
+
+@admin.register(SyntheticConversation)
+class SyntheticConversationAdmin(admin.ModelAdmin):
+    pass
 
 
 @admin.register(Cycle)
@@ -219,10 +227,6 @@ class InterventionAdmin(admin.ModelAdmin):
             f"../start_session/{object_id}/",
         )
         return super().change_view(request, object_id, form_url, extra_context=extra_context)
-
-
-from django.contrib import admin, messages
-from django.utils import timezone
 
 
 @admin.register(TreatmentSession)

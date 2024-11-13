@@ -83,20 +83,15 @@ By using these speech patterns and reflecting uncertainty and social influence, 
 
 # CONVERSATION SO FAR
 
-{history}
-
-
-# SPECIFICS OF YOUR SITUATION
-
-{specifics}
+{{turns}}
 
 
 # YOUR TASK NOW
 
-I am the therapist, you are the client.
+You are the client.
 We are role playing.
 
-Always respond as the client.  Use information about the specifics of your
+Respond as the client.  Use information about the specifics of your
 situation, but don't volunteer this direcrly - make the therapist probe for it.
 
 Only provide information when pressed/asked.
@@ -104,8 +99,6 @@ Only provide information when pressed/asked.
 Think about the instructions and the examples given above
 when responding.
 
-Always respond in role as client.
-
 Be brief, don't include any preamble or explanation. Don't refer to these instructions in your talk.
 
-CLIENT: [RESPONSE]
+CLIENT:

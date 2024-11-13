@@ -8,6 +8,7 @@ from autoslug import AutoSlugField
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 from django.db import models
 from django.db.models import Count, Q
 from django.template import Context, Template
@@ -32,7 +33,7 @@ class RoleChoices(models.TextChoices):
     INTERVENTION_DEVELOPER = "intervention_developer", "Intervention Developer"
     CLIENT = "client", "Client"
     SUPERVISOR = "supervisor", "Supervisor"
-    BOT = "bot", "Bot"
+    THERAPIST = "therapist", "Therapist"
 
 
 class StepJudgementFrequencyChoices(models.TextChoices):
@@ -42,6 +43,9 @@ class StepJudgementFrequencyChoices(models.TextChoices):
 
 
 def format_turns(turns):
+    if not turns.count():
+        return "No conversation history yet."
+
     return "\n".join([f"{t.speaker.role.upper()}: {t.text}" for t in turns.order_by("timestamp")])
 
 
@@ -330,9 +334,13 @@ class TreatmentSession(models.Model):
     def current_step(self):
         return self.state.step
 
-    def listen(self, speaker, text):
+    def listen(self, speaker, text, timestamp=None):
         """Record a Turn in the session when the client speaks"""
-        turn = Turn.objects.create(session_state=self.state, speaker=speaker, text=text)
+        timestamp = timestamp or timezone.now()
+
+        turn = Turn.objects.create(
+            session_state=self.state, speaker=speaker, text=text, timestamp=timestamp
+        )
         turn.save()
         logger.info(f"TURN SAVED: {turn}")
         return turn
@@ -446,7 +454,7 @@ class TreatmentSession(models.Model):
     def respond(self):
         """Respond to the client's last utterance (and manage transitions)."""
 
-        bot = CustomUser.objects.filter(role=RoleChoices.BOT).first()
+        bot = CustomUser.objects.filter(role=RoleChoices.THERAPIST).first()
         step = self.current_step()
         transitions = step.transitions_from.all()
 
@@ -583,3 +591,21 @@ class ErrorLog(models.Model):
 
     def __str__(self):
         return f"<{self.pk}> {self.timestamp}: {self.message}"
+
+
+class SyntheticConversation(models.Model):
+    """A synthetic conversation between two TreatmentSessions"""
+
+    session_one = models.ForeignKey(
+        TreatmentSession, on_delete=models.CASCADE, related_name="conversation_one"
+    )
+    session_two = models.ForeignKey(
+        TreatmentSession, on_delete=models.CASCADE, related_name="conversation_two"
+    )
+    start_time = models.DateTimeField(default=timezone.now)
+
+    def get_absolute_url(self):
+        return reverse("fake_conversation_detail", args=[str(self.pk)])
+
+    def __str__(self):
+        return f"Synthetic conversation between Session {self.session_one.id} and Session {self.session_two.id} starting at {self.start_time}"
