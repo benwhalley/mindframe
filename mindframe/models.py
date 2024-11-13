@@ -155,6 +155,10 @@ class Step(models.Model):
         all_notes = Note.objects.filter(session_state__session__cycle=session.cycle)
         all_turns = Turn.objects.filter(session_state__session__cycle=session.cycle)
 
+        # ALI - THIS IS AN IMPORTANT PART BECAUSE IT PROVIDES CONTEXT FOR THE LLM WHEN RESPONDING TO CLIENTS AND ALSO WHEN MAKING JUDGEMENTS
+        # FOR SOME THINGS WE WILL BE ABLE TO EXTEND THIS FUNCTION AND PROVIDE MORE CONTEXT
+        # IN OTHER CASES (E.G. FOR RAG) WE WILL NEED TO MAKE A TEMPLATETAG AND USE THAT IN THE PROMPT TEMPLATE TO DYNAMICALLY EXTRACT EXTRA CONTEXT
+
         context = Context(
             {
                 "session": session,
@@ -256,7 +260,7 @@ class Judgement(models.Model):
                 session_state=session.state,
                 message=f"Error making judgement {self.title}",
                 traceback=str(e),
-                metadata=[inputs, context],
+                metadata=[dict(inputs), context],
             )
             logger.error(f"ERROR MAKING JUDGEMENT {el}")
             return None
