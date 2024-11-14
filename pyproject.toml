@@ -32,10 +32,7 @@ uvicorn = "^0.30.1"
 python-dotenv = "^1.0.1"
 black = "^24.4.2"
 django-environ = "^0.11.2"
-dephell = "^0.8.3"
 poetry-plugin-export = "^1.8.0"
-setuptools = "58.0.4"
-
 
 [tool.poetry.scripts]
 mindframe-bot = "mindframe.chatbot:main"

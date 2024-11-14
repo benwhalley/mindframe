@@ -51,6 +51,8 @@ setup.py
 ./mindframe/migrations/0030_alter_example_embedding_alter_note_uuid_and_more.py
 ./mindframe/migrations/0031_alter_note_uuid_alter_treatmentsession_uuid_and_more.py
 ./mindframe/migrations/0032_alter_cycle_client_alter_cycle_intervention_and_more.py
+./mindframe/migrations/0033_alter_note_uuid_alter_treatmentsession_uuid_and_more.py
+./mindframe/migrations/0034_alter_note_uuid_alter_treatmentsession_uuid_and_more.py
 ./mindframe/migrations/__init__.py
 ./mindframe/static/mindframe/css/admin-extra.css
 ./mindframe/static/mindframe/css/prism.css
@@ -113,6 +115,8 @@ mindframe/migrations/0029_example_embedding_alter_note_uuid_and_more.py
 mindframe/migrations/0030_alter_example_embedding_alter_note_uuid_and_more.py
 mindframe/migrations/0031_alter_note_uuid_alter_treatmentsession_uuid_and_more.py
 mindframe/migrations/0032_alter_cycle_client_alter_cycle_intervention_and_more.py
+mindframe/migrations/0033_alter_note_uuid_alter_treatmentsession_uuid_and_more.py
+mindframe/migrations/0034_alter_note_uuid_alter_treatmentsession_uuid_and_more.py
 mindframe/migrations/__init__.py
 mindframe/static/mindframe/css/admin-extra.css
 mindframe/static/mindframe/css/prism.css
