@@ -48,7 +48,7 @@ setup(
         "python-dotenv==1.*,>=1.0.1",
         "rules==3.*,>=3.4.0",
         "sentence-transformers==3.*,>=3.3.0",
-        "setuptools==70.0.0",
+        "setuptools==75.5.0",
         "shortuuid==1.*,>=1.0.13",
         "uvicorn==0.*,>=0.30.1",
     ],
