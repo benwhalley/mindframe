@@ -30,7 +30,7 @@ def main():
         # Prepopulate history from existing turns in this session
         history = []
         for turn in Turn.objects.filter(session_state__session=session).order_by("timestamp"):
-            role = "assistant" if turn.speaker.role == RoleChoices.BOT else "user"
+            role = "assistant" if turn.speaker.role == RoleChoices.THERAPIST else "user"
             if role == "user":
                 history.append((turn.text, ""))
             else:
