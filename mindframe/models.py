@@ -142,7 +142,7 @@ class Intervention(LifecycleModel):
         unique_together = ("title", "version", "sem_ver")
 
 
-class Example(models.Model):
+class Example(LifecycleModel):
 
     intervention = models.ForeignKey(
         Intervention, on_delete=models.CASCADE, related_name="examples"
@@ -151,6 +151,10 @@ class Example(models.Model):
     text = models.TextField()
 
     embedding = VectorField(dimensions=384, null=True, blank=True)
+
+    @hook(BEFORE_UPDATE)
+    def on_text_change(self):
+        generate_embedding.delay(self.pk, self.text)
 
     class Meta:
         indexes = [
