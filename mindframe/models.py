@@ -1,7 +1,10 @@
+import hashlib
+import json
 import logging
 import re
 from collections import defaultdict, OrderedDict
 from enum import Enum
+from django.forms.models import model_to_dict
 
 import shortuuid
 from autoslug import AutoSlugField
@@ -17,11 +20,14 @@ from django.utils.text import slugify
 from pydantic import BaseModel
 from pgvector.django import VectorField, HnswIndex
 import shortuuid
+from django_lifecycle import LifecycleModel, hook, BEFORE_UPDATE, AFTER_UPDATE
+from django_lifecycle.conditions import WhenFieldHasChanged
 
 from mindframe.multipart_llm import chatter
 from mindframe.return_type_models import JUDGEMENT_RETURN_TYPES
 from mindframe.structured_judgements import data_extraction_function_factory
 from mindframe.settings import MINDFRAME_AI_MODELS, MINDFRAME_SHORTUUID_ALPHABET
+from mindframe.tasks import generate_embedding
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +65,7 @@ class CustomUser(AbstractUser):
         return self.username
 
 
-class Intervention(models.Model):
+class Intervention(LifecycleModel):
     """A treatment intervention
 
     e.g. CBT or Functional Imagery Training"""
@@ -67,20 +73,73 @@ class Intervention(models.Model):
     def natural_key(self):
         return slugify(self.short_title)
 
+    def compute_version(self):
+        """Compute a version hash based on all linked objects."""
+
+        hashed_fields = {
+            "interventions": [
+                "title",
+            ],  # "short_title"],
+            "steps": ["title", "prompt_template"],
+            "transitions": ["conditions"],  # "from_step__title", "to_step__title",
+            "judgements": [
+                "title",
+            ],  # "variable_name", "prompt_template"],
+            "examples": ["title", "text"],
+        }
+
+        related_data = {
+            "intervention": model_to_dict(self, fields=hashed_fields["interventions"]),
+            "steps": list(self.steps.values(*hashed_fields["steps"])),
+            "transitions": list(
+                Transition.objects.filter(from_step__intervention=self).values(
+                    *hashed_fields["transitions"]
+                )
+            ),
+            "judgements": list(
+                Judgement.objects.filter(intervention=self).values(*hashed_fields["judgements"])
+            ),
+            "examples": list(self.examples.values(*hashed_fields["examples"])),
+        }
+        serialized_data = json.dumps(related_data, sort_keys=True)
+        print(serialized_data)
+        return hashlib.sha256(serialized_data.encode("utf-8")).hexdigest()
+
+    @hook(AFTER_UPDATE)
+    def update_version(self, *args, **kwargs):
+        new_version = self.compute_version()
+        if self.version != new_version:
+            # Prevent recursive save
+            self.version = new_version
+            super(Intervention, self).save(update_fields=["version"])
+
+    def get_export_url(self):
+        return reverse("admin:mindframe_export", args=[self.id])
+
     title = models.CharField(max_length=255)
     short_title = models.CharField(max_length=20)
     slug = AutoSlugField(populate_from="short_title", unique=True)
+    version = models.CharField(max_length=64, null=True, editable=False)
+    sem_ver = models.CharField(max_length=64, null=True, editable=True)
 
     response_format_instructions = models.TextField(
         help_text="Instructions for the bot on how to format it's response. Best done as a markdown list. Can be included as {{intervention.response_format_instructions}} in the prompt template.",
         default="""- respond in a single sentence\n""",
     )
 
+    def transitions(self):
+        return Transition.objects.filter(
+            Q(from_step__intervention=self) | Q(to_step__intervention=self)
+        )
+
+    def ver(self):
+        return self.version and self.version[:8] or "-"
+
     def __str__(self):
-        return self.title
+        return f"{self.title} ({self.sem_ver}/{self.ver()})"
 
     class Meta:
-        unique_together = ("title",)  # "version")
+        unique_together = ("title", "version", "sem_ver")
 
 
 class Example(models.Model):
@@ -188,7 +247,6 @@ class Step(models.Model):
 
         template = Template(self.prompt_template)
         context = self.get_step_context(session)
-
         pmpt = template.render(context)
         # logger.info(f"PROMPT:\n{pmpt}")
         completions = chatter(pmpt, model=MINDFRAME_AI_MODELS.expensive)
@@ -200,7 +258,7 @@ class Step(models.Model):
         unique_together = [("intervention", "title"), ("intervention", "slug")]
 
     def __str__(self):
-        return f"{self.title} ({self.intervention.title})"
+        return f"{self.title} ({self.intervention.title}, {self.intervention.sem_ver}/{self.intervention.ver()})"
 
 
 class Transition(models.Model):
@@ -245,7 +303,7 @@ class Judgement(models.Model):
         return cls_or_function
 
     def __str__(self) -> str:
-        return f"<{self.variable_name}> {self.title}"
+        return f"<{self.variable_name}> {self.title} ({self.intervention.short_title} {self.intervention.sem_ver})"
 
     def make_judgement(self, session):
         logger.debug(f"Making judgement {self.title} for {session}")
@@ -459,6 +517,8 @@ class TreatmentSession(models.Model):
         """Respond to the client's last utterance (and manage transitions)."""
 
         bot = CustomUser.objects.filter(role=RoleChoices.THERAPIST).first()
+        if not bot:
+            raise Exception("No therapist user found to respond to client.")
         step = self.current_step()
         transitions = step.transitions_from.all()
 

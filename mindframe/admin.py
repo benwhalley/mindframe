@@ -1,3 +1,4 @@
+from django.db import transaction
 import logging
 import pprint
 from django.contrib import admin
@@ -12,6 +13,11 @@ from django.utils.html import format_html, format_html_join
 from django.urls import reverse
 from django.contrib import admin, messages
 from django.utils import timezone
+from django.http import HttpResponse
+import json
+from django import forms
+from django.shortcuts import render, redirect
+from django.contrib import messages
 
 import shortuuid
 from django.contrib import admin
@@ -31,11 +37,17 @@ from .models import (
     SyntheticConversation,
 )
 
+
 from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
+
 
 shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
 
 logger = logging.getLogger(__name__)
+
+
+class InterventionImportForm(forms.Form):
+    file = forms.FileField(label="Select JSON file to import")
 
 
 @admin.register(CustomUser)
@@ -103,7 +115,7 @@ class StepJudgementInline(admin.TabularInline):
 
 @admin.register(Step)
 class StepAdmin(admin.ModelAdmin):
-    list_display = ("title", "intervention")
+    list_display = ("title", "slug", "intervention")
     autocomplete_fields = ("intervention",)
     search_fields = ("title", "intervention__title")
     inlines = [
@@ -126,6 +138,7 @@ class StepAdmin(admin.ModelAdmin):
 @admin.register(Transition)
 class TransitionAdmin(admin.ModelAdmin):
     list_display = ("from_step", "to_step")
+    list_filter = ("to_step__intervention",)
     search_fields = ("from_step__name", "to_step__name")
 
 
@@ -174,6 +187,7 @@ class JudgementAdmin(admin.ModelAdmin):
 class ExampleAdmin(admin.ModelAdmin):
     list_display = ("intervention", "title")
     list_filter = ("intervention",)
+    autocomplete_fields = ["intervention"]
     search_fields = (
         "title",
         "intervention__title",
@@ -188,10 +202,16 @@ class TreatmentSessionStateAdmin(admin.ModelAdmin):
 
 @admin.register(Intervention)
 class InterventionAdmin(admin.ModelAdmin):
-    list_display = ("title", "slug", "short_title", "start_session_button")
+    list_display = ("title_version", "ver", "slug", "short_title", "start_session_button")
     search_fields = ("title",)
     inlines = [ExampleInline]
-    readonly_fields = ["slug"]
+    readonly_fields = ["slug", "version"]
+
+    def title_version(self, obj):
+        return f"{obj.title} ({obj.sem_ver})"
+
+    def ver(self, obj):
+        return obj.ver()
 
     def start_session_button(self, obj):
         return format_html(
@@ -210,8 +230,128 @@ class InterventionAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.start_session),
                 name="start_session",
             ),
+            path(
+                "<int:object_id>/export/",
+                self.admin_site.admin_view(self.export_intervention),
+                name="mindframe_export",
+            ),
+            path(
+                "import/",
+                self.admin_site.admin_view(self.import_intervention),
+                name="import_intervention",
+            ),
         ]
         return custom_urls + urls
+
+    def export_intervention(self, request, object_id):
+        intervention = Intervention.objects.filter(pk=object_id).first()
+
+        related_objects = {
+            "intervention": {
+                "title": intervention.title,
+                "short_title": intervention.short_title,
+                "slug": intervention.slug,
+                "response_format_instructions": intervention.response_format_instructions,
+                "version": intervention.version,
+            },
+            "steps": list(intervention.steps.values()),
+            "judgements": list(Judgement.objects.filter(intervention=intervention).values()),
+            "examples": list(intervention.examples.values()),
+            # note need to handle these differently on import
+            "transitions": list(
+                Transition.objects.filter(to_step__intervention=intervention).values(
+                    "from_step__slug", "to_step__slug", "conditions"
+                )
+            ),
+        }
+
+        # Serialize to JSON
+        response = HttpResponse(
+            json.dumps(related_objects, indent=4),
+            content_type="application/json",
+        )
+        response["Content-Disposition"] = (
+            f'attachment; filename="intervention_{intervention.slug}.json"'
+        )
+        return response
+
+    def import_intervention(self, request):
+        if request.method == "POST":
+            form = InterventionImportForm(request.POST, request.FILES)
+            if form.is_valid():
+                with transaction.atomic():
+                    file = form.cleaned_data["file"]
+                    try:
+                        data = json.load(file)
+                        intervention_data = data.pop("intervention")
+
+                        # Generate a new semantic version (you can customize this logic)
+                        new_sem_ver = f"{intervention_data.get('sem_ver', '1.0.1')}-imported"
+
+                        # Create a new intervention with a different version
+                        intervention = Intervention.objects.create(
+                            title=f"{intervention_data['title']} (Imported)",
+                            short_title=intervention_data["short_title"],
+                            slug=None,  # Let AutoSlugField generate a new slug
+                            sem_ver=new_sem_ver,
+                            response_format_instructions=intervention_data.get(
+                                "response_format_instructions", ""
+                            ),
+                        )
+
+                        # Keep a mapping of old IDs to new instances for steps and judgements
+                        step_mapping = {}
+                        judgement_mapping = {}
+
+                        # Create the mapping during step import
+                        step_mapping = {}
+                        for step_data in data["steps"]:
+                            step_data.pop("id", None)  # Remove the original ID
+                            step_data["intervention_id"] = intervention.id
+                            new_step = Step.objects.create(**step_data)
+                            step_mapping[new_step.slug] = new_step
+
+                        # Import Judgements
+                        for judgement_data in data["judgements"]:
+                            judgement_data.pop("id", None)  # Remove the original ID
+                            judgement_data["intervention_id"] = intervention.id
+                            new_judgement = Judgement.objects.create(**judgement_data)
+                            judgement_mapping[judgement_data["variable_name"]] = new_judgement
+
+                        # Import Examples
+                        for example_data in data["examples"]:
+                            example_data.pop("id", None)  # Remove the original ID
+                            example_data["intervention_id"] = intervention.id
+                            Example.objects.create(**example_data)
+
+                        # Import Transitions
+                        # note we lookup by slug among the NEWLY CREATED ste[]
+                        for transition_data in data["transitions"]:
+
+                            transition_data["from_step"] = step_mapping[
+                                transition_data.pop("from_step__slug")
+                            ]
+                            transition_data["to_step"] = step_mapping[
+                                transition_data.pop("to_step__slug")
+                            ]
+                            # Create the new Transition object
+                            Transition.objects.create(**transition_data)
+
+                        messages.success(
+                            request,
+                            f"Imported Intervention '{intervention.title}' with version '{new_sem_ver} ({intervention.ver()})'.",
+                        )
+                        return redirect("admin:mindframe_intervention_changelist")
+                    except Exception as e:
+                        messages.error(request, f"Error importing intervention: {e}")
+        else:
+            form = InterventionImportForm()
+
+        context = {
+            "form": form,
+            "title": "Import Intervention",
+        }
+        return render(request, "admin/intervention_import.html", context)
 
     def start_session(self, request, intervention_id):
         intervention = Intervention.objects.get(pk=intervention_id)
