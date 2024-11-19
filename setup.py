@@ -51,7 +51,7 @@ entry_points = {"console_scripts": ["mindframe-bot = mindframe.chatbot:main"]}
 
 setup_kwargs = {
     "name": "mindframe",
-    "version": "0.1.8.1",
+    "version": "0.1.8.2",
     "description": "A Python package for the `mindframe` project",
     "long_description": "None",
     "author": "Ben Whalley",
