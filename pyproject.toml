@@ -13,7 +13,8 @@ Django = "^5.0.6"
 magentic = "^0.32.0"
 pydantic = "^2.9.2"
 pandoc = "^2.4"
-psycopg2 = "^2.9.9"
+psycopg2 = {markers = "sys_platform == 'linux'", version = "~=2.9"}
+psycopg2_binary = {markers = "sys_platform == 'darwin'", version = "~=2.9"}
 celery = "^5.4.0"
 redis = "^5.2"
 litellm = "^1.51.0"
