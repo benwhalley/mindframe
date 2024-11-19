@@ -8,3 +8,4 @@ demo-website/src/config/__pycache__
 __pycache__
 demo-website/src/.env
 *.pgdump
+mindframe.egg-info
