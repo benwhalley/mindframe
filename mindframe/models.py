@@ -29,7 +29,6 @@ from mindframe.structured_judgements import data_extraction_function_factory
 from mindframe.settings import MINDFRAME_AI_MODELS, MINDFRAME_SHORTUUID_ALPHABET
 from mindframe.tasks import generate_embedding
 
-from model_clone import CloneMixin
 
 logger = logging.getLogger(__name__)
 
