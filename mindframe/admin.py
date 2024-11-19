@@ -1,6 +1,8 @@
+import io
 from django.db import transaction
 import logging
 import pprint
+from django.forms.models import model_to_dict
 from django.contrib import admin
 from django.db import models
 from django.shortcuts import redirect
@@ -11,6 +13,7 @@ from django.conf import settings
 from django.forms import Textarea
 from django.utils.html import format_html, format_html_join
 from django.urls import reverse
+from django.db.models import Q
 from django.contrib import admin, messages
 from django.utils import timezone
 from django.http import HttpResponse
@@ -39,7 +42,14 @@ from .models import (
 
 
 from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
+from ruamel.yaml import YAML
 
+yaml = YAML()
+yaml.default_flow_style = False  # Use block style
+yaml.width = 4096  # Avoid wrapping long lines into multiple lines
+yaml.representer.add_representer(
+    str, lambda dumper, data: dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+)
 
 shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
 
@@ -177,6 +187,7 @@ class NoteAdmin(admin.ModelAdmin):
 
 @admin.register(Judgement)
 class JudgementAdmin(admin.ModelAdmin):
+    list_display = ("title", "variable_name", "slug", "intervention")
     autocomplete_fields = [
         "intervention",
     ]
@@ -214,19 +225,61 @@ class InterventionAdmin(admin.ModelAdmin):
         return obj.ver()
 
     def start_session_button(self, obj):
-        return format_html(
-            '<a class="button" href="{}">Start New Session</a>',
-            f"start_session/{obj.id}/",
-        )
+        url = reverse("admin:start_session", args=[obj.id])
+        return format_html(f'<a class="button" href="{url}">New Session</a>')
 
     start_session_button.short_description = "Start Session"
     start_session_button.allow_tags = True
+
+    def mermaid_diagram(self, obj):
+        """
+        Renders a Mermaid diagram for the intervention.
+        """
+        # Generate Mermaid syntax for the diagram
+        steps = obj.steps.all()
+        transitions = Transition.objects.filter(
+            Q(from_step__intervention=obj) | Q(to_step__intervention=obj)
+        )
+
+        diagram = ["graph TD"]
+        for step in steps:
+            diagram.append(f'{step.slug.replace("-", "_")}["{step.title}"]')
+
+        for transition in transitions:
+            from_slug = transition.from_step.slug.replace("-", "_")
+            to_slug = transition.to_step.slug.replace("-", "_")
+            conditions = transition.conditions or "No conditions set!!"
+            # Escape quotes in conditions
+            conditions = conditions.replace('"', "'")
+            diagram.append(f'{from_slug} -->|"{conditions}"| {to_slug}')
+
+        diagram.append(
+            f"""classDef smallText fill:none,color:black,stroke:none, font-size:10px;linkStyle default stroke-width:1px,font-size:10px;"""
+        )
+
+        mermaid_code = "\n".join(diagram)
+
+        # Render Mermaid container and script
+        return mermaid_code
+
+    mermaid_diagram.short_description = "Intervention Flowchart"
+
+    def render_mermaid_view(self, request, object_id):
+        """
+        Displays the Mermaid diagram on a separate page.
+        """
+        intervention = self.get_object(request, object_id)
+        return render(
+            request,
+            "admin/intervention_mermaid.html",
+            {"intervention": intervention, "mermaid_code": self.mermaid_diagram(intervention)},
+        )
 
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
             path(
-                "start_session/<int:intervention_id>/",
+                "<int:intervention_id>/new-session/",
                 self.admin_site.admin_view(self.start_session),
                 name="start_session",
             ),
@@ -240,38 +293,50 @@ class InterventionAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.import_intervention),
                 name="import_intervention",
             ),
+            path(
+                "<int:object_id>/mermaid/",
+                self.admin_site.admin_view(self.render_mermaid_view),
+                name="mermaid_diagram",
+            ),
         ]
         return custom_urls + urls
 
     def export_intervention(self, request, object_id):
         intervention = Intervention.objects.filter(pk=object_id).first()
 
+        # all fields except id
+        step_fields = [f.name for f in Step._meta.get_fields() if f.name != "id"]
+        judgement_fields = [f.name for f in Judgement._meta.get_fields() if f.name != "id"]
+        example_fields = [f.name for f in Example._meta.get_fields() if f.name != "id"]
+
         related_objects = {
-            "intervention": {
-                "title": intervention.title,
-                "short_title": intervention.short_title,
-                "slug": intervention.slug,
-                "response_format_instructions": intervention.response_format_instructions,
-                "version": intervention.version,
-            },
-            "steps": list(intervention.steps.values()),
-            "judgements": list(Judgement.objects.filter(intervention=intervention).values()),
-            "examples": list(intervention.examples.values()),
-            # note need to handle these differently on import
+            "intervention": model_to_dict(intervention, fields=Intervention.exported_fields),
+            "steps": list(intervention.steps.values(*Step.exported_fields)),
+            "judgements": list(
+                Judgement.objects.filter(intervention=intervention).values(
+                    *Judgement.exported_fields
+                )
+            ),
+            "examples": list(intervention.examples.values(*Example.exported_fields)),
+            # note we need to handle these differently on import
             "transitions": list(
                 Transition.objects.filter(to_step__intervention=intervention).values(
-                    "from_step__slug", "to_step__slug", "conditions"
+                    *Transition.exported_fields
                 )
             ),
         }
 
-        # Serialize to JSON
+        # Serialize
+        stream = io.StringIO()
+        yaml.dump(related_objects, stream)
+        stream.seek(0)
+
         response = HttpResponse(
-            json.dumps(related_objects, indent=4),
-            content_type="application/json",
+            stream.read(),
+            content_type="application/yaml",
         )
         response["Content-Disposition"] = (
-            f'attachment; filename="intervention_{intervention.slug}.json"'
+            f'attachment; filename="intervention_{intervention.slug}.yaml"'
         )
         return response
 
@@ -282,7 +347,7 @@ class InterventionAdmin(admin.ModelAdmin):
                 with transaction.atomic():
                     file = form.cleaned_data["file"]
                     try:
-                        data = json.load(file)
+                        data = yaml.load(file)
                         intervention_data = data.pop("intervention")
 
                         # Generate a new semantic version (you can customize this logic)
@@ -294,9 +359,6 @@ class InterventionAdmin(admin.ModelAdmin):
                             short_title=intervention_data["short_title"],
                             slug=None,  # Let AutoSlugField generate a new slug
                             sem_ver=new_sem_ver,
-                            response_format_instructions=intervention_data.get(
-                                "response_format_instructions", ""
-                            ),
                         )
 
                         # Keep a mapping of old IDs to new instances for steps and judgements
@@ -357,16 +419,42 @@ class InterventionAdmin(admin.ModelAdmin):
         intervention = Intervention.objects.get(pk=intervention_id)
         client = request.user
         cycle = Cycle.objects.create(intervention=intervention, client=client)
-        session = TreatmentSession.objects.create(cycle=cycle, started=timezone.now())
+        session = TreatmentSession.objects.create(
+            cycle=cycle,
+            started=timezone.now(),
+        )
         return redirect(f"{settings.CHATBOT_URL}/?session_id={session.uuid}")
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
+
         extra_context = extra_context or {}
-        extra_context["start_session_action"] = format_html(
-            '<a class="button" href="{}">Start New Session</a>',
-            f"../start_session/{object_id}/",
+        extra_context.update(
+            {
+                "new_session": reverse(
+                    "admin:start_session",
+                    args=[
+                        object_id,
+                    ],
+                ),
+                "diagram": reverse(
+                    "admin:mermaid_diagram",
+                    args=[
+                        object_id,
+                    ],
+                ),
+                "mermaid": self.mermaid_diagram(self.get_object(request, object_id)),
+            }
         )
+
         return super().change_view(request, object_id, form_url, extra_context=extra_context)
+
+    class Media:
+        js = [
+            "https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js",  # Include Mermaid.js
+        ]
+        css = {
+            "all": ("mindframe/css/admin-extra.css",),  # Optional custom admin styles
+        }
 
 
 @admin.register(TreatmentSession)

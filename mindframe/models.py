@@ -29,6 +29,8 @@ from mindframe.structured_judgements import data_extraction_function_factory
 from mindframe.settings import MINDFRAME_AI_MODELS, MINDFRAME_SHORTUUID_ALPHABET
 from mindframe.tasks import generate_embedding
 
+from model_clone import CloneMixin
+
 logger = logging.getLogger(__name__)
 
 shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
@@ -122,11 +124,6 @@ class Intervention(LifecycleModel):
     version = models.CharField(max_length=64, null=True, editable=False)
     sem_ver = models.CharField(max_length=64, null=True, editable=True)
 
-    response_format_instructions = models.TextField(
-        help_text="Instructions for the bot on how to format it's response. Best done as a markdown list. Can be included as {{intervention.response_format_instructions}} in the prompt template.",
-        default="""- respond in a single sentence\n""",
-    )
-
     def transitions(self):
         return Transition.objects.filter(
             Q(from_step__intervention=self) | Q(to_step__intervention=self)
@@ -152,7 +149,7 @@ class Example(LifecycleModel):
 
     embedding = VectorField(dimensions=384, null=True, blank=True)
 
-    @hook(BEFORE_UPDATE)
+    @hook(AFTER_UPDATE)
     def on_text_change(self):
         generate_embedding.delay(self.pk, self.text)
 
@@ -198,8 +195,7 @@ class StepJudgement(models.Model):
 
 
 class Step(models.Model):
-    """Each Step is a node in the intervention graph.
-
+    """
     This model handles the immediate response to the client in each turn.
     """
 
@@ -209,7 +205,7 @@ class Step(models.Model):
     intervention = models.ForeignKey(Intervention, on_delete=models.CASCADE, related_name="steps")
 
     title = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255)
+    slug = AutoSlugField(populate_from="title")
     prompt_template = models.TextField()
     judgements = models.ManyToManyField("Judgement", through="StepJudgement")
 
@@ -266,7 +262,6 @@ class Step(models.Model):
 
 
 class Transition(models.Model):
-    """An edge between two Step nodes"""
 
     from_step = models.ForeignKey(Step, on_delete=models.CASCADE, related_name="transitions_from")
     to_step = models.ForeignKey(Step, on_delete=models.CASCADE, related_name="transitions_to")
@@ -280,6 +275,9 @@ class Transition(models.Model):
         if self.from_step.intervention != self.to_step.intervention:
             raise ValidationError("from_step and to_step must belong to the same intervention.")
 
+    class Meta:
+        unique_together = [("from_step", "to_step")]
+
     def __str__(self):
         return f"{self.from_step} -> {self.to_step}"
 
@@ -290,6 +288,7 @@ class Judgement(models.Model):
 
     intervention = models.ForeignKey("mindframe.Intervention", on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
+    slug = AutoSlugField(populate_from="title")
     variable_name = models.CharField(max_length=255)
     prompt_template = models.TextField()
     pydantic_model_name = models.CharField(
@@ -305,9 +304,6 @@ class Judgement(models.Model):
         if self.valid_options:
             return cls_or_function(self.valid_options)
         return cls_or_function
-
-    def __str__(self) -> str:
-        return f"<{self.variable_name}> {self.title} ({self.intervention.short_title} {self.intervention.sem_ver})"
 
     def make_judgement(self, session):
         logger.debug(f"Making judgement {self.title} for {session}")
@@ -348,7 +344,16 @@ class Judgement(models.Model):
         newnote.save()
         return newnote
 
+    def __str__(self) -> str:
+        return f"<{self.variable_name}> {self.title} ({self.intervention.short_title} {self.intervention.sem_ver})"
 
+    class Meta:
+        unique_together = [("intervention", "title"), ("intervention", "slug")]
+
+
+# ######################### #
+#
+#
 # Records made at runtime
 
 
@@ -373,7 +378,6 @@ class TreatmentSession(models.Model):
         return self.uuid
 
     uuid = models.CharField(unique=True, default=shortuuid.uuid, editable=False, null=False)
-
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name="sessions")
     started = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(auto_now=True)

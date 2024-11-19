@@ -1,4 +1,5 @@
 from celery import shared_task
+from django.db import transaction
 from mindframe.settings import MINDFRAME_AI_MODELS
 from django.db import transaction
 import logging
@@ -8,16 +9,18 @@ logger = logging.getLogger(__name__)
 
 @shared_task
 def generate_embedding(example_id, text):
-    print("Generating embedding for example")
-    from mindframe.models import Example  # avoid circular imports
+    """
+    Async task to generate a text embedding for a given example.
+    """
+    from mindframe.models import Example
 
     embed = MINDFRAME_AI_MODELS.embedding.encode(text)
-    print("Done generating embedding")
+
     with transaction.atomic():
-        example = Example.objects.select_for_update().get(id=example_id)
-        if example.text == text:
-            example.embedding = embed
-            example.save()
+        example = Example.objects.filter(id=example_id)
+        # make sure texts match before updating
+        if example.first() and example.first().text == text:
+            example.update(embedding=embed)
             logger.info(f"Embedding generated for {example}.")
         else:
             logger.warning(
