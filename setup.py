@@ -36,6 +36,7 @@ install_requires = [
     "pydantic>=2.9.2,<3.0.0",
     "python-dotenv>=1.0.1,<2.0.0",
     "redis>=5.2,<6.0",
+    "ruamel-yaml>=0.18.6,<0.19.0",
     "rules>=3.4,<4.0",
     "sentence-transformers>=3.3.0,<4.0.0",
     "shortuuid>=1.0.13,<2.0.0",

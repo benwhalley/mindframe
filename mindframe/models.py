@@ -1,9 +1,10 @@
+import os
 import hashlib
 import json
 import logging
 import re
 from collections import defaultdict, OrderedDict
-from enum import Enum
+from enum import Enum, auto
 from django.forms.models import model_to_dict
 
 import shortuuid
@@ -23,10 +24,13 @@ import shortuuid
 from django_lifecycle import LifecycleModel, hook, BEFORE_UPDATE, AFTER_UPDATE
 from django_lifecycle.conditions import WhenFieldHasChanged
 
-from mindframe.multipart_llm import chatter
+import instructor
+from openai import AzureOpenAI, OpenAI
+
+from mindframe.multipart_llm import chatter, structured_chat
 from mindframe.return_type_models import JUDGEMENT_RETURN_TYPES
-from mindframe.structured_judgements import data_extraction_function_factory
-from mindframe.settings import MINDFRAME_AI_MODELS, MINDFRAME_SHORTUUID_ALPHABET
+from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
+
 from mindframe.tasks import generate_embedding
 
 
@@ -36,6 +40,8 @@ shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
 
 
 class RoleChoices(models.TextChoices):
+    """Defines various roles in the system such as developers, clients, and supervisors."""
+
     SYSTEM_DEVELOPER = "system_developer", "System Developer"
     INTERVENTION_DEVELOPER = "intervention_developer", "Intervention Developer"
     CLIENT = "client", "Client"
@@ -44,6 +50,8 @@ class RoleChoices(models.TextChoices):
 
 
 class StepJudgementFrequencyChoices(models.TextChoices):
+    """Specifies when/how frequently a judgement should be made during a step."""
+
     TURN = "turn", "Each turn"
     ENTER = "enter", "When entering the step"
     EXIT = "exit", "When exiting the step"
@@ -57,6 +65,7 @@ def format_turns(turns):
 
 
 class CustomUser(AbstractUser):
+    """Custom user model with additional role field for defining user roles."""
 
     role = models.CharField(
         max_length=30, choices=RoleChoices.choices, default=RoleChoices.CLIENT.value
@@ -67,9 +76,7 @@ class CustomUser(AbstractUser):
 
 
 class Intervention(LifecycleModel):
-    """A treatment intervention
-
-    e.g. CBT or Functional Imagery Training"""
+    """A treatment/intervention, including steps, transitions, and related metadata."""
 
     def natural_key(self):
         return slugify(self.short_title)
@@ -123,6 +130,22 @@ class Intervention(LifecycleModel):
     version = models.CharField(max_length=64, null=True, editable=False)
     sem_ver = models.CharField(max_length=64, null=True, editable=True)
 
+    # TODO - make this non nullable
+    default_conversation_model = models.ForeignKey(
+        "LLM",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="default_for_conversations",
+    )
+    default_judgement_model = models.ForeignKey(
+        "LLM",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="default_for_judgements",
+    )
+
     def transitions(self):
         return Transition.objects.filter(
             Q(from_step__intervention=self) | Q(to_step__intervention=self)
@@ -139,6 +162,7 @@ class Intervention(LifecycleModel):
 
 
 class Example(LifecycleModel):
+    """Stores examples related to Interventions, including embeddings for vector search."""
 
     intervention = models.ForeignKey(
         Intervention, on_delete=models.CASCADE, related_name="examples"
@@ -169,6 +193,8 @@ class Example(LifecycleModel):
 
 
 class StepJudgement(models.Model):
+    """Relationships between steps and judgements, and when a Judgement should be made."""
+
     judgement = models.ForeignKey(
         "Judgement", related_name="stepjudgements", on_delete=models.CASCADE
     )
@@ -194,9 +220,7 @@ class StepJudgement(models.Model):
 
 
 class Step(models.Model):
-    """
-    This model handles the immediate response to the client in each turn.
-    """
+    """Represents a step in an intervention, including a prompt template and Judgements."""
 
     def natural_key(self):
         return slugify(f"{self.intervention.title}__{self.title}")
@@ -240,6 +264,9 @@ class Step(models.Model):
         )
         return context
 
+    def get_model(self, session):
+        return session.cycle.intervention.default_conversation_model
+
     def spoken_response(self, session) -> OrderedDict:
         """Use an llm to create a spoken response to clients,
         using features of the session as context."""
@@ -247,11 +274,13 @@ class Step(models.Model):
         template = Template(self.prompt_template)
         context = self.get_step_context(session)
         pmpt = template.render(context)
-        # logger.info(f"PROMPT:\n{pmpt}")
-        completions = chatter(pmpt, model=MINDFRAME_AI_MODELS.expensive)
-
+        completions, llm_calls = chatter(
+            pmpt,
+            model=self.get_model(session),
+            log_context={"step": self, "session": session, "prompt": pmpt, "context": context},
+        )
         # returns an OrderedDict of completions (intermediate 'thougts' and the __RESPONSE__)
-        return completions
+        return completions, llm_calls
 
     class Meta:
         unique_together = [("intervention", "title"), ("intervention", "slug")]
@@ -261,6 +290,7 @@ class Step(models.Model):
 
 
 class Transition(models.Model):
+    """A transition between Steps, specifying required conditions to be met."""
 
     from_step = models.ForeignKey(Step, on_delete=models.CASCADE, related_name="transitions_from")
     to_step = models.ForeignKey(Step, on_delete=models.CASCADE, related_name="transitions_to")
@@ -282,6 +312,11 @@ class Transition(models.Model):
 
 
 class Judgement(models.Model):
+    """A Judgement to be made on the current session state.
+
+    Judgements are defined by a prompt template and expected return type/acceptable return values.
+    """
+
     def natural_key(self):
         return slugify(f"{self.variable_name}")
 
@@ -305,41 +340,39 @@ class Judgement(models.Model):
         return cls_or_function
 
     def make_judgement(self, session):
+        """
+
+        s = TreatmentSession.objects.last()
+        self = Judgement.objects.first()
+        self.make_judgement(s)
+        """
         logger.debug(f"Making judgement {self.title} for {session}")
         template = Template(self.prompt_template)
         # extract this so DRY with Step.spoken_response
         context = session.current_step().get_step_context(session)
-        inputs = {"input": template.render(context)}
+        inputs = {"prompt": template.render(context)}
         try:
             return self.process_inputs(session, inputs)
         except Exception as e:
-            el = ErrorLog.objects.create(
-                session_state=session.state,
-                message=f"Error making judgement {self.title}",
-                traceback=str(e),
-                metadata=[dict(inputs), context],
-            )
-            logger.error(f"ERROR MAKING JUDGEMENT {el}")
+            logger.error(f"ERROR MAKING JUDGEMENT {e}")
             return None
+
+    def get_model(self, session):
+        return session.cycle.intervention.default_conversation_model
 
     def process_inputs(self, session, inputs: dict):
 
-        extraction_function = data_extraction_function_factory(
-            self.return_type,
-            # remember, that other templating goes on prior, when generating {input}
-            # these templates are stored in Judgement model instances in the db
-            # this just adds the instruction to respond in JSON which is what we almost always want.
-            prompt_template="{input}\nYou MUST use the tool calling functionality and respond in JSON in the correct format.",
-        )
-
         newnote = Note.objects.create(judgement=self, session_state=session.state, inputs=inputs)
-        with MINDFRAME_AI_MODELS.expensive:
-            llm_result = extraction_function(**newnote.inputs)
-            newnote.data = llm_result.model_dump()
 
-        logger.info(f"JUDGEMENT RESULT: {llm_result}")
-        logger.warning(f"NEW NOTE: {newnote}")
+        llm_result, compl, log = structured_chat(
+            newnote.inputs["prompt"],
+            llm=self.get_model(session),
+            return_type=self.return_type,
+            log_context={"judgement": self, "session": session, "inputs": inputs},
+        )
+        # TODO: save the token_counts from compl
 
+        newnote.data = llm_result and llm_result.model_dump()
         newnote.save()
         return newnote
 
@@ -357,7 +390,7 @@ class Judgement(models.Model):
 
 
 class Cycle(models.Model):
-    """An Cycle of treatment linking multiple TreatmentSessions"""
+    """A cycle of treatment for a client, linking multiple treatment sessions."""
 
     client = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="cycles")
     intervention = models.ForeignKey(
@@ -371,7 +404,7 @@ class Cycle(models.Model):
 
 
 class TreatmentSession(models.Model):
-    """An individual session in which a client uses the service"""
+    """An individual 'session' for a client within a treatment cycle."""
 
     def natural_key(self):
         return self.uuid
@@ -541,23 +574,22 @@ class TreatmentSession(models.Model):
         step = self.evaluate_transitions_and_update_step(step, transitions, client_data)
 
         # generate a response using the current or newly updated step
-        completions = step.spoken_response(self)
+        completions, llm_logs = step.spoken_response(self)
         key, utterance = next(reversed(completions.items()))
 
         # save the generated response as a new Turn
         newturn = Turn.objects.create(
             session_state=self.state,
             speaker=bot,
-            text=utterance.value,
-            metadata={k: i.json() for k, i in completions.items()},
+            text=utterance,
+            metadata=dict(completions.items()),
         )
         newturn.save()
 
         # return the response only (this gets used by the gradio app)
         # perhaps we should return the Turn object and allow the gradio app to
         # use other attributes of it?
-        logger.warning(utterance.value)
-        return utterance.value
+        return utterance
 
     class Meta:
         ordering = ["-started"]
@@ -567,7 +599,7 @@ class TreatmentSession(models.Model):
 
 
 class TreatmentSessionState(models.Model):
-    """Tracks state within a session: which step we are at, and have come from."""
+    """Tracks the state of a treatment session, including the current and previous steps."""
 
     session = models.ForeignKey(TreatmentSession, on_delete=models.CASCADE, related_name="progress")
     timestamp = models.DateTimeField(default=timezone.now)
@@ -587,7 +619,7 @@ class TreatmentSessionState(models.Model):
         ordering = ["timestamp"]
 
     def __str__(self):
-        return f"{self.step.title}"
+        return f"{self.session}: {self.step.title}"
 
 
 class Turn(models.Model):
@@ -618,7 +650,10 @@ class Turn(models.Model):
 
 
 class Note(models.Model):
-    """Clinical records created by exercuting a Judgement at a point in time"""
+    """Stores clinical records or outputs from Judgements made during treatment sessions.
+
+    Notes can be either plain text or contasin structured data, depending on the Judgement that created them.
+    """
 
     uuid = models.CharField(unique=True, default=shortuuid.uuid, editable=False, null=False)
 
@@ -647,18 +682,28 @@ class Note(models.Model):
         return f"{self.judgement.return_type.__name__}[{self.judgement.variable_name}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
 
 
-class ErrorLog(models.Model):
-    """Log errors that occur during runtime (especially LLM errors)
-    Perhaps we should just setup Sentry, but this seems useful for now.
-    """
+class LLMLogTypes(models.TextChoices):
+    """Types of logs that can be stored in the LLMLog model."""
+
+    ERROR = auto()
+    USAGE = auto()
+
+
+class LLMLog(models.Model):
+    """Log LLM usage and errors."""
 
     timestamp = models.DateTimeField(default=timezone.now)
-    session_state = models.ForeignKey(
-        TreatmentSessionState, on_delete=models.CASCADE, null=True, blank=True
+    log_type = models.CharField(
+        choices=LLMLogTypes.choices, max_length=25, default=LLMLogTypes.USAGE
     )
-    message = models.TextField()
+    step = models.ForeignKey(Step, on_delete=models.CASCADE, null=True, blank=True)
+    judgement = models.ForeignKey(Judgement, on_delete=models.CASCADE, null=True, blank=True)
+    model = models.ForeignKey("LLM", on_delete=models.CASCADE, null=True, blank=True)
+
+    session = models.ForeignKey(TreatmentSession, on_delete=models.CASCADE, null=True, blank=True)
+
+    message = models.TextField(blank=True, null=True)
     metadata = models.JSONField(default=dict, null=True, blank=True)
-    traceback = models.TextField()
 
     def __str__(self):
         return f"<{self.pk}> {self.timestamp}: {self.message}"
@@ -680,3 +725,40 @@ class SyntheticConversation(models.Model):
 
     def __str__(self):
         return f"Synthetic conversation between Session {self.session_one.id} and Session {self.session_two.id} starting at {self.start_time}"
+
+
+class LLMProvider(models.TextChoices):
+    AZURE = auto()
+    OLLAMA = auto()
+
+
+class LLM(models.Model):
+    """Store details of Language Models used for Step and Judgement execution"""
+
+    nickname = models.SlugField(unique=False, editable=True)
+    provider_name = models.CharField(choices=LLMProvider.choices)
+    model_name = models.CharField(max_length=255)
+
+    azure = instructor.from_openai(AzureOpenAI())
+    ollama = instructor.from_openai(
+        OpenAI(
+            base_url=os.environ.get("OLLAMA_API_BASE", "http://localhost:11434/v1"),
+            api_key=os.environ.get("OLLAMA_API_KEY", "ollama"),  # required, but unused
+        ),
+        # required to workaround bug in ollama tool returns
+        mode=instructor.Mode.JSON,
+    )
+
+    def __str__(self) -> str:
+        return f"{self.nickname} | {self.provider_name}/{self.model_name}"
+
+    def chatter(self, prompt):
+        return chatter(prompt, self)[0]  # only return completions, not logs
+
+    def instruct(self, prompt, response_model, *args, **kwargs):
+        res, compl_, log_ = structured_chat(prompt, self, response_model, *args, **kwargs)
+        return res
+
+    @property
+    def provider(self):
+        return {"AZURE": self.azure, "OLLAMA": self.ollama}.get(self.provider_name)

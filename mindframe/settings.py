@@ -3,10 +3,10 @@ import warnings
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from types import SimpleNamespace
-
 from magentic import OpenaiChatModel
 from magentic.chat_model.litellm_chat_model import LitellmChatModel
-
+import instructor
+from openai import AzureOpenAI, OpenAI
 from sentence_transformers import SentenceTransformer
 
 
@@ -30,9 +30,6 @@ MINDFRAME_AI_MODELS = getattr(
     settings,
     "MINDFRAME_AI_MODELS",
     SimpleNamespace(
-        free=LitellmChatModel("ollama_chat/llama3.2", api_base="http://localhost:11434"),
-        expensive=OpenaiChatModel("gpt-4o", api_type="azure"),
-        cheap=OpenaiChatModel("gpt-4o-mini", api_type="azure"),
         embedding=LazySentenceTransformer("sentence-transformers/all-MiniLM-L6-v2"),
     ),
 )

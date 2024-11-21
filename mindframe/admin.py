@@ -37,7 +37,9 @@ from .models import (
     TreatmentSessionState,
     Judgement,
     StepJudgement,
+    LLM,
     SyntheticConversation,
+    LLMLog,
 )
 
 
@@ -75,6 +77,47 @@ class ExampleInline(admin.TabularInline):
 @admin.register(SyntheticConversation)
 class SyntheticConversationAdmin(admin.ModelAdmin):
     pass
+
+
+@admin.register(LLM)
+class LLMAdmin(admin.ModelAdmin):
+    search_fields = ["model_name"]
+    list_display = ["model_name", "provider_name", "nickname"]
+
+
+@admin.register(LLMLog)
+class LLMLogAdmin(admin.ModelAdmin):
+    list_display = [
+        "timestamp",
+        "log_type",
+        "inference_for",
+        "message",
+    ]
+    readonly_fields = [
+        "log_type",
+        "session",
+        "step",
+        "judgement",
+        "timestamp",
+        "message",
+        "metadata",
+        "metadata_neat",
+    ]
+
+    def inference_for(self, obj):
+        return obj.step and "Step" or obj.judgement and "Judgement" or "Unknown"
+
+    exclude = [
+        "metadata",
+    ]
+    search_fields = ["model__model_name", "step__title", "judgement__title", "session__uuid"]
+    list_filter = ["log_type", "model", "judgement", "step"]
+    date_hierarchy = "timestamp"
+
+    def metadata_neat(self, obj):
+        import pprint
+
+        return format_html("<pre>{}</pre>", pprint.pformat(obj.metadata))
 
 
 @admin.register(Cycle)
@@ -217,6 +260,7 @@ class InterventionAdmin(admin.ModelAdmin):
     search_fields = ("title",)
     inlines = [ExampleInline]
     readonly_fields = ["slug", "version"]
+    autocomplete_fields = ["default_conversation_model", "default_judgement_model"]
 
     def title_version(self, obj):
         return f"{obj.title} ({obj.sem_ver})"
