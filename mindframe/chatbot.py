@@ -3,6 +3,14 @@ import os
 import django
 import gradio as gr
 import logging
+import requests  # For external API calls
+import whisper
+
+try:
+    model = whisper.load_model("turbo")
+except Exception as e:
+    print(f"Error loading whisper model: {e}")
+    model = None
 
 
 def main():
@@ -21,9 +29,7 @@ def main():
 
     # Function to initialize chat history based on session_id from request
     def initialize_chat(request: gr.Request):
-        # Get session_id from query parameters
         session_id = request.query_params.get("session_id")
-
         session = get_session(session_id)
         print(f"Selected session: {session}")
 
@@ -41,27 +47,63 @@ def main():
 
         return history, session_id
 
+    # External API call for audio transcription
+    def transcribe_audio(audio_file):
+        transcription = model.transcribe(audio_file)
+        return transcription
+
     # Chat function to handle user input and bot responses
-    def chat_with_bot(session_id, history, user_input):
+    def chat_with_bot(session_id, history, user_input, audio_input):
         session = get_session(session_id)
         user = session.cycle.client
+
+        # TODO need to do more sanity checking and clearning of the audio input here
+        if audio_input is not None:
+            transcription = transcribe_audio(audio_input).get("text", "Audio not transcribed")
+            logger.info(f"Transcribed audio input: {transcription}")
+            if transcription:  # Process only if there's valid input
+                user_input = transcription
+
         session.listen(speaker=user, text=user_input)
         bot_response = session.respond()
         history.append((user_input, bot_response))
-        return history, ""  # Return updated history and clear input box
+
+        return history, "", None  # Clear text and audio inputs
 
     with gr.Blocks() as iface:
         chatbot = gr.Chatbot()
         user_input = gr.Textbox(show_label=False, placeholder="Type your message here...")
+
+        if model is not None:
+            logger.info("Adding audio input")
+            audio_input = gr.Audio(
+                sources=["microphone"], type="filepath", label="Speak your message"
+            )
+        else:
+            logger.warning("No audio input shown as whisper model is not available")
+            audio_input = gr.Textbox(visible=False)
+
         session_id_box = gr.Textbox(visible=False)  # Hidden textbox for session_id
 
-        # Initialize chat history with session_id from query string and store session_id in hidden textbox
+        # Initialize chat history with session_id from query string and
+        # store session_id in hidden textbox
         iface.load(initialize_chat, inputs=None, outputs=[chatbot, session_id_box])
 
-        # Handle user input with session_id in the chat function
-        user_input.submit(
-            chat_with_bot, [session_id_box, chatbot, user_input], [chatbot, user_input]
-        )
+        # Function to handle input selection logic
+        def handle_input(session_id, history, text_input, audio_path):
+            if text_input.strip():  # Prioritize text input if available
+                return chat_with_bot(session_id, history, text_input, None)
+            elif audio_path:  # Process audio input only if no text is provided
+                return chat_with_bot(session_id, history, "", audio_path)
+            else:  # Do nothing if no input is provided
+                return history, "", None
+
+        # Bind the input submission to the shared logic
+        inputs = [session_id_box, chatbot, user_input, audio_input]
+        outputs = [chatbot, user_input, audio_input]
+
+        user_input.submit(handle_input, inputs, outputs)
+        audio_input.change(handle_input, inputs, outputs)
 
     iface.launch(server_name="0.0.0.0", server_port=int(os.environ.get("CHAT_PORT", 8000)))
 
