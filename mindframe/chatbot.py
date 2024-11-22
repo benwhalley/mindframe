@@ -4,14 +4,9 @@ import django
 import gradio as gr
 import logging
 import whisper
-from django.conf import settings
-from django.urls import reverse
 
-try:
-    model = whisper.load_model("turbo")
-except Exception as e:
-    logger.warning(f"Error loading whisper model: {e}")
-    model = None
+from django.urls import reverse
+from django.conf import settings
 
 
 def main():
@@ -20,6 +15,16 @@ def main():
     print(project_root)
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     django.setup()
+    from django.conf import settings
+
+    if settings.MINDFRAME_AUDIO_INPUT:
+        try:
+            model = whisper.load_model("turbo")
+        except Exception as e:
+            logger.warning(f"Error loading whisper model: {e}")
+            model = None
+    else:
+        model = None
 
     logger = logging.getLogger(__name__)
 
@@ -105,7 +110,7 @@ def main():
             elif audio_path:  # Process audio input only if no text is provided
                 return chat_with_bot(session_id, history, "", audio_path)
             else:  # Do nothing if no input is provided
-                return history, "", None
+                return history, text_input, audio_path  # Preserve current state without resetting
 
         # Bind the input submission to the shared logic
         inputs = [session_id_box, chatbot, user_input, audio_input]
