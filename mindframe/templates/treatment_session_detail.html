@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% load pretty %}
+{% load turns %}
+{% load guidance %}
+{% block content %}
+<div class="container mt-5">
+    <h1>Treatment Session Detail</h1>
+
+    <hr class="mt-3">
+
+
+    <div class="row mb-4">
+
+        <div class="col-6">
+            <p>Session: {{ session }} [<code>{{session.uuid}}</code>]</p>
+
+        </div>
+
+
+            <!-- <pre>{{session|turns:"all"|md}}</pre> -->
+            <!-- <pre> {{session|guidance|md}}</pre> -->
+
+        <div class="col-6">
+            <a class="btn btn-primary" href="{{session.chatbot_link}}">Continue conversation</a>
+        </div>
+
+    </div>
+    <hr>
+    <div class="row">
+
+
+
+        <div class="col-5"><h5>Conversation</h5></div>
+        <div class="col-4"><h5>Thoughts</h5></div>
+        <div class="col-3"><h5>Notes/LLM Calls</h5></div>
+
+
+        <style>
+            pre {
+                white-space: pre-wrap; /* Enable wrapping */
+                word-wrap: break-word; /* Break long words if necessary */
+                overflow-wrap: break-word; /* Compatibility for older browsers */
+            }
+        </style>
+    {% regroup turns by session_state as state_turns %}
+    {% for group, turns in state_turns %}
+    <div class="col-12">
+       <hr>
+        <h5>{{group.step.title}}
+        </h5>
+    </div>
+    {% for turn in turns %}
+    <hr>
+    <div class="col-6">
+    <div class="row">
+        <div class="col-1">
+            {{forloop.counter}}.
+        </div>
+        <div class="col-2">
+            {{turn.speaker.username.upper}}:
+        </div>
+        <div class="col">
+             {{turn.text}}
+             <a href="{% url 'admin:mindframe_turn_change' turn.id %}">[+]
+            </a>
+        </div>
+
+    </div>
+
+    </div>
+    <div class="col-3 small">
+        {{turn.metadata.THOUGHTS}}
+    </div>
+
+    <div class="col-3 small">
+        {% if turn.notes.all.count %}
+        <p>Notes</p>
+        {% endif %}
+        {% for note in turn.notes.all %}
+                <p>
+                    <code>{{note.judgement.variable_name}}</code>: {{note.data.value}}
+                    <!-- <pre class="small">{{note.data|pretty_json}}</pre> -->
+                <a href="{% url 'admin:mindframe_note_change' note.id %}">[+]
+                </a>
+            </p>
+        {% endfor %}
+
+        {% if turn.llm_calls.all.count %}
+        <p>LLM Calls</p>
+        {% endif %}
+        {% for call in turn.llm_calls.all %}
+            <p>
+                <a href="{% url 'admin:mindframe_llmlog_change' call.id %}">{{call.message}}</a>
+            </p>
+        {% endfor %}
+
+        <a  class='btn btn-sm btn-outline-success mb-4 float-end ' href="{% url 'admin:start_again_from_turn' turn.pk %}">Start again from here</a>
+    </div>
+
+    {% endfor %}
+    {% endfor %}
+</div>
+</div>
+{% endblock %}

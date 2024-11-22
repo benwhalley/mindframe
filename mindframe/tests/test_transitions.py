@@ -24,9 +24,11 @@ tt.notes.all().delete()
 tt.progress.all().delete()
 
 
-tt.notes.all().count() == 0
+tt.state.notes.all().count() == 0
 
-tt.respond()
+
+nt = Turn.objects.create(speaker=tt.cycle.client)
+tt.current_step().spoken_response(tt, nt)
 tt.listen(tt.cycle.client, "yes I am ready")
 tt.respond()
 

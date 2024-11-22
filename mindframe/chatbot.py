@@ -3,13 +3,14 @@ import os
 import django
 import gradio as gr
 import logging
-import requests  # For external API calls
 import whisper
+from django.conf import settings
+from django.urls import reverse
 
 try:
     model = whisper.load_model("turbo")
 except Exception as e:
-    print(f"Error loading whisper model: {e}")
+    logger.warning(f"Error loading whisper model: {e}")
     model = None
 
 
@@ -22,7 +23,7 @@ def main():
 
     logger = logging.getLogger(__name__)
 
-    from mindframe.models import TreatmentSession, CustomUser, RoleChoices, Cycle, Turn
+    from mindframe.models import TreatmentSession, RoleChoices, Turn
 
     def get_session(id):
         return TreatmentSession.objects.get(uuid=id)
@@ -45,7 +46,13 @@ def main():
         if session.turns.all().count() == 0:
             history.append(("", session.respond()))
 
-        return history, session_id
+        # Generate the URL to the treatment session detail view
+        session_detail_url = (
+            f"{settings.WEB_URL}{reverse('treatment_session_detail', args=[session_id])}"
+        )
+        session_link = f"[View Treatment Session Details]({session_detail_url})"
+
+        return history, session_id, session_link
 
     # External API call for audio transcription
     def transcribe_audio(audio_file):
@@ -57,7 +64,7 @@ def main():
         session = get_session(session_id)
         user = session.cycle.client
 
-        # TODO need to do more sanity checking and clearning of the audio input here
+        # TODO: Add more sanity checking and cleaning for the audio input here
         if audio_input is not None:
             transcription = transcribe_audio(audio_input).get("text", "Audio not transcribed")
             logger.info(f"Transcribed audio input: {transcription}")
@@ -71,6 +78,9 @@ def main():
         return history, "", None  # Clear text and audio inputs
 
     with gr.Blocks() as iface:
+        # Markdown component for the session link, placed at the top
+        session_link_md = gr.Markdown()
+
         chatbot = gr.Chatbot()
         user_input = gr.Textbox(show_label=False, placeholder="Type your message here...")
 
@@ -85,9 +95,8 @@ def main():
 
         session_id_box = gr.Textbox(visible=False)  # Hidden textbox for session_id
 
-        # Initialize chat history with session_id from query string and
-        # store session_id in hidden textbox
-        iface.load(initialize_chat, inputs=None, outputs=[chatbot, session_id_box])
+        # Initialize chat history with session_id from query string and store session_id in hidden textbox
+        iface.load(initialize_chat, inputs=None, outputs=[chatbot, session_id_box, session_link_md])
 
         # Function to handle input selection logic
         def handle_input(session_id, history, text_input, audio_path):

@@ -1,12 +1,9 @@
 # MINDFRAME SPECIFIC SETTINGS
-import warnings
+
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from types import SimpleNamespace
-from magentic import OpenaiChatModel
-from magentic.chat_model.litellm_chat_model import LitellmChatModel
-import instructor
-from openai import AzureOpenAI, OpenAI
+
 from sentence_transformers import SentenceTransformer
 
 

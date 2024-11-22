@@ -1,41 +1,68 @@
-def generate_intervention_mermaid_diagram(intervention):
-    """
-    Generates a Mermaid diagram for an intervention, showing steps as nodes and transitions as edges
-    labeled with their conditions.
+from django.db.models import Q
+from mindframe.models import Transition
 
-    Args:
-        intervention: An Intervention object to generate the diagram for.
 
-    Returns:
-        A string representing the Mermaid diagram.
+def mermaid_diagram(obj):
     """
-    steps = intervention.steps.all()
+    Renders a Mermaid diagram for the intervention.
+    """
+    # Generate Mermaid syntax for the diagram
+    steps = obj.steps.all()
     transitions = Transition.objects.filter(
-        Q(from_step__intervention=intervention) | Q(to_step__intervention=intervention)
+        Q(from_step__intervention=obj) | Q(to_step__intervention=obj)
     )
 
-    # Start the Mermaid diagram
-    diagram = ["graph TD"]
-    diagram.append(
-        f'    title("{intervention.title} ({intervention.sem_ver}/{intervention.ver()})")'
-    )
+    diagram = [
+        """
+---
+config:
+  look: handDrawn
+  theme: neutral
+---
 
-    # Add nodes for each step
+
+graph TD
+"""
+    ]
+
     for step in steps:
-        diagram.append(f'    {step.slug}["{step.title}"]')
+        diagram.append(f'{step.slug.replace("-", "_")}["{step.title}"]')
 
-    # Add edges for each transition
     for transition in transitions:
-        from_slug = transition.from_step.slug
-        to_slug = transition.to_step.slug
-        cnd = transition.conditions.replace('"', "").replace("'", "").split("\n") or []
-        print(transition.conditions)
-        conditions = "; ".join(cnd)
-        diagram.append(f'    {from_slug} -->|"{conditions}"| {to_slug}')
+        from_slug = transition.from_step.slug.replace("-", "_")
+        to_slug = transition.to_step.slug.replace("-", "_")
+        conditions = transition.conditions or "No conditions set!!"
+        # Escape quotes in conditions
+        conditions = conditions.replace('"', "'")
+        diagram.append(f'{from_slug} -->|"{conditions}"| {to_slug}')
 
-    return "\n".join(diagram)
+        judgement_str = "&nbsp;" + "<br>".join(
+            [i.variable_name for i in transition.from_step.judgements.all()]
+        )
+        diagram.append(f"{from_slug}_judgements --> {from_slug}")
+        diagram.append(f"class {from_slug}_judgements,{from_slug} noArrow;")
+        diagram.append(f"class {from_slug}_judgements judgement;")
+        diagram.append(f"{from_slug}_judgements({judgement_str})")
 
+        if not transition.from_step:
+            judgement_str = "J:" + "<br>".join(
+                [i.variable_name for i in transition.to_step.judgements.all()]
+            )
+            diagram.append(f"{to_slug}_judgements --> {to_slug}")
+            diagram.append(f"class {to_slug}_judgements,{to_slug} noArrow;")
+            diagram.append(f"class {to_slug}_judgements judgement;")
+            diagram.append(f"{to_slug}_judgements({judgement_str})")
 
-# Example usage
-intervention = Intervention.objects.get(pk=22)
-print(generate_intervention_mermaid_diagram(intervention))
+    diagram.append(
+        """
+classDef judgement fill:none,color:red,stroke:none, font-size:10px;
+classDef smallText fill:none,color:black,stroke:none, font-size:10px;linkStyle default stroke-width:1px,font-size:10px;
+classDef noArrow dotted;
+
+"""
+    )
+
+    mermaid_code = "\n".join(diagram)
+
+    # Render Mermaid container and script
+    return mermaid_code

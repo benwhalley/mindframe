@@ -2,7 +2,6 @@ import os
 import hashlib
 import json
 import logging
-import re
 from collections import defaultdict, OrderedDict
 from enum import Enum, auto
 from django.forms.models import model_to_dict
@@ -10,19 +9,21 @@ from django.forms.models import model_to_dict
 import shortuuid
 from autoslug import AutoSlugField
 from django.conf import settings
+from django.utils.safestring import mark_safe
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.db import models
 from django.db.models import Count, Q
+
+
 from django.template import Context, Template
 from django.utils import timezone
 from django.utils.text import slugify
 from pydantic import BaseModel
 from pgvector.django import VectorField, HnswIndex
 import shortuuid
-from django_lifecycle import LifecycleModel, hook, BEFORE_UPDATE, AFTER_UPDATE
-from django_lifecycle.conditions import WhenFieldHasChanged
+from django_lifecycle import LifecycleModel, hook, AFTER_UPDATE
 
 import instructor
 from openai import AzureOpenAI, OpenAI
@@ -37,6 +38,18 @@ from mindframe.tasks import generate_embedding
 logger = logging.getLogger(__name__)
 
 shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
+
+
+def s_uuid():
+    return shortuuid.uuid()
+
+
+# prefix attached to all prompts to ensure templating syntax works
+TEMPLATE_PREFIX = """
+{% load pretty %}
+{% load guidance %}
+{% load turns %}
+"""
 
 
 class RoleChoices(models.TextChoices):
@@ -61,7 +74,10 @@ def format_turns(turns):
     if not turns.count():
         return "No conversation history yet."
 
-    return "\n".join([f"{t.speaker.role.upper()}: {t.text}" for t in turns.order_by("timestamp")])
+    formatted_turns = "\n\n".join(
+        [f"{t.speaker.role.upper()}: {t.text}" for t in turns.order_by("timestamp")]
+    )
+    return mark_safe(formatted_turns)
 
 
 class CustomUser(AbstractUser):
@@ -207,6 +223,10 @@ class StepJudgement(models.Model):
     once = models.BooleanField(
         default=False, help_text="Once we have a non-null value returned, don't repeat."
     )
+    use_as_guidance = models.BooleanField(
+        default=False,
+        help_text="Allow this judgement to be used as guidance when generating responses to the client. Exposed as a list of {{guidance}} in the prompt template.",
+    )
 
     def natural_key(self):
         return (
@@ -234,7 +254,7 @@ class Step(models.Model):
 
     def get_step_context(self, session):
 
-        all_notes = Note.objects.filter(session_state__session__cycle=session.cycle)
+        all_notes = Note.objects.filter(turn__session_state__session__cycle=session.cycle)
         all_turns = Turn.objects.filter(session_state__session__cycle=session.cycle)
 
         # ALI - THIS IS AN IMPORTANT PART BECAUSE IT PROVIDES CONTEXT FOR THE LLM WHEN RESPONDING TO CLIENTS AND ALSO WHEN MAKING JUDGEMENTS
@@ -255,10 +275,10 @@ class Step(models.Model):
                 "session_turns": format_turns(all_turns.filter(session_state__session=session)),
                 "all_turns": format_turns(all_turns),
                 # just for this step -- note, this is done a different way than for turns
-                "notes": all_notes.filter(session_state__session=session).filter(
+                "notes": all_notes.filter(turn__session_state__session=session).filter(
                     timestamp__gt=session.state.timestamp
                 ),
-                "session_notes": all_notes.filter(session_state__session=session),
+                "session_notes": all_notes.filter(turn__session_state__session=session),
                 "all_notes": all_notes,
             }
         )
@@ -267,17 +287,24 @@ class Step(models.Model):
     def get_model(self, session):
         return session.cycle.intervention.default_conversation_model
 
-    def spoken_response(self, session) -> OrderedDict:
+    def spoken_response(self, turn) -> OrderedDict:
         """Use an llm to create a spoken response to clients,
         using features of the session as context."""
 
-        template = Template(self.prompt_template)
+        session = turn.session_state.session
+        template = Template(TEMPLATE_PREFIX + self.prompt_template)
         context = self.get_step_context(session)
         pmpt = template.render(context)
         completions, llm_calls = chatter(
             pmpt,
             model=self.get_model(session),
-            log_context={"step": self, "session": session, "prompt": pmpt, "context": context},
+            log_context={
+                "step": self,
+                "session": session,
+                "prompt": pmpt,
+                "turn": turn,
+                "context": context,
+            },
         )
         # returns an OrderedDict of completions (intermediate 'thougts' and the __RESPONSE__)
         return completions, llm_calls
@@ -324,6 +351,11 @@ class Judgement(models.Model):
     title = models.CharField(max_length=255)
     slug = AutoSlugField(populate_from="title")
     variable_name = models.CharField(max_length=255)
+    task_summary = models.TextField(
+        blank=True,
+        null=True,
+        help_text="A brief summary of the task or question asked by this judgement. E.g. 'Evaluate the client's emotional state'.",
+    )
     prompt_template = models.TextField()
     pydantic_model_name = models.CharField(
         choices=[(k, k) for k, v in JUDGEMENT_RETURN_TYPES.items()],
@@ -339,36 +371,39 @@ class Judgement(models.Model):
             return cls_or_function(self.valid_options)
         return cls_or_function
 
-    def make_judgement(self, session):
+    def make_judgement(self, turn):
         """
 
         s = TreatmentSession.objects.last()
         self = Judgement.objects.first()
         self.make_judgement(s)
         """
+        session = turn.session_state.session
         logger.debug(f"Making judgement {self.title} for {session}")
-        template = Template(self.prompt_template)
+        template = Template(TEMPLATE_PREFIX + self.prompt_template)
         # extract this so DRY with Step.spoken_response
         context = session.current_step().get_step_context(session)
         inputs = {"prompt": template.render(context)}
         try:
-            return self.process_inputs(session, inputs)
+            return self.process_inputs(turn, inputs)
         except Exception as e:
+            raise e
             logger.error(f"ERROR MAKING JUDGEMENT {e}")
             return None
 
     def get_model(self, session):
         return session.cycle.intervention.default_conversation_model
 
-    def process_inputs(self, session, inputs: dict):
+    def process_inputs(self, turn, inputs: dict):
 
-        newnote = Note.objects.create(judgement=self, session_state=session.state, inputs=inputs)
+        newnote = Note.objects.create(judgement=self, turn=turn, inputs=inputs)
+        session = turn.session_state.session
 
         llm_result, compl, log = structured_chat(
             newnote.inputs["prompt"],
             llm=self.get_model(session),
             return_type=self.return_type,
-            log_context={"judgement": self, "session": session, "inputs": inputs},
+            log_context={"judgement": self, "session": session, "inputs": inputs, "turn": turn},
         )
         # TODO: save the token_counts from compl
 
@@ -409,10 +444,13 @@ class TreatmentSession(models.Model):
     def natural_key(self):
         return self.uuid
 
-    uuid = models.CharField(unique=True, default=shortuuid.uuid, editable=False, null=False)
+    uuid = models.CharField(unique=True, default=s_uuid, editable=False, null=False)
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name="sessions")
     started = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(auto_now=True)
+
+    def chatbot_link(self):
+        return f"{settings.CHATBOT_URL}/?session_id={self.uuid}"
 
     @property
     def turns(self):
@@ -454,7 +492,7 @@ class TreatmentSession(models.Model):
         ).annotate(
             notes_count=Count(
                 "notes",
-                filter=Q(notes__session_state__session__cycle=self.cycle)
+                filter=Q(notes__turn__session_state__session__cycle=self.cycle)
                 & ~Q(notes__data__value=None),
             )
         )
@@ -465,16 +503,18 @@ class TreatmentSession(models.Model):
         )
         # log which ones we skipped
         for i in potential_judgements_to_run.filter(stepjudgements__once=True, notes_count__gt=0):
-            nts = Note.objects.filter(judgement=i, session_state__session__cycle=self.cycle).values(
-                "data"
-            )
+            nts = Note.objects.filter(
+                judgement=i, turn__session_state__session__cycle=self.cycle
+            ).values("data")
             logger.debug(f"SKIPPED JUDGEMENT: {i} - Existing Notes: {nts}")
 
         return judgements_to_run
 
     def build_client_data_dict(self, step):
         """Make a dictionary of the MOST RECENT note for each judgement variable plus metadata"""
-        session_notes = Note.objects.filter(session_state__session=self).filter(data__isnull=False)
+        session_notes = Note.objects.filter(turn__session_state__session=self).filter(
+            data__isnull=False
+        )
         client_data = defaultdict(lambda: None)
         client_data.update(
             dict(
@@ -496,7 +536,7 @@ class TreatmentSession(models.Model):
         logger.debug(f"DATA DETERMINING TRANSITION: {client_data}")
         return client_data
 
-    def evaluate_transitions_and_update_step(self, step, transitions, client_data):
+    def evaluate_transitions_and_update_step(self, turn, step, transitions, client_data):
         # check each of the conditions for each transition, line by line
         # all of the conditions must hold for the transition to be made
         # conditions are evaluated in a clean context with no globals but
@@ -547,7 +587,7 @@ class TreatmentSession(models.Model):
             logger.debug(f"ENTRY/EXIT JUDGEMENTS TO RUN: {judgements_to_run}")
 
             # then do the judgements we need
-            jvals_ = [j.make_judgement(self) for j in judgements_to_run]
+            jvals_ = [j.make_judgement(turn) for j in judgements_to_run]
 
             step = next_step  # Update the step to reflect the new state
 
@@ -559,6 +599,7 @@ class TreatmentSession(models.Model):
         bot = CustomUser.objects.filter(role=RoleChoices.THERAPIST).first()
         if not bot:
             raise Exception("No therapist user found to respond to client.")
+
         step = self.current_step()
         transitions = step.transitions_from.all()
 
@@ -566,30 +607,35 @@ class TreatmentSession(models.Model):
         turn_jgmnts = step.stepjudgements.filter(when=StepJudgementFrequencyChoices.TURN)
         judgements_to_run = self.get_judgements_to_run(step, turn_jgmnts)
 
+        # generate a new turn for the bot
+        newturn = Turn.objects.create(speaker=bot, session_state=self.state)
+        newturn.save()
+
         # do the judgements we need now
-        jvals_ = [j.make_judgement(self) for j in judgements_to_run]
+        jvals_ = [j.make_judgement(newturn) for j in judgements_to_run]
 
         client_data = self.build_client_data_dict(step)
 
-        step = self.evaluate_transitions_and_update_step(step, transitions, client_data)
+        step = self.evaluate_transitions_and_update_step(newturn, step, transitions, client_data)
 
-        # generate a response using the current or newly updated step
-        completions, llm_logs = step.spoken_response(self)
+        completions, llm_logs = step.spoken_response(newturn)
+
+        # the final completion is the response to return
         key, utterance = next(reversed(completions.items()))
 
-        # save the generated response as a new Turn
-        newturn = Turn.objects.create(
-            session_state=self.state,
-            speaker=bot,
-            text=utterance,
-            metadata=dict(completions.items()),
-        )
+        # save the generated response and other data to the new Turn
+        newturn.session_state = self.state  # update in case we changed step
+        newturn.text = utterance
+        newturn.metadata = dict(completions.items())
         newturn.save()
 
         # return the response only (this gets used by the gradio app)
         # perhaps we should return the Turn object and allow the gradio app to
         # use other attributes of it?
         return utterance
+
+    def get_absolute_url(self):
+        return reverse("treatment_session_detail", args=[str(self.uuid)])
 
     class Meta:
         ordering = ["-started"]
@@ -625,7 +671,7 @@ class TreatmentSessionState(models.Model):
 class Turn(models.Model):
     """An individual utterance during a session (either client or therapist)."""
 
-    uuid = models.CharField(unique=True, default=shortuuid.uuid, editable=False, null=False)
+    uuid = models.CharField(unique=True, default=s_uuid, editable=False, null=False)
 
     session_state = models.ForeignKey(
         TreatmentSessionState,
@@ -655,10 +701,18 @@ class Note(models.Model):
     Notes can be either plain text or contasin structured data, depending on the Judgement that created them.
     """
 
-    uuid = models.CharField(unique=True, default=shortuuid.uuid, editable=False, null=False)
+    uuid = models.CharField(unique=True, default=s_uuid, editable=False, null=False)
 
-    session_state = models.ForeignKey(
-        TreatmentSessionState,
+    # session_state = models.ForeignKey(
+    #     TreatmentSessionState,
+    #     on_delete=models.CASCADE,
+    #     null=True,
+    #     blank=True,
+    #     related_name="notes",
+    # )
+
+    turn = models.ForeignKey(
+        "Turn",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -676,7 +730,9 @@ class Note(models.Model):
     data = models.JSONField(default=dict, null=True, blank=True)
 
     def val(self):
-        return self.data.get("text", None) or self.data
+        return (
+            self.data.get("text", None) or {"task_summary": self.judgement.task_summary} | self.data
+        )
 
     def __str__(self):
         return f"{self.judgement.return_type.__name__}[{self.judgement.variable_name}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
@@ -701,8 +757,12 @@ class LLMLog(models.Model):
     model = models.ForeignKey("LLM", on_delete=models.CASCADE, null=True, blank=True)
 
     session = models.ForeignKey(TreatmentSession, on_delete=models.CASCADE, null=True, blank=True)
+    turn = models.ForeignKey(
+        Turn, on_delete=models.CASCADE, null=True, blank=True, related_name="llm_calls"
+    )
 
     message = models.TextField(blank=True, null=True)
+    prompt_text = models.TextField(blank=True, null=True)
     metadata = models.JSONField(default=dict, null=True, blank=True)
 
     def __str__(self):

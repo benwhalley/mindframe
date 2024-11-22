@@ -146,14 +146,17 @@ def structured_chat(
     except Exception as e:
         res, com, msg, lt, meta = None, None, str(e), LLMLogTypes.ERROR, str(log_context)
         logger.warning(f"Error calling LLM: {e}")
+        # raise e
 
     llm_call_log = LLMLog.objects.create(
         log_type=lt,
-        session=log_context.pop("session", None),
-        judgement=log_context.pop("judgement", None),
-        step=log_context.pop("step", None),
+        session=log_context.get("session", None),
+        judgement=log_context.get("judgement", None),
+        turn=log_context.get("turn", None),
+        step=log_context.get("step", None),
         model=llm,
         message=msg,
+        prompt_text=prompt,
         metadata=meta,
     )
 
@@ -191,11 +194,13 @@ def simple_chat(prompt, llm, log_context={}):
 
     el = LLMLog.objects.create(
         log_type=lt,
-        session=log_context.pop("session", None),
-        judgement=log_context.pop("judgement", None),
-        step=log_context.pop("step", None),
+        session=log_context.get("session", None),
+        judgement=log_context.get("judgement", None),
+        turn=log_context.get("turn", None),
+        step=log_context.get("step", None),
         model=llm,
         message=msg,
+        prompt_text=prompt,
         metadata=meta,
     )
     logger.warning(f"MAKING llm log {el}")
@@ -203,11 +208,20 @@ def simple_chat(prompt, llm, log_context={}):
 
 
 class SpokenResponse(BaseModel):
-    """A spoken response, continuing the previous conversation."""
+    """A spoken response, continuing the previous conversation naturally and fluently."""
 
     response: str = Field(
         ...,
         description="A spoken response, continuing the previous conversation. Don't label the speaker or use quotes, just the words spoken.",
+    )
+
+
+class InternalThoughtsResponse(BaseModel):
+    """A response containing plans, thoughts and step-by-step reasoning to solve a task."""
+
+    response: str = Field(
+        ...,
+        description="Your thoughts. Never a spoken response yet -- just careful step by step thinking, planning and reasoning, written in very concise note form. Always on topic and relevant to the task at hand.",
     )
 
 
@@ -258,19 +272,19 @@ def chatter(multipart_prompt, model, log_context={}):
             # each class must at least have a `response` field which is extracted below
             resp_types = {
                 "speak": SpokenResponse,
-                "poem": PoeticalResponse,
+                "think": InternalThoughtsResponse,
                 "pick": SelectionResponse,
+                "poem": PoeticalResponse,
             }
             return_type = resp_types.get(keyparts[0].strip(), SpokenResponse)
             key = keyparts[1].strip()
-
             res, comp, log = structured_chat(
                 prompt + "\nAlways use the tools/JSON response.",
                 model,
                 return_type=return_type,
                 log_context=log_context,
             )
-            # extract the `response` field`
+
             res = res and res.response or None
 
         # check we have a string key to save the result, or make one from the prompt

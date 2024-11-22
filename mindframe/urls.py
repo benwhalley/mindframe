@@ -1,5 +1,9 @@
 from django.urls import path
-from mindframe.views import create_public_session, SyntheticConversationDetailView
+from mindframe.views import (
+    create_public_session,
+    SyntheticConversationDetailView,
+    TreatmentSessionDetailView,
+)
 
 
 urlpatterns = [
@@ -13,5 +17,10 @@ urlpatterns = [
         "fake/conversation/<int:pk>/",
         SyntheticConversationDetailView.as_view(),
         name="fake_conversation_detail",
+    ),
+    path(
+        "sessions/<str:uuid>/",
+        TreatmentSessionDetailView.as_view(),
+        name="treatment_session_detail",
     ),
 ]

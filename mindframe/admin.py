@@ -44,6 +44,8 @@ from .models import (
 
 
 from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
+from mindframe.graphing import mermaid_diagram
+
 from ruamel.yaml import YAML
 
 yaml = YAML()
@@ -90,19 +92,26 @@ class LLMLogAdmin(admin.ModelAdmin):
     list_display = [
         "timestamp",
         "log_type",
+        "turn_id",
         "inference_for",
         "message",
     ]
     readonly_fields = [
+        "prompt_text",
         "log_type",
         "session",
         "step",
+        "model",
+        "turn",
         "judgement",
         "timestamp",
         "message",
         "metadata",
         "metadata_neat",
     ]
+
+    def turn_id(self, obj):
+        return obj.turn and obj.turn.uuid[:5] + "…"
 
     def inference_for(self, obj):
         return obj.step and "Step" or obj.judgement and "Judgement" or "Unknown"
@@ -132,14 +141,11 @@ class TreatmentSessionStateInline(admin.TabularInline):
     model = TreatmentSessionState
     extra = 0
     max_num = 0
-    readonly_fields = ["timestamp", "previous_step", "step", "start_again_button"]
-
-    def start_again_button(self, obj):
-        """Button to duplicate the session and start again from this state."""
-        url = reverse("admin:start_again", args=[obj.session.pk, obj.pk])
-        return format_html('<a class="button" href="{}">Restart Chat from here</a>', url)
-
-    start_again_button.short_description = "Actions"
+    readonly_fields = [
+        "timestamp",
+        "previous_step",
+        "step",
+    ]
 
 
 class TransitionInline(admin.TabularInline):
@@ -199,23 +205,97 @@ class TransitionAdmin(admin.ModelAdmin):
 class TurnAdmin(admin.ModelAdmin):
     list_display = (
         "speaker",
-        "session_state__id",
-        "session_state",
+        "session_state__session__uuid",
         "text",
         "timestamp",
     )
     list_filter = ("speaker", "timestamp")
-    search_fields = ("session__cycle__client__username",)
+    search_fields = (
+        "session_state__session__cycle__client__username",
+        "session_state__session__uuid",
+    )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "start_again/<int:turn_id>/",
+                self.admin_site.admin_view(self.start_again_from_turn),
+                name="start_again_from_turn",
+            ),
+        ]
+        return custom_urls + urls
+
+    def start_again_from_turn(self, request, turn_id):
+        try:
+            # Get the specified turn
+            original_turn = Turn.objects.get(id=turn_id)
+            original_session = original_turn.session_state.session
+            turn_timestamp = original_turn.timestamp
+
+            # 1. Duplicate the Cycle
+            original_cycle = original_session.cycle
+            new_cycle = Cycle.objects.create(
+                client=original_cycle.client,
+                intervention=original_cycle.intervention,
+                start_date=timezone.now(),
+            )
+
+            # 2. Duplicate the TreatmentSession
+            new_session = TreatmentSession.objects.create(cycle=new_cycle, started=timezone.now())
+
+            # 3. Duplicate relevant TreatmentSessionStates
+            tss_to_dupe = TreatmentSessionState.objects.filter(
+                session=original_session, timestamp__lte=turn_timestamp
+            ).order_by("timestamp")
+            for state in tss_to_dupe:
+                state.pk = None
+                state.session = new_session
+                state.save()
+
+            # 4. Duplicate Turns and Notes before the turn timestamp
+            turns_to_duplicate = Turn.objects.filter(
+                session_state__session=original_session,
+                timestamp__lte=turn_timestamp,
+            )
+            for turn in turns_to_duplicate:
+                logs_ids = turn.llm_calls.all().values("id")  # get the ids of the LLM logs
+                turn.pk = None  # reset primary key to create new object
+                turn.uuid = shortuuid.uuid()
+                turn.session_state = new_session.state  # Attach to new session
+                turn.save()
+                # we don't duplicate LLM Log objects, but do reference them in the new turn
+                turn.llm_calls.add(*LLMLog.objects.filter(id__in=logs_ids))
+
+            notes_to_duplicate = Note.objects.filter(
+                turn__session_state__session=original_session,
+                timestamp__lte=turn_timestamp,
+            )
+            for note in notes_to_duplicate:
+                note.pk = None
+                note.uuid = shortuuid.uuid()
+                note.turn = turn
+                note.save()
+
+            # Redirect to chatbot interface for the new session
+            return redirect(f"{settings.CHATBOT_URL}/?session_id={new_session.uuid}")
+
+        except Exception as e:
+            logger.error(f"An error occurred while starting again: {e}")
+            self.message_user(
+                request, f"An error occurred while starting again: {e}", level=messages.ERROR
+            )
+            return redirect("admin:mindframe_turn_change", turn_id)
 
 
 @admin.register(Note)
 class NoteAdmin(admin.ModelAdmin):
-    list_display = ("session_state", "judgement", "val", "timestamp")
+    list_display = ("turn__id", "judgement", "val", "timestamp")
     list_filter = ("timestamp", "judgement")
-    readonly_fields = ["session_state", "judgement", "timestamp", "pprint_inputs", "pprint_data"]
-    search_fields = ("session_state__session__cycle__client__username",)
+    readonly_fields = ["turn", "judgement", "timestamp", "pprint_inputs", "pprint_data"]
+    search_fields = ("turn__session_state__session__cycle__client__username",)
     autocomplete_fields = [
-        "session_state",
+        "turn",
     ]
 
     def pprint_inputs(self, obj):
@@ -230,11 +310,15 @@ class NoteAdmin(admin.ModelAdmin):
 
 @admin.register(Judgement)
 class JudgementAdmin(admin.ModelAdmin):
-    list_display = ("title", "variable_name", "slug", "intervention")
+    list_display = ("variable_name", "title", "task_summary", "slug", "intervention")
     autocomplete_fields = [
         "intervention",
     ]
-    search_fields = ["title", "intervention__title"]
+    search_fields = ["title", "variable_name", "intervention__title"]
+    list_editable = [
+        "title",
+        "task_summary",
+    ]
 
 
 @admin.register(Example)
@@ -276,35 +360,8 @@ class InterventionAdmin(admin.ModelAdmin):
     start_session_button.allow_tags = True
 
     def mermaid_diagram(self, obj):
-        """
-        Renders a Mermaid diagram for the intervention.
-        """
-        # Generate Mermaid syntax for the diagram
-        steps = obj.steps.all()
-        transitions = Transition.objects.filter(
-            Q(from_step__intervention=obj) | Q(to_step__intervention=obj)
-        )
 
-        diagram = ["graph TD"]
-        for step in steps:
-            diagram.append(f'{step.slug.replace("-", "_")}["{step.title}"]')
-
-        for transition in transitions:
-            from_slug = transition.from_step.slug.replace("-", "_")
-            to_slug = transition.to_step.slug.replace("-", "_")
-            conditions = transition.conditions or "No conditions set!!"
-            # Escape quotes in conditions
-            conditions = conditions.replace('"', "'")
-            diagram.append(f'{from_slug} -->|"{conditions}"| {to_slug}')
-
-        diagram.append(
-            f"""classDef smallText fill:none,color:black,stroke:none, font-size:10px;linkStyle default stroke-width:1px,font-size:10px;"""
-        )
-
-        mermaid_code = "\n".join(diagram)
-
-        # Render Mermaid container and script
-        return mermaid_code
+        return mermaid_diagram(obj)
 
     mermaid_diagram.short_description = "Intervention Flowchart"
 
@@ -507,16 +564,22 @@ class TreatmentSessionAdmin(admin.ModelAdmin):
     autocomplete_fields = ["cycle"]
     list_display = (
         "id",
+        "n_turns",
+        "chatbot_link",
+        "view_link",
+        "uuid",
         "cycle__id",
         "state",
-        "chatbot_link",
         "started",
         "last_updated",
         "uuid",
         # "clinical_notes",  # Add this to display related notes in the list view
     )
     list_filter = ("cycle__intervention__short_title", "started", "last_updated")
-    search_fields = ("cycle__client__username",)
+    search_fields = (
+        "uuid",
+        "cycle__client__username",
+    )
     inlines = [TreatmentSessionStateInline]
     readonly_fields = ["cycle", "uuid", "started", "last_updated", "clinical_notes"]
 
@@ -530,8 +593,11 @@ class TreatmentSessionAdmin(admin.ModelAdmin):
         ),
     )
 
+    def n_turns(self, obj):
+        return obj.turns.count()
+
     def clinical_notes(self, obj):
-        notes = Note.objects.filter(session_state__session=obj)
+        notes = Note.objects.filter(turn__session_state__session=obj)
         if not notes.exists():
             return "No notes available"
         return format_html_join(
@@ -543,125 +609,11 @@ class TreatmentSessionAdmin(admin.ModelAdmin):
     clinical_notes.short_description = "Clinical Notes/Judgements"
 
     def chatbot_link(self, obj):
-        url = f"{settings.CHATBOT_URL}/?session_id={obj.uuid}"
-        return format_html('<a href="{}" target="_blank">Continue</a>', url)
+        return format_html('<a href="{}" target="_blank">Continue</a>', obj.chatbot_link())
 
     chatbot_link.short_description = "Chat"
 
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path(
-                "start_again/<int:session_id>/<int:state_id>/",
-                self.admin_site.admin_view(self.start_again_from_state),
-                name="start_again",
-            ),
-        ]
-        return custom_urls + urls
+    def view_link(self, obj):
+        return format_html('<a href="{}" target="_blank">View</a>', obj.get_absolute_url())
 
-    def start_again_from_state(self, request, session_id, state_id):
-        try:
-            # Original session and state
-            original_session = TreatmentSession.objects.get(id=session_id)
-            original_state = TreatmentSessionState.objects.get(id=state_id)
-
-            # 1. Duplicate the Cycle
-            original_cycle = original_session.cycle
-            new_cycle = Cycle.objects.create(
-                client=original_cycle.client,
-                intervention=original_cycle.intervention,
-                start_date=original_session.cycles.start_date,
-            )
-
-            # 2. Duplicate the TreatmentSession
-            new_session = TreatmentSession.objects.create(cycle=new_cycle, started=timezone.now())
-
-            # 3. Duplicate relevant TreatmentSessionStates
-            TreatmentSessionState.objects.filter(
-                session=original_session, timestamp__lte=original_state.timestamp
-            ).order_by("timestamp").update(session=new_session)
-
-            # 4. Duplicate Turns and Notes before `state_id`
-            turns_to_duplicate = Turn.objects.filter(
-                session_state__session__cycle=original_session.cycle,
-                session_state__timestamp__lte=original_state.timestamp,
-            )
-            for turn in turns_to_duplicate:
-                turn.pk = None  # Reset primary key to create new object
-                turn.session_state = new_session.state  # Attach to new session
-                turn.save()
-
-            notes_to_duplicate = Note.objects.filter(
-                session_state__session__cycle=original_session.cycle,
-                session_state__timestamp__lte=original_state.timestamp,
-            )
-            for note in notes_to_duplicate:
-                note.pk = None
-                note.session_state = new_session.state
-                note.save()
-
-            logging.warning(f"DUPLICATED SESSION {original_session} FROM STATE {original_state}")
-            return redirect(f"{settings.CHATBOT_URL}/?session_id={new_session.uuid}")
-
-        except Exception as e:
-            self.message_user(
-                request, f"An error occurred while starting again: {e}", level=messages.ERROR
-            )
-            return redirect("admin:app_treatmentsession_change", original_session.pk)
-
-    def start_again_from_state(self, request, session_id, state_id):
-        try:
-            # Original session and state
-            original_session = TreatmentSession.objects.get(id=session_id)
-            original_state = TreatmentSessionState.objects.get(id=state_id)
-
-            # 1. Duplicate the Cycle
-            original_cycle = original_session.cycle
-            new_cycle = Cycle.objects.create(
-                client=original_cycle.client,
-                intervention=original_cycle.intervention,
-                start_date=timezone.now(),
-            )
-
-            # 2. Duplicate the TreatmentSession
-            new_session = TreatmentSession.objects.create(cycle=new_cycle, started=timezone.now())
-
-            # 3. Duplicate relevant TreatmentSessionStates
-            tss_to_dupe = TreatmentSessionState.objects.filter(
-                session=original_session, timestamp__lte=original_state.timestamp
-            ).order_by("timestamp")
-            for i in tss_to_dupe:
-                i.pk = None
-                i.session = new_session
-                i.save()
-
-            # 4. Duplicate Turns and Notes before `state_id`
-            turns_to_duplicate = Turn.objects.filter(
-                session_state__session=original_session,
-                session_state__timestamp__lte=original_state.timestamp,
-            )
-            for turn in turns_to_duplicate:
-                turn.pk = None  # Reset primary key to create new object
-                turn.uuid = shortuuid.uuid()
-                turn.session_state = new_session.state  # Attach to new session
-                turn.save()
-
-            notes_to_duplicate = Note.objects.filter(
-                session_state__session=original_session,
-                session_state__timestamp__lte=original_state.timestamp,
-            )
-            for note in notes_to_duplicate:
-                note.pk = None
-                note.uuid = shortuuid.uuid()
-                note.session_state = new_session.state
-                note.save()
-
-            # Redirect to chatbot interface for the new session
-            return redirect(f"{settings.CHATBOT_URL}/?session_id={new_session.uuid}")
-
-        except Exception as e:
-            logger.error(f"An error occurred while starting again: {e}")
-            self.message_user(
-                request, f"An error occurred while starting again: {e}", level=messages.ERROR
-            )
-            return redirect("admin:mindframe_treatmentsession_change", original_session.pk)
+    view_link.short_description = "View"

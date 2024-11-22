@@ -57,3 +57,39 @@ class SyntheticConversationDetailView(DetailView):
         ).order_by("timestamp")
 
         return context
+
+
+from django.views.generic.detail import DetailView
+from django.shortcuts import get_object_or_404
+from django.db.models import Prefetch
+from django.utils.safestring import mark_safe
+from .models import TreatmentSession, Turn, TreatmentSessionState, LLMLog, Note
+
+
+class TreatmentSessionDetailView(DetailView):
+    model = TreatmentSession
+    template_name = "treatment_session_detail.html"
+    context_object_name = "session"
+    slug_field = "uuid"
+    slug_url_kwarg = "uuid"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        session = self.object
+
+        # Prefetch related data for performance
+        context["turns"] = (
+            Turn.objects.filter(session_state__session__uuid=session.uuid)
+            .prefetch_related("speaker", "session_state__step")
+            .order_by("timestamp")
+        )
+
+        context["states"] = session.progress.select_related("step", "previous_step")
+        context["logs"] = LLMLog.objects.filter(session=session).select_related(
+            "step", "judgement", "model"
+        )
+        context["notes"] = Note.objects.filter(turn__session_state__session=session).select_related(
+            "judgement"
+        )
+
+        return context

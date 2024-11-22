@@ -37,6 +37,7 @@ poetry-plugin-export = "^1.8.0"
 django-lifecycle = "^1.2.4"
 gevent = "^24.11"
 ruamel-yaml = "^0.18.6"
+instructor = "^1.6.4"
 
 [tool.poetry.scripts]
 mindframe-bot = "mindframe.chatbot:main"
