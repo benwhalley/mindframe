@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mindframe"
-version = "0.1.8.2"
+version = "0.1.9"
 description = "A Python package for the `mindframe` project"
 authors = [
     "Ben Whalley <ben.whalley@plymouth.ac.uk>",

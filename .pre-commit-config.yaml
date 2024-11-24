@@ -1,20 +1,17 @@
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.3.0
+  - repo: local
     hooks:
-      - id: check-yaml
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
+      - id: poetry2setup
+        name: Generate setup.py from poetry
+        entry: bash -c 'poetry2setup > setup.py'
+        language: python
+        additional_dependencies:
+          - poetry2setup
+        files: ^pyproject\.toml$
+
 
   - repo: https://github.com/psf/black
     rev: 24.4.2
     hooks:
       - id: black
-
-  # - repo: local
-  #   hooks:
-  #     - id: dephell-deps-convert
-  #       name: Convert pyproject.toml to setup.py
-  #       entry: dephell deps convert --from=pyproject.toml --to=setup.py
-  #       language: system
-  #       files: ^pyproject\.toml$
+        exclude: ^setup\.py$
