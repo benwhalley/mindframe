@@ -33,7 +33,7 @@ def create_public_session(request, intervention_slug):
     session = TreatmentSession.objects.create(cycle=cycle, started=timezone.now())
 
     # Redirect to the chat page with the session UUID
-    chat_url = f"{settings.CHATBOT_URL}/?session_id={session.uuid}"
+    chat_url = f"{settings.CHAT_URL}/?session_id={session.uuid}"
     return redirect(chat_url)
 
 

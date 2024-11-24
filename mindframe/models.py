@@ -450,7 +450,7 @@ class TreatmentSession(models.Model):
     last_updated = models.DateTimeField(auto_now=True)
 
     def chatbot_link(self):
-        return f"{settings.CHATBOT_URL}/?session_id={self.uuid}"
+        return f"{settings.CHAT_URL}/?session_id={self.uuid}"
 
     @property
     def turns(self):
