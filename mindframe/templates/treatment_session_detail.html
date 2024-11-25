@@ -12,7 +12,13 @@
     <div class="row mb-4">
 
         <div class="col-6">
-            <p>Session: {{ session }} [<code>{{session.uuid}}</code>]</p>
+            <p>
+                Session: 
+                
+                    {{ session }} [<code>{{session.uuid}}</code>]    
+                    <a href="{% url 'admin:mindframe_treatmentsession_change' session.pk %}">+</a>
+                
+            </p>
 
         </div>
 
