@@ -82,14 +82,24 @@ df[['out', 'metadata__usage__prompt_tokens']].sum()
 
 import logging
 import re
-from collections import namedtuple, OrderedDict
+from collections import namedtuple, OrderedDict, defaultdict
 from hashlib import sha256
 from typing import List
+from types import FunctionType
 
 import dotenv
 import tiktoken
 from django.conf import settings
 from pydantic import BaseModel, Field
+from mindframe.return_type_models import (
+    SpokenResponse,
+    InternalThoughtsResponse,
+    selection_response_model,
+    BooleanResponse,
+    DefaultResponse,
+    PoeticalResponse,
+    ExtractedResponse,
+)
 
 
 dotenv.load_dotenv(".env")
@@ -108,7 +118,7 @@ def split_multipart_prompt(text) -> OrderedDict:
     if bool(re.search(r"\[\[\s?\]\]", text)):
         raise Exception("Empty response key in prompt, e.g. [[]], is not allowed. Use [[var]].")
 
-    varname_pattern = r"\[\[\s*([\w+\:\s+]+)\s*\]\]"
+    varname_pattern = r"\[\[\s*([\w+\:\|\,\s+]+)\s*\]\]"
     parts = list(filter(bool, map(str.strip, re.split(varname_pattern, text))))
     # if we didn't explicitly include a final response variable, add one here
     if len(parts) % 2 == 1:
@@ -120,8 +130,113 @@ def split_multipart_prompt(text) -> OrderedDict:
     return result
 
 
-# print(split_multipart_prompt("First part as aspeech[[speech:XXX]]second part as text[[yyy]]"))
-# print(split_multipart_prompt("First part as aspeech[[speech: XXX]]second part as text[[yyy]]"))
+# test1 = split_multipart_prompt("First part as aspeech[[pick:XXX|a,b,c]]second part as text[[yyy]]")
+# list(test1.keys())[0] == "pick:XXX|a,b,c"
+# list(test1.keys())[1] == "yyy"
+
+
+RET_TYPES = defaultdict(lambda: DefaultResponse)
+RET_TYPES.update(
+    {
+        "poem": PoeticalResponse,
+        "speak": SpokenResponse,
+        "extract": ExtractedResponse,
+        "think": InternalThoughtsResponse,
+        "pick": selection_response_model,
+        "decide": BooleanResponse,
+        "boolean": BooleanResponse,
+        "bool": BooleanResponse,
+    }
+)
+
+
+def extract_keys_and_options(key):
+    """
+    Returns the keyname and return type and response options as a KeyParts namedtuple.
+
+    Args:
+        key (str): A string like "returntype:keyname|option1,option2,option3" or "keymame"
+
+    Returns:
+        namedtuple: KeyParts, with name, return_type and return_options fields.
+
+    Examples:
+
+        >>> extract_keys_and_options("pick:XXX|a,b,c")
+        >>> extract_keys_and_options("XXX|a,b,c")
+
+    """
+    # split on colon
+    keyparts = re.split(r":\s?", key)
+    if len(keyparts) == 1:
+        kn_ops = keyparts[0].strip()
+        rn = None
+    else:
+        kn_ops = keyparts[1].strip()
+        rn = keyparts[0].strip()
+    # split the kn and options on | symbol
+    kn_ops_split = re.split(r"\|\s?", kn_ops)
+    kn = kn_ops_split[0].strip()
+    if len(kn_ops_split) == 1:
+        ro = None
+    else:
+        ro = [i.strip() for i in kn_ops_split[1].strip().split(",")]
+
+    return namedtuple("KeyParts", ["name", "return_type", "return_options"])(kn, RET_TYPES[rn], ro)
+
+
+def parse_prompt(prompt_text):
+    '''
+    Parse a multi-part prompt into an ordered dictionary of key-value pairs.
+
+    Each key is the variable name, and the value is a `PromptPart` object containing:
+    - `key`: the variable name.
+    - `return_type`: the type of return value specified in the prompt (e.g., "speak", "pick").
+    - `options`: any options specified in the prompt (e.g., "a,b,c").
+    - `text`: the corresponding text from the prompt.
+
+    Args:
+        prompt_text (str): A string containing the multi-part prompt.
+
+    Returns:
+        OrderedDict: An ordered dictionary where keys are variable names, and values are `PromptPart` objects.
+
+    Notes:
+        - If no explicit key is provided, a hash of the prompt text is used as the key.
+
+    Examples:
+        >>> def split_multipart_prompt(prompt_text):
+        ...     # Example helper to split prompts for testing
+        ...     return OrderedDict({
+        ...         "speak:A": "A is spoken",
+        ...         "B": "B is spoken",
+        ...         "pick:C|a,b,c": "C is chosen",
+        ...         "think:D": "D is a thought"
+        ...     })
+        >>> def extract_keys_and_options(key_text):
+        ...     # Example helper to extract keys and options
+        ...     key, _, options = key_text.partition("|")
+        ...     return namedtuple("KeyPart", ["name", "return_type", "return_options"])(*key.split(":"), options.split(",") if options else [])
+        >>> test2 = parse_prompt("""
+        ... A is spoken [[speak:A]]
+        ... B is spoken [[B]]
+        ... C is chosen [[pick:C|a,b,c]]
+        ... D is a thought [[think:D]]
+        ... """)
+        >>> test2[0].key == "A"
+    '''
+
+    pro_dic = split_multipart_prompt(prompt_text)
+    parts = [(extract_keys_and_options(k), v) for k, v in pro_dic.items()]
+
+    return OrderedDict(
+        {
+            k.name: namedtuple("PromptPart", ["key", "return_type", "options", "text"])(
+                k.name, k.return_type, k.return_options, v
+            )
+            for k, v in parts
+        }
+    )
 
 
 def structured_chat(
@@ -131,9 +246,14 @@ def structured_chat(
     max_retries=3,
     log_context={},
 ):
+    """
+    Make a tool call to an LLM, returning the `response` field, a completion object and the LLMLog.
+    """
+
     from mindframe.models import LLMLog, LLMLogTypes
 
     logger.debug(prompt)
+
     try:
         res, com = llm.provider.chat.completions.create_with_completion(
             model=llm.model_name,
@@ -207,88 +327,29 @@ def simple_chat(prompt, llm, log_context={}):
     return res, com, el
 
 
-class SpokenResponse(BaseModel):
-    """A spoken response, continuing the previous conversation naturally and fluently."""
-
-    response: str = Field(
-        ...,
-        description="A spoken response, continuing the previous conversation. Don't label the speaker or use quotes, just the words spoken.",
-    )
-
-
-class InternalThoughtsResponse(BaseModel):
-    """A response containing plans, thoughts and step-by-step reasoning to solve a task."""
-
-    response: str = Field(
-        ...,
-        description="Your thoughts. Never a spoken response yet -- just careful step by step thinking, planning and reasoning, written in very concise note form. Always on topic and relevant to the task at hand.",
-    )
-
-
-class PoeticalResponse(BaseModel):
-    """A spoken response, continuing the previous conversation, in 16th C style."""
-
-    response: str = Field(
-        ...,
-        description="A response, continuing the previous conversation but always in POETRICAL form - often a haiku.",
-    )
-
-
-class SelectionResponse(BaseModel):
-    """A spoken response, continuing the previous conversation, in 16th C style."""
-
-    response: str = Field(
-        ...,
-        description="A selection from one of the options. No discussion or explanation, just the text of the choice, exactly matching one of the options provided.",
-    )
-
-
 def chatter(multipart_prompt, model, log_context={}):
     """Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next."""
-
-    prompts_dict = split_multipart_prompt(multipart_prompt)
+    pprompt = parse_prompt(multipart_prompt)
     results_dict = OrderedDict()
 
     prompt_parts = []
     llm_calls = []
 
-    for key, value in prompts_dict.items():
-        prompt_parts.append(value)
-        prompt = "\n".join(prompt_parts)
-
-        # we split the key on : to check if there is a special return type for this completion
-        keyparts = re.split(r":\s?", key)
-
-        if len(keyparts) == 1:
-            # there is no specified return type, so we just
-            # do the completion as simple chat
-            key = keyparts[0]
-            res, comp, log = simple_chat(prompt, model, log_context)
+    for key, value in pprompt.items():
+        prompt_parts.append(value.text)
+        prompt = "\n\n--\n\n".join(map(str, prompt_parts))
+        if isinstance(value.return_type, FunctionType):
+            rt = value.return_type(value.options)
         else:
-            # make sure we get a spoken response back
-            # without other parts of the dialogue repeated
+            rt = value.return_type
 
-            # setup some special classes we can use in the prompt syntax
-            # each class must at least have a `response` field which is extracted below
-            resp_types = {
-                "speak": SpokenResponse,
-                "think": InternalThoughtsResponse,
-                "pick": SelectionResponse,
-                "poem": PoeticalResponse,
-            }
-            return_type = resp_types.get(keyparts[0].strip(), SpokenResponse)
-            key = keyparts[1].strip()
-            res, comp, log = structured_chat(
-                prompt + "\nAlways use the tools/JSON response.",
-                model,
-                return_type=return_type,
-                log_context=log_context,
-            )
-
-            res = res and res.response or None
-
-        # check we have a string key to save the result, or make one from the prompt
-        key = key or sha256(prompt.encode()).hexdigest()[:8]
+        res, comp, log = structured_chat(
+            prompt + "\nAlways use the tools/JSON response.",
+            model,
+            return_type=rt,
+            log_context=log_context,
+        )
+        res = res and res.response or None
 
         results_dict[key] = res
         prompt_parts.append(res)
@@ -306,59 +367,38 @@ def chatter(multipart_prompt, model, log_context={}):
     return (results_dict, LLMLog.objects.filter(pk__in=[i.pk for i in llm_calls]))
 
 
-# OLDER STUFF USING MAGENTIC
+if False:
+    from pprint import pprint
+    from mindframe.models import LLM
+    from mindframe.multipart_llm import chatter, parse_prompt
 
+    mini = LLM.objects.filter(provider_name="AZURE", model_name="gpt-4o-mini").first()
 
-# @prompt("""{prompt}""")
-# def chat(prompt: str) -> str: ...
+    t4, logs = chatter(
+        """
+    Say something funny [[speak:A]]
+    And another thing: [[B]]
+    How funny are you? Pick one of the following: [[pick:C|unfunny, abitfunny, veryfunny]]
 
-# with AI_MODELS.cheap:
-#     chat("say hello")
+    Think about this chat session. What is happening here? [[think:D]]
+    """,
+        model=mini,
+    )
+    t4
 
-# def chatter_magentic(multipart_prompt, model=AI_MODELS.cheap):
-#     """Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next."""
+    t5, logs = chatter(
+        """
+    Tell a joke [[speak:A]]
+    Think about this chat session. What is happening here? [[think:D]]
+    Is this a real conversation [[pick:E|yes, no]]
+    """,
+        model=mini,
+    )
+    t5
 
-#     prompts_dict = split_multipart_prompt(multipart_prompt)
-#     results_dict = OrderedDict()
-
-#     prompt_parts = []
-
-#     for key, value in prompts_dict.items():
-#         prompt_parts.append(value)
-#         prompt = "\n".join(prompt_parts)
-#         with model:
-#             logger.debug(f"Calling LLM ({model}): {prompt[:60]} ...")
-#             try:
-#                 res = chat(prompt)
-#                 results_dict[key] = ChatResult(
-#                     value=res,
-#                     prompt=prompt,
-#                     input_tokens=len(encoding.encode(prompt)),
-#                     output_tokens=len(encoding.encode(res)),
-#                 )
-#                 prompt_parts.append(res)
-#             except Exception as e:
-#                 logger.error(f"Error calling LLM: {e}")
-#                 logger.error(f"Prompt: {prompt}")
-
-#     # duplicate the last item as the __RESPONSE__ so we have a
-#     # predictable key to access the final completion, but can still
-#     # also access the last key by names used in the template
-#     lastkey = next(reversed(results_dict))
-#     if lastkey != "__RESPONSE__":
-#         results_dict["__RESPONSE__"] = results_dict[lastkey]
-
-#     return results_dict
-
-
-# pmpt = """Think about mammals[[THOUGHTS]] Now tell me a joke[[JOKE]]"""
-# results_dict = chatter(pmpt)
-# results_dict.keys()
-# results_dict['THOUGHTS']
-# results_dict['__RESPONSE__'] == results_dict['JOKE']
-
-
-# pmpt = """Think about mammals[[THOUGHTS]] Now tell me a joke"""
-# results_dict = chatter(pmpt)
-# list(results_dict.keys()) == ['THOUGHTS', '__RESPONSE__']
-# results_dict['__RESPONSE__']
+    chatter(
+        """
+    Think about mammals: [[think:D]]
+    """,
+        model=mini,
+    )

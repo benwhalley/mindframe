@@ -37,6 +37,7 @@ install_requires = \
  'pgvector>=0.3.6,<0.4.0',
  'poetry-plugin-export>=1.8.0,<2.0.0',
  'pydantic>=2.9.2,<3.0.0',
+ 'python-box>=7.2.0,<8.0.0',
  'python-dotenv>=1.0.1,<2.0.0',
  'redis>=5.2,<6.0',
  'ruamel-yaml>=0.18.6,<0.19.0',
@@ -54,7 +55,7 @@ entry_points = \
 
 setup_kwargs = {
     'name': 'mindframe',
-    'version': '0.1.9.1',
+    'version': '0.1.10',
     'description': 'A Python package for the `mindframe` project',
     'long_description': 'None',
     'author': 'Ben Whalley',

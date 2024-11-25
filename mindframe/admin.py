@@ -278,7 +278,7 @@ class TurnAdmin(admin.ModelAdmin):
                 note.save()
 
             # Redirect to chatbot interface for the new session
-            return redirect(f"{settings.CHATBOT_URL}/?session_id={new_session.uuid}")
+            return redirect(f"{settings.CHAT_URL}/?session_id={new_session.uuid}")
 
         except Exception as e:
             logger.error(f"An error occurred while starting again: {e}")
@@ -524,7 +524,7 @@ class InterventionAdmin(admin.ModelAdmin):
             cycle=cycle,
             started=timezone.now(),
         )
-        return redirect(f"{settings.CHATBOT_URL}/?session_id={session.uuid}")
+        return redirect(f"{settings.CHAT_URL}/?session_id={session.uuid}")
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
 

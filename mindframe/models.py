@@ -3,6 +3,8 @@ import hashlib
 import json
 import logging
 from collections import defaultdict, OrderedDict
+from box import Box
+
 from enum import Enum, auto
 from django.forms.models import model_to_dict
 
@@ -341,7 +343,13 @@ class Transition(models.Model):
 class Judgement(models.Model):
     """A Judgement to be made on the current session state.
 
-    Judgements are defined by a prompt template and expected return type/acceptable return values.
+        Judgements are defined by a prompt template and expected return type/acceptable return values.
+
+    jj =Judgement.objects.last()
+    ss = TreatmentSession.objects.last()
+    tt = ss.turns.all().last()
+    jr = jj.make_judgement(tt)
+    jr.items()
     """
 
     def natural_key(self):
@@ -357,19 +365,6 @@ class Judgement(models.Model):
         help_text="A brief summary of the task or question asked by this judgement. E.g. 'Evaluate the client's emotional state'.",
     )
     prompt_template = models.TextField()
-    pydantic_model_name = models.CharField(
-        choices=[(k, k) for k, v in JUDGEMENT_RETURN_TYPES.items()],
-        max_length=255,
-        default="BriefNote",
-    )
-    valid_options = models.JSONField(default=list, blank=True, null=True)
-
-    @property
-    def return_type(self) -> BaseModel:
-        cls_or_function = JUDGEMENT_RETURN_TYPES[self.pydantic_model_name]
-        if self.valid_options:
-            return cls_or_function(self.valid_options)
-        return cls_or_function
 
     def make_judgement(self, turn):
         """
@@ -399,15 +394,13 @@ class Judgement(models.Model):
         newnote = Note.objects.create(judgement=self, turn=turn, inputs=inputs)
         session = turn.session_state.session
 
-        llm_result, compl, log = structured_chat(
+        llm_result, logs = chatter(
             newnote.inputs["prompt"],
-            llm=self.get_model(session),
-            return_type=self.return_type,
+            model=self.get_model(session),
             log_context={"judgement": self, "session": session, "inputs": inputs, "turn": turn},
         )
-        # TODO: save the token_counts from compl
 
-        newnote.data = llm_result and llm_result.model_dump()
+        newnote.data = llm_result
         newnote.save()
         return newnote
 
@@ -522,7 +515,7 @@ class TreatmentSession(models.Model):
                     "judgement__variable_name"
                 )
                 # data__value is a magic field name - see return_type_models.py
-                .values_list("judgement__variable_name", "data__value")
+                .values_list("judgement__variable_name", "data")
             )
         )
 
@@ -544,6 +537,15 @@ class TreatmentSession(models.Model):
 
         # TODO: helping users debug their conditions and providing sensible error
         # messages will be important here and needs to be added.
+
+        # convert to a dotten namespace to allowed dotted access to vars in conditions users write
+        # from box import Box
+        # x=Box({'a': {'c':3}, 'b': 2}, default_box=True)
+        # eval("x.a.c", {}, x) == x.a.c
+        # eval("a.a.c", {}, x) == x.a.c
+
+        client_data = Box(client_data, default_box=True)
+        logger.debug(f"CLIENT DATA AS BOX: {client_data}")
         transition_results = [
             (
                 t,
@@ -735,7 +737,9 @@ class Note(models.Model):
         )
 
     def __str__(self):
-        return f"{self.judgement.return_type.__name__}[{self.judgement.variable_name}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
+        return (
+            f"[{self.judgement.variable_name}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
+        )
 
 
 class LLMLogTypes(models.TextChoices):
