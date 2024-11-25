@@ -27,6 +27,7 @@ graph TD
 
     for step in steps:
         diagram.append(f'{step.slug.replace("-", "_")}["{step.title}"]')
+        diagram.append(f'click {step.slug.replace("-", "_")} "{step.get_absolute_url()}" "Goog"')
 
     for transition in transitions:
         from_slug = transition.from_step.slug.replace("-", "_")

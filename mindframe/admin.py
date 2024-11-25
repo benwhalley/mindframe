@@ -177,6 +177,7 @@ class StepAdmin(admin.ModelAdmin):
     list_display = ("title", "slug", "intervention")
     autocomplete_fields = ("intervention",)
     search_fields = ("title", "intervention__title")
+    list_filter = ("intervention",)
     inlines = [
         StepJudgementInline,
         TransitionInline,

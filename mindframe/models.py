@@ -254,6 +254,9 @@ class Step(models.Model):
     prompt_template = models.TextField()
     judgements = models.ManyToManyField("Judgement", through="StepJudgement")
 
+    def get_absolute_url(self):
+        return reverse("admin:mindframe_step_change", args=[str(self.id)])
+
     def get_step_context(self, session):
 
         all_notes = Note.objects.filter(turn__session_state__session__cycle=session.cycle)
