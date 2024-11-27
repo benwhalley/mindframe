@@ -7,8 +7,7 @@ MindFrame coordinates multiple models, orchestrating their outputs into coherent
 Using a graph-based representation of interventions, MindFrame allows for more control over the treatment flow, and for services to be more easily validated against guidelines and best pratice, tested for efficacy, and refined to suit the local context. Mindframe is not a 'black box': it is designed to ensure that services are grounded in psychological theory, are evidence-based, and can be properly supervised and audited by human clinicians.
 
 
-For developers looking to setup a local instance of mindframe, see: https://github.com/benwhalley/mindframe-demo
-
+<!-- For developers looking to setup a local instance of mindframe, see: https://github.com/benwhalley/mindframe-demo -->
 
 ### Key Features
 
@@ -31,11 +30,14 @@ What makes mindframe different from other chatbot systems based on fine-tuning w
 
 Unlike systems which fine-tune language models to produce output similar in tone of style to that of a therapist, mindframe focusses on the structure of the therapy itself. This allows for more control over the therapy flow, and for interventions to be more easily validated and tested.
 
-Segmentation of different tasks allows treatmet developers to integrate multiple specialised models trained in different tasks: for example different models may be used to detect transitions in conversation betwee stages of therapy, versus generating realistic text/speech. This helps to reduce the load on any single model, reduces hallucination, and ensures the language model follows the larger structural transitions within and across sessions. The modular nature of the system allows for easy testing and validation of individual intervention components.
+Segmentation of different tasks allows treatment developers to integrate multiple specialised models trained in different tasks: for example different models may be used to detect transitions in conversation betwee stages of therapy, versus generating realistic text/speech. This helps to reduce the load on any single model, reduces hallucination, and ensures the language model follows the larger structural transitions within and across sessions. The modular nature of the system allows for easy testing and validation of individual intervention components.
 
 
 
 ### A shared language to describe interventions
+
+![](docs/steps.png)
+
 
 MindFrame organizes therapy sessions around several key primitives:
 
