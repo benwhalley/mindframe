@@ -53,4 +53,4 @@ MindFrame organizes therapy sessions around several key primitives:
 
 - *Examples* are short excepts from good or bad therapeutic practice, stored for semantic search and retrieval during conversations. Steps are templated in a way that allows treatment developers to dynamically insert relevant examples into the LLM prompt, leveraging the power of recent AI models to use 'few-shot' learning to generate high-quality responses.
 
-Each of these components is defined in a simple, declarative text-based format.
+Each of these components is defined in a simple, declarative text-based format. See [examples of the syntax here](docs/syntax.md).
