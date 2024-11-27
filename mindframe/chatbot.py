@@ -107,12 +107,24 @@ def main():
 
         # Function to handle input selection logic
         def handle_input(session_id, history, text_input, audio_path):
-            if text_input.strip():  # Prioritize text input if available
-                return chat_with_bot(session_id, history, text_input, None)
-            elif audio_path:  # Process audio input only if no text is provided
-                return chat_with_bot(session_id, history, "", audio_path)
-            else:  # Do nothing if no input is provided
-                return history, text_input, audio_path  # Preserve current state without resetting
+            try:
+
+                if text_input.strip():  # Prioritize text input if available
+                    return chat_with_bot(session_id, history, text_input, None)
+                elif audio_path:  # Process audio input only if no text is provided
+                    return chat_with_bot(session_id, history, "", audio_path)
+                else:  # Do nothing if no input is provided
+                    return (
+                        history,
+                        text_input,
+                        audio_path,
+                    )  # Preserve current state without resetting
+            except Exception as e:
+                # TODO work out better error handling in the gradio client
+                # for the moment just dump the exception to to the chat stream shown to the user
+                logger.error(f"Error handling input: {e}")
+                history.append(("", str(e)))
+                return history, text_input, audio_path
 
         # Bind the input submission to the shared logic
         inputs = [session_id_box, chatbot, user_input, audio_input]
