@@ -3,7 +3,8 @@ import os
 import django
 import gradio as gr
 import logging
-import whisper
+
+# import whisper
 
 from django.urls import reverse
 from django.conf import settings
@@ -17,14 +18,15 @@ def main():
     django.setup()
     from django.conf import settings
 
-    if settings.MINDFRAME_AUDIO_INPUT:
-        try:
-            model = whisper.load_model("turbo")
-        except Exception as e:
-            logger.warning(f"Error loading whisper model: {e}")
-            model = None
-    else:
-        model = None
+    # if settings.MINDFRAME_AUDIO_INPUT:
+    #     try:
+    #         model = whisper.load_model("turbo")
+    #     except Exception as e:
+    #         logger.warning(f"Error loading whisper model: {e}")
+    #         model = None
+    # else:
+    #     model = None
+    model = None
 
     logger = logging.getLogger(__name__)
 
