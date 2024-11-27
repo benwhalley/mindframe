@@ -37,7 +37,8 @@ simple_chat("tell a joke", mini)[0]
 simple_chat("tell a joke", local)[0]
 
 
-chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke[[JOKE]]", mini)[0]
+zz = chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke[[JOKE]]", mini)
+zz[0]
 
 chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke[[JOKE]]", local)[0]
 
@@ -90,6 +91,7 @@ from types import FunctionType
 import dotenv
 import tiktoken
 from django.conf import settings
+from django.template import Context, Template
 from pydantic import BaseModel, Field
 from mindframe.return_type_models import (
     SpokenResponse,
@@ -107,16 +109,43 @@ logger = logging.getLogger(__name__)
 encoding = tiktoken.encoding_for_model("gpt-4o-mini")
 
 
-# Function to split the document into an ordered dictionary by `[VARNAME]` blocks
+# a lookup dict of return types for different actions specified in prompt templates
+ACTION_LOOKUP = defaultdict(lambda: DefaultResponse)
+ACTION_LOOKUP.update(
+    {
+        "speak": SpokenResponse,
+        "extract": ExtractedResponse,
+        "think": InternalThoughtsResponse,
+        "pick": selection_response_model,
+        "decide": BooleanResponse,
+        "boolean": BooleanResponse,
+        "bool": BooleanResponse,
+        "poem": PoeticalResponse,
+    }
+)
+
+
 def split_multipart_prompt(text) -> OrderedDict:
-    # this is a bit gross to use regex
+    """
+    Split the prompt_template into an ordered dictionary of varname:prompt pairs.
+
+    Templates are split wherever a `[[VARNAME]]` symbol occurs, defining a completion
+    to be made by the llm.
+    """
+
+    # it is a bit gross to use regex
     # we should maybe use pandoc instead and traverse a tree nicely, see
     # import pandoc
     # from pandoc.types import *
-    # it works fine for now though
+    # alternately use pyparsing?
+    # it works ok for now though...
 
+    # some basic checks of template validity
     if bool(re.search(r"\[\[\s?\]\]", text)):
         raise Exception("Empty response key in prompt, e.g. [[]], is not allowed. Use [[var]].")
+    # todo - check that:
+    # - all var_names are valid python identifiers
+    # - all actions are valid (i.e. can be found in ACTION_LOOKUP)
 
     varname_pattern = r"\[\[\s*([\w+\:\|\,\s+]+)\s*\]\]"
     parts = list(filter(bool, map(str.strip, re.split(varname_pattern, text))))
@@ -135,21 +164,6 @@ def split_multipart_prompt(text) -> OrderedDict:
 # list(test1.keys())[1] == "yyy"
 
 
-RET_TYPES = defaultdict(lambda: DefaultResponse)
-RET_TYPES.update(
-    {
-        "poem": PoeticalResponse,
-        "speak": SpokenResponse,
-        "extract": ExtractedResponse,
-        "think": InternalThoughtsResponse,
-        "pick": selection_response_model,
-        "decide": BooleanResponse,
-        "boolean": BooleanResponse,
-        "bool": BooleanResponse,
-    }
-)
-
-
 def extract_keys_and_options(key):
     """
     Returns the keyname and return type and response options as a KeyParts namedtuple.
@@ -162,8 +176,7 @@ def extract_keys_and_options(key):
 
     Examples:
 
-        >>> extract_keys_and_options("pick:XXX|a,b,c")
-        >>> extract_keys_and_options("XXX|a,b,c")
+        >>> extract_keys_and_options("action:VAR_NAME|option1,option2,option3")
 
     """
     # split on colon
@@ -174,7 +187,7 @@ def extract_keys_and_options(key):
     else:
         kn_ops = keyparts[1].strip()
         rn = keyparts[0].strip()
-    # split the kn and options on | symbol
+    # split the kn and options on the pipe (|) symbol
     kn_ops_split = re.split(r"\|\s?", kn_ops)
     kn = kn_ops_split[0].strip()
     if len(kn_ops_split) == 1:
@@ -182,16 +195,18 @@ def extract_keys_and_options(key):
     else:
         ro = [i.strip() for i in kn_ops_split[1].strip().split(",")]
 
-    return namedtuple("KeyParts", ["name", "return_type", "return_options"])(kn, RET_TYPES[rn], ro)
+    return namedtuple("KeyParts", ["name", "return_type", "return_options"])(
+        kn, ACTION_LOOKUP[rn], ro
+    )
 
 
-def parse_prompt(prompt_text):
+def parse_prompt(prompt_text) -> OrderedDict:
     '''
     Parse a multi-part prompt into an ordered dictionary of key-value pairs.
 
     Each key is the variable name, and the value is a `PromptPart` object containing:
     - `key`: the variable name.
-    - `return_type`: the type of return value specified in the prompt (e.g., "speak", "pick").
+    - `return_type`: the action and so return value specified in the prompt (e.g., "speak", "pick").
     - `options`: any options specified in the prompt (e.g., "a,b,c").
     - `text`: the corresponding text from the prompt.
 
@@ -224,6 +239,12 @@ def parse_prompt(prompt_text):
         ... D is a thought [[think:D]]
         ... """)
         >>> test2[0].key == "A"
+
+
+    TODO:  additional tests needed so that:
+    - options can only be specified for `pick` actions
+    - a key must be specified, or is returned as the hash of the prompt text so we always have a key
+    - others...
     '''
 
     pro_dic = split_multipart_prompt(prompt_text)
@@ -251,8 +272,6 @@ def structured_chat(
     """
 
     from mindframe.models import LLMLog, LLMLogTypes
-
-    logger.debug(prompt)
 
     try:
         res, com = llm.provider.chat.completions.create_with_completion(
@@ -327,24 +346,45 @@ def simple_chat(prompt, llm, log_context={}):
     return res, com, el
 
 
-def chatter(multipart_prompt, model, log_context={}):
-    """Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next."""
+# prefix attached to all prompts to ensure templating syntax works
+TEMPLATE_PREFIX = """
+{% load pretty %}
+{% load guidance %}
+{% load turns %}
+{% load examples %}
+{% load notes %}
+"""
+
+
+def chatter(multipart_prompt, model, context={}, log_context={}):
+    """
+    Parse and execute a prompt template specifying multiple completions.
+
+    Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next.
+    """
     pprompt = parse_prompt(multipart_prompt)
     results_dict = OrderedDict()
 
     prompt_parts = []
     llm_calls = []
 
-    for key, value in pprompt.items():
-        prompt_parts.append(value.text)
+    for key, prompt_part in pprompt.items():
+        # prompt_part is namedtuple with key, return_type, options, text
+        prompt_parts.append(prompt_part.text)
         prompt = "\n\n--\n\n".join(map(str, prompt_parts))
-        if isinstance(value.return_type, FunctionType):
-            rt = value.return_type(value.options)
-        else:
-            rt = value.return_type
 
-        res, comp, log = structured_chat(
-            prompt + "\nAlways use the tools/JSON response.",
+        # deal with the case that the return type is a factory
+        # and accepts the options as a parameter
+        if isinstance(prompt_part.return_type, FunctionType):
+            rt = prompt_part.return_type(prompt_part.options)
+        else:
+            rt = prompt_part.return_type
+
+        # this suffix is not _required_ by helps guide the llm to return json
+        template = Template(TEMPLATE_PREFIX + prompt + "\nAlways use the tools/JSON response.")
+        pmt = template.render(Context(context))
+        res, completion_obj, log = structured_chat(
+            pmt,
             model,
             return_type=rt,
             log_context=log_context,

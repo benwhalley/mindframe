@@ -88,8 +88,12 @@ class TreatmentSessionDetailView(DetailView):
         context["logs"] = LLMLog.objects.filter(session=session).select_related(
             "step", "judgement", "model"
         )
+        from box import Box
+
         context["notes"] = Note.objects.filter(turn__session_state__session=session).select_related(
             "judgement"
         )
+
+        context["data"] = session.state.step.make_data_variable(session)
 
         return context

@@ -5,25 +5,50 @@ from mindframe.models import format_turns, Turn
 register = template.Library()
 
 
-@register.filter
-def turns(session, filter_type):
+@register.simple_tag(takes_context=True)
+def turns(context, filter_type="all", n=None):
+
+    # Access `session` from the context
+    session = context.get("session")
+
+    if not session:
+        raise ValueError("Session is not available in the context.")
+
     turns = Turn.objects.filter(session_state__session__id=session.id).order_by("timestamp")
 
     if filter_type == "all":
         t = turns
 
-    if filter_type == "step":
+    elif filter_type == "step":
         t = turns.filter(session_state__step=session.current_step())
 
-    # handle 'recent:10' syntax
-    if filter_type.startswith("recent:"):
-        try:
-            limit = int(filter_type.split(":")[1])
-            t = turns[:limit]
-        except (IndexError, ValueError):
-            t = turns
+    if n:
+        t = turns.order_by("-timestamp")[:n][::-1]
+        # query again because otherwise we return a list not a queryset
+        t = Turn.objects.filter(id__in=[turn.id for turn in t])
 
     return format_turns(t)
+
+
+# @register.filter
+# def turns(session, filter_type):
+#     turns = Turn.objects.filter(session_state__session__id=session.id).order_by("timestamp")
+
+#     if filter_type == "all":
+#         t = turns
+
+#     if filter_type == "step":
+#         t = turns.filter(session_state__step=session.current_step())
+
+#     # handle 'recent:10' syntax
+#     if filter_type.startswith("recent:"):
+#         try:
+#             limit = int(filter_type.split(":")[1])
+#             t = turns[:limit]
+#         except (IndexError, ValueError):
+#             t = turns
+
+#     return format_turns(t)
 
 
 # @register.filter

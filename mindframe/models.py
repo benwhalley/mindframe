@@ -46,14 +46,6 @@ def s_uuid():
     return shortuuid.uuid()
 
 
-# prefix attached to all prompts to ensure templating syntax works
-TEMPLATE_PREFIX = """
-{% load pretty %}
-{% load guidance %}
-{% load turns %}
-"""
-
-
 class RoleChoices(models.TextChoices):
     """Defines various roles in the system such as developers, clients, and supervisors."""
 
@@ -257,7 +249,24 @@ class Step(models.Model):
     def get_absolute_url(self):
         return reverse("admin:mindframe_step_change", args=[str(self.id)])
 
-    def get_step_context(self, session):
+    def make_data_variable(self, session):
+        """This makes the `data` context variable, used in the prompt template, for a given set of notes."""
+
+        notes = Note.objects.filter(turn__session_state__session__cycle=session.cycle)
+
+        def getv(notes, v):
+            notes = notes.filter(judgement__variable_name=v)
+            r = {v: notes.last().data, v + "__all": notes}
+            return r
+
+        vars = set(notes.values_list("judgement__variable_name", flat=True))
+        dd = {}
+        for i in vars:
+            dd.update(getv(notes, i))
+
+        return dd
+
+    def get_step_context(self, session) -> dict:
 
         all_notes = Note.objects.filter(turn__session_state__session__cycle=session.cycle)
         all_turns = Turn.objects.filter(session_state__session__cycle=session.cycle)
@@ -266,27 +275,24 @@ class Step(models.Model):
         # FOR SOME THINGS WE WILL BE ABLE TO EXTEND THIS FUNCTION AND PROVIDE MORE CONTEXT
         # IN OTHER CASES (E.G. FOR RAG) WE WILL NEED TO MAKE A TEMPLATETAG AND USE THAT IN THE PROMPT TEMPLATE TO DYNAMICALLY EXTRACT EXTRA CONTEXT
 
-        context = Context(
-            {
-                "session": session,
-                "intervention": session.cycle.intervention,
-                # "examples": session.cycle.intervention.examples.all(),
-                # just for this step
-                "turns": format_turns(
-                    all_turns.filter(session_state__session=session).filter(
-                        session_state__step=self
-                    )
-                ),
-                "session_turns": format_turns(all_turns.filter(session_state__session=session)),
-                "all_turns": format_turns(all_turns),
-                # just for this step -- note, this is done a different way than for turns
-                "notes": all_notes.filter(turn__session_state__session=session).filter(
-                    timestamp__gt=session.state.timestamp
-                ),
-                "session_notes": all_notes.filter(turn__session_state__session=session),
-                "all_notes": all_notes,
-            }
-        )
+        context = {
+            "session": session,
+            "intervention": session.cycle.intervention,
+            # "examples": session.cycle.intervention.examples.all(),
+            # just for this step
+            "turns": format_turns(
+                all_turns.filter(session_state__session=session).filter(session_state__step=self)
+            ),
+            "session_turns": format_turns(all_turns.filter(session_state__session=session)),
+            "all_turns": format_turns(all_turns),
+            # just for this step -- note, this is done a different way than for turns
+            "notes": all_notes.filter(turn__session_state__session=session).filter(
+                timestamp__gt=session.state.timestamp
+            ),
+            "session_notes": all_notes.filter(turn__session_state__session=session),
+            "all_notes": all_notes,
+            "data": self.make_data_variable(session),
+        }
         return context
 
     def get_model(self, session):
@@ -297,18 +303,18 @@ class Step(models.Model):
         using features of the session as context."""
 
         session = turn.session_state.session
-        template = Template(TEMPLATE_PREFIX + self.prompt_template)
-        context = self.get_step_context(session)
-        pmpt = template.render(context)
+        ctx = self.get_step_context(session)
+
         completions, llm_calls = chatter(
-            pmpt,
+            self.prompt_template,
+            context=ctx,
             model=self.get_model(session),
             log_context={
                 "step": self,
                 "session": session,
-                "prompt": pmpt,
+                "prompt": self.prompt_template,
                 "turn": turn,
-                "context": context,
+                "context": ctx,
             },
         )
         # returns an OrderedDict of completions (intermediate 'thougts' and the __RESPONSE__)
@@ -378,12 +384,10 @@ class Judgement(models.Model):
         """
         session = turn.session_state.session
         logger.debug(f"Making judgement {self.title} for {session}")
-        template = Template(TEMPLATE_PREFIX + self.prompt_template)
-        # extract this so DRY with Step.spoken_response
-        context = session.current_step().get_step_context(session)
-        inputs = {"prompt": template.render(context)}
         try:
-            return self.process_inputs(turn, inputs)
+            return self.process_inputs(
+                turn, inputs=session.current_step().get_step_context(session)
+            )
         except Exception as e:
             raise e
             logger.error(f"ERROR MAKING JUDGEMENT {e}")
@@ -394,12 +398,13 @@ class Judgement(models.Model):
 
     def process_inputs(self, turn, inputs: dict):
 
-        newnote = Note.objects.create(judgement=self, turn=turn, inputs=inputs)
+        newnote = Note.objects.create(judgement=self, turn=turn, inputs=None)
         session = turn.session_state.session
 
         llm_result, logs = chatter(
-            newnote.inputs["prompt"],
+            self.prompt_template,
             model=self.get_model(session),
+            context=inputs,
             log_context={"judgement": self, "session": session, "inputs": inputs, "turn": turn},
         )
 

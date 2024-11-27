@@ -1,29 +1,53 @@
 {% extends "base.html" %}
 {% load pretty %}
 {% load turns %}
+{% load examples %}
+{% load notes %}
 {% load guidance %}
 {% block content %}
 <div class="container mt-5">
     <h1>Treatment Session Detail</h1>
 
     <hr class="mt-3">
-
-
     <div class="row mb-4">
-
         <div class="col-6">
             <p>
                 Session: 
-                
                     {{ session }} [<code>{{session.uuid}}</code>]    
                     <a href="{% url 'admin:mindframe_treatmentsession_change' session.pk %}">+</a>
-                
             </p>
-
         </div>
 
+        <!-- <pre>
+            {% examples data.preferred_name.XXX %}
+            
+            
+            Examples for: "{{data.preferred_name.name}}"
+            {% examples data.preferred_name.name %}
+        
+        </pre> -->
+        
+        <!-- <pre>
+{% notes  'welcome' only_most_recent=False string=False as all_notes %}
+{% for n in all_notes %}
+{{n.judgement.title}}: {{n.data.done}} ({{n.timestamp}})
+{% endfor %}
 
-            <!-- <pre>{{session|turns:"all"|md}}</pre> -->
+        </pre> -->
+        
+        <!-- <pre>{% notes "welcome" only_most_recent=False %}</pre> -->
+        
+        
+        <!-- <pre>{{all_notes}}</pre> -->
+        
+        <!-- <pre>{% examples "therapist introducing multisensory imagery" n=1 window=0 %}</pre> -->
+        
+        <!-- <pre>{% examples "therapist talking about imagergy" %}</pre>
+        <pre>{% turns "all" n=5 %}</pre> 
+        -->
+        
+
+        
             <!-- <pre> {{session|guidance|md}}</pre> -->
 
         <div class="col-6">

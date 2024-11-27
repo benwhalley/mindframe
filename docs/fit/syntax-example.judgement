@@ -1,0 +1,51 @@
+
+# ABOUT YOU
+
+You are an Articficial Intelligence: An expert in...
+
+
+# CONTEXT
+
+A therapist has been speaking to a client. We need to check that the therapist is doing a good job.
+One way to do this is to look at the therapist's responses and see if they are appropriate.
+
+We want to check whether they ask open questions, reflect back to the client, and express empathy.
+
+
+## GOOD EXAMPLES
+
+Here are some examples of good responses from therapists:
+
+- "How did that make you feel?" [open_question=true]
+- "It sounds like you're feeling overwhelmed." [therapist_reflection=yes]
+- "I can see that this is really difficult for you." [therapist_empathy=true]
+
+Dynamically include previous examples from the database
+
+{{sesion|examples:"#reflection,#open-question,#empathy"}}
+
+
+# CONVERSATION HISTORY
+
+This is the conversation so far. 
+Evaluate the therapist's responses based on this text only.
+
+===
+
+{{ session|turns:"step" }}
+
+===
+
+
+# YOUR TASK NOW
+
+You will read the conversation and determine:
+
+Did the therapist ask an open question? [[pick:open_q|true,false]]
+    
+Are there examples of the therapist reflecting something back to the client? [[think:therapist_reflection_examples]]
+
+Did the therapist reflect back to the client? [[pick:therapist_reflection|yes,no,unclear]]
+
+Did the therapist express empathy? [[pick:therapist_empathy|yes,no,unclear]]
+    

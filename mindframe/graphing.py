@@ -22,6 +22,14 @@ config:
 
 
 graph TD
+
+classDef conditions fill:none,color:green,stroke:none, font-size:10px;
+classDef judgement fill:none,color:red,stroke:none, font-size:10px;
+classDef smallText fill:none,color:black,stroke:none, font-size:10px;linkStyle default stroke-width:1px,font-size:10px;
+classDef conditionText fill:none,color:green,stroke:none, font-size:12px;
+
+
+
 """
     ]
 
@@ -40,8 +48,7 @@ graph TD
         judgement_str = "&nbsp;" + "<br>".join(
             [i.variable_name for i in transition.from_step.judgements.all()]
         )
-        diagram.append(f"{from_slug}_judgements --> {from_slug}")
-        diagram.append(f"class {from_slug}_judgements,{from_slug} noArrow;")
+        diagram.append(f"{from_slug}_judgements -.- {from_slug}")
         diagram.append(f"class {from_slug}_judgements judgement;")
         diagram.append(f"{from_slug}_judgements({judgement_str})")
 
@@ -49,19 +56,9 @@ graph TD
             judgement_str = "J:" + "<br>".join(
                 [i.variable_name for i in transition.to_step.judgements.all()]
             )
-            diagram.append(f"{to_slug}_judgements --> {to_slug}")
-            diagram.append(f"class {to_slug}_judgements,{to_slug} noArrow;")
+            diagram.append(f"{to_slug}_judgements -.-> {to_slug}")
             diagram.append(f"class {to_slug}_judgements judgement;")
             diagram.append(f"{to_slug}_judgements({judgement_str})")
-
-    diagram.append(
-        """
-classDef judgement fill:none,color:red,stroke:none, font-size:10px;
-classDef smallText fill:none,color:black,stroke:none, font-size:10px;linkStyle default stroke-width:1px,font-size:10px;
-classDef noArrow dotted;
-
-"""
-    )
 
     mermaid_code = "\n".join(diagram)
 

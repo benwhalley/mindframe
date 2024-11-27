@@ -330,6 +330,7 @@ class ExampleAdmin(admin.ModelAdmin):
     search_fields = (
         "title",
         "intervention__title",
+        "text",
     )
 
 
