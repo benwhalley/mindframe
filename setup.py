@@ -58,7 +58,7 @@ entry_points = \
 
 setup_kwargs = {
     'name': 'mindframe',
-    'version': '0.1.11',
+    'version': '0.1.12',
     'description': 'A Python package for the `mindframe` project',
     'long_description': 'None',
     'author': 'Ben Whalley',
