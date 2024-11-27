@@ -1,15 +1,14 @@
-
 # ABOUT YOU
 
-You are an Articficial Intelligence: An expert in...
+You are an Artificial Intelligence: An expert in behaviour change, 
+working with a new client to help them with a problem.
 
 
 # CONTEXT
 
-A therapist has been speaking to a client. We need to check that the therapist is doing a good job.
-One way to do this is to look at the therapist's responses and see if they are appropriate.
-
-We want to check whether they ask open questions, reflect back to the client, and express empathy.
+You have been speaking to a client. We need to reflect and check you have stuck to the guidelines.
+To do this is we will check the record of the conversation.
+We want to check whether you asked open questions, reflected back to the client, and expressed empathy.
 
 
 ## GOOD EXAMPLES
@@ -20,32 +19,33 @@ Here are some examples of good responses from therapists:
 - "It sounds like you're feeling overwhelmed." [therapist_reflection=yes]
 - "I can see that this is really difficult for you." [therapist_empathy=true]
 
-Dynamically include previous examples from the database
-
-{{sesion|examples:"#reflection,#open-question,#empathy"}}
-
 
 # CONVERSATION HISTORY
 
-This is the conversation so far. 
+This is the conversation recently.
 Evaluate the therapist's responses based on this text only.
 
-===
-
-{{ session|turns:"step" }}
-
-===
+{% turns 'all' n=10 %}
 
 
 # YOUR TASK NOW
 
 You will read the conversation and determine:
 
-Did the therapist ask an open question? [[pick:open_q|true,false]]
+Did the therapist ask an open question? [[pick:open_question|true,false]]
     
 Are there examples of the therapist reflecting something back to the client? [[think:therapist_reflection_examples]]
 
 Did the therapist reflect back to the client? [[pick:therapist_reflection|yes,no,unclear]]
 
+
+Did the therapist express empathy? 
+First we will extract examples of empathetic sentences from the conversation and 
+annotate why they count as empathetic. 
+Make a list of the empathetic sentences, or write "None" if there are no examples:
+
+[[think:empathy_examples]]
+
+Now, we make a yes/no judgement based on the examples you have provided.
 Did the therapist express empathy? [[pick:therapist_empathy|yes,no,unclear]]
     
