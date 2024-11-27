@@ -192,5 +192,5 @@ step transition should take place.
 
 ## More examples
 
-- [Step](syntax-exmaple.step
+- [Step](syntax-exmaple.step)
 - [Judgement](syntax-exmaple.judgement)
