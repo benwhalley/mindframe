@@ -141,7 +141,7 @@ class TreatmentSessionDetailView(LoginRequiredMixin, DetailView):
         # Prefetch related data for performance
         context["turns"] = (
             Turn.objects.filter(session_state__session__uuid=session.uuid)
-            .prefetch_related("speaker", "session_state__step")
+            .prefetch_related("speaker", "session_state__step", "notes", "llm_calls")
             .order_by("timestamp")
         )
 
