@@ -22,10 +22,10 @@ class Migration(migrations.Migration):
                 choices=[
                     (
                         "CommentedBooleanResponse",
-                        mindframe.return_type_models.CommentedBooleanResponse,
+                        None,
                     ),
-                    ("ComplexNote", mindframe.return_type_models.ComplexNote),
-                    ("BriefNote", mindframe.return_type_models.BriefNote),
+                    ("ComplexNote", None),
+                    ("BriefNote", None),
                 ],
                 default="BriefNote",
                 max_length=255,
