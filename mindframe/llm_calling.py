@@ -2,10 +2,10 @@
 # Define your desired output structure
 
 from pydantic import BaseModel, Field
-from mindframe.multipart_llm import structured_chat
+from mindframe.llm_calling import structured_chat
 from typing import Optional, List
 
-from mindframe.multipart_llm import *
+from mindframe.llm_calling import *
 
 
 mini, _ = LLM.objects.get_or_create(provider_name="AZURE", model_name="gpt-4o-mini", nickname=",mini")
@@ -23,7 +23,7 @@ split_multipart_prompt("one[[talk:y]]two[[RESP]]dddd")['talk:y'] == 'one'
 
 
 rr = chatter("Pick an ancient civilisation: [[thoughts]] Now pick one of art, science or magic. Just one of those three words [[pick:topic]] Now tell me a SINGLE interesting fact[[speak:]]", mini)
-rr[0]['__RESPONSE__']
+rr[0]['RESPONSE_']
 rr[1]
 
 chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]", mini)[0]['JOKE']
@@ -87,6 +87,7 @@ from collections import namedtuple, OrderedDict, defaultdict
 from hashlib import sha256
 from typing import List
 from types import FunctionType
+from django.apps import apps
 
 import dotenv
 import tiktoken
@@ -151,7 +152,7 @@ def split_multipart_prompt(text) -> OrderedDict:
     parts = list(filter(bool, map(str.strip, re.split(varname_pattern, text))))
     # if we didn't explicitly include a final response variable, add one here
     if len(parts) % 2 == 1:
-        parts.append("__RESPONSE__")
+        parts.append("RESPONSE_")
     # iterate over tuples and return an ordered dictionary
     result = OrderedDict(zip(parts[1::2], parts[::2]))
     for text_segment, varname in zip(parts[::2], parts[1::2]):
@@ -395,14 +396,14 @@ def chatter(multipart_prompt, model, context={}, log_context={}):
         prompt_parts.append(res)
         llm_calls.append(log)
 
-    # duplicate the last item as the __RESPONSE__ so we have a
+    # duplicate the last item as the RESPONSE_ so we have a
     # predictable key to access the final completion, but can still
     # also access the last key by names used in the template
     lastkey = next(reversed(results_dict))
-    if lastkey != "__RESPONSE__":
-        results_dict["__RESPONSE__"] = results_dict[lastkey]
+    if lastkey != "RESPONSE_":
+        results_dict["RESPONSE_"] = results_dict[lastkey]
 
-    from mindframe.models import LLMLog
+    LLMLog = apps.get_model("mindframe", "LLMLog")
 
     return (results_dict, LLMLog.objects.filter(pk__in=[i.pk for i in llm_calls]))
 
@@ -410,7 +411,7 @@ def chatter(multipart_prompt, model, context={}, log_context={}):
 if False:
     from pprint import pprint
     from mindframe.models import LLM
-    from mindframe.multipart_llm import chatter, parse_prompt
+    from mindframe.llm_calling import chatter, parse_prompt
 
     mini = LLM.objects.filter(provider_name="AZURE", model_name="gpt-4o-mini").first()
 

@@ -1,5 +1,5 @@
 from mindframe.models import TreatmentSession, format_turns
-from mindframe.multipart_llm import chatter
+from mindframe.llm_calling import chatter
 
 tt = TreatmentSession.objects.all().first()
 tt.turns.all().delete()
@@ -25,7 +25,7 @@ for i in range(15):
     print("RESPONSE", tt.respond())
     cli_res = chatter(
         tc.format(**{"history": format_turns(tt.turns.all()), "specifics": specifics})
-    )["__RESPONSE__"].value
+    )["RESPONSE_"].value
     print("CLIENT", cli_res)
     tt.listen(tt.cycle.client, cli_res)
 

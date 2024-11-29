@@ -1,8 +1,18 @@
 from django import template
 from django.db.models import Q
-from mindframe.models import format_turns, Turn
+from mindframe.models import Turn
 
 register = template.Library()
+
+
+def format_turns(turns):
+    if not turns.count():
+        return "No conversation history yet."
+
+    formatted_turns = "\n\n".join(
+        [f"{t.speaker.role.upper()}: {t.text}" for t in turns.order_by("timestamp")]
+    )
+    return mark_safe(formatted_turns)
 
 
 @register.simple_tag(takes_context=True)

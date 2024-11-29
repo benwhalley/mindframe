@@ -30,8 +30,7 @@ from django_lifecycle import LifecycleModel, hook, AFTER_UPDATE
 import instructor
 from openai import AzureOpenAI, OpenAI
 
-from mindframe.multipart_llm import chatter, structured_chat
-from mindframe.return_type_models import JUDGEMENT_RETURN_TYPES
+from mindframe.llm_calling import chatter, structured_chat
 from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
 
 from mindframe.tasks import generate_embedding
@@ -62,16 +61,6 @@ class StepJudgementFrequencyChoices(models.TextChoices):
     TURN = "turn", "Each turn"
     ENTER = "enter", "When entering the step"
     EXIT = "exit", "When exiting the step"
-
-
-def format_turns(turns):
-    if not turns.count():
-        return "No conversation history yet."
-
-    formatted_turns = "\n\n".join(
-        [f"{t.speaker.role.upper()}: {t.text}" for t in turns.order_by("timestamp")]
-    )
-    return mark_safe(formatted_turns)
 
 
 class CustomUser(AbstractUser):
@@ -180,22 +169,23 @@ class Example(LifecycleModel):
     title = models.CharField(max_length=255)
     text = models.TextField()
 
-    embedding = VectorField(dimensions=384, null=True, blank=True)
+    # embedding = VectorField(dimensions=384, null=True, blank=True)
+
+    # class Meta:
+    #     indexes = [
+    #         HnswIndex(
+    #             name="example_embedding_index",
+    #             fields=["embedding"],
+    #             m=16,
+    #             ef_construction=64,
+    #             opclasses=["vector_l2_ops"],
+    #         ),
+    #     ]
 
     @hook(AFTER_UPDATE)
     def on_text_change(self):
-        generate_embedding.delay(self.pk, self.text)
+        return generate_embedding.delay(self.pk)
 
-    class Meta:
-        indexes = [
-            HnswIndex(
-                name="example_embedding_index",
-                fields=["embedding"],
-                m=16,
-                ef_construction=64,
-                opclasses=["vector_l2_ops"],
-            ),
-        ]
         unique_together = [("intervention", "title")]
 
     def __str__(self):
@@ -250,15 +240,19 @@ class Step(models.Model):
         return reverse("admin:mindframe_step_change", args=[str(self.id)])
 
     def make_data_variable(self, session):
-        """This makes the `data` context variable, used in the prompt template, for a given set of notes."""
+        """This makes the `data` context variable, used in the prompt template.
 
-        notes = Note.objects.filter(turn__session_state__session__cycle=session.cycle)
+        The layout/structure of this object is important because end-users will access it in templates and it needs to be consistent/predictable and provide good defaults.
+        """
 
         def getv(notes, v):
             notes = notes.filter(judgement__variable_name=v)
             r = {v: notes.last().data, v + "__all": notes}
             return r
 
+        # get all notes for this session and flatten them so that we can access the latest
+        # instance of each Judgement/Note by variable name
+        notes = Note.objects.filter(turn__session_state__session__cycle=session.cycle)
         vars = set(notes.values_list("judgement__variable_name", flat=True))
         dd = {}
         for i in vars:
@@ -278,14 +272,6 @@ class Step(models.Model):
         context = {
             "session": session,
             "intervention": session.cycle.intervention,
-            # "examples": session.cycle.intervention.examples.all(),
-            # just for this step
-            "turns": format_turns(
-                all_turns.filter(session_state__session=session).filter(session_state__step=self)
-            ),
-            "session_turns": format_turns(all_turns.filter(session_state__session=session)),
-            "all_turns": format_turns(all_turns),
-            # just for this step -- note, this is done a different way than for turns
             "notes": all_notes.filter(turn__session_state__session=session).filter(
                 timestamp__gt=session.state.timestamp
             ),
@@ -299,8 +285,7 @@ class Step(models.Model):
         return session.cycle.intervention.default_conversation_model
 
     def spoken_response(self, turn) -> OrderedDict:
-        """Use an llm to create a spoken response to clients,
-        using features of the session as context."""
+        """Use an llm to create a spoken response to clients, using session data as context."""
 
         session = turn.session_state.session
         ctx = self.get_step_context(session)
@@ -317,7 +302,7 @@ class Step(models.Model):
                 "context": ctx,
             },
         )
-        # returns an OrderedDict of completions (intermediate 'thougts' and the __RESPONSE__)
+        # returns an OrderedDict of completions (intermediate 'thougts' and the RESPONSE_)
         return completions, llm_calls
 
     class Meta:
@@ -522,7 +507,7 @@ class TreatmentSession(models.Model):
                 session_notes.order_by("judgement__variable_name", "-timestamp").distinct(
                     "judgement__variable_name"
                 )
-                # data__value is a magic field name - see return_type_models.py
+                # `data`` can contain multiple values, each defined by a different completion - see return_type_models.py
                 .values_list("judgement__variable_name", "data")
             )
         )
