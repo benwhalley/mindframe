@@ -1,6 +1,7 @@
 from django import template
 from django.db.models import Q
 from mindframe.models import Turn
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
