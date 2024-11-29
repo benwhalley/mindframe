@@ -5,6 +5,8 @@ import pprint
 from django.forms.models import model_to_dict
 from django.contrib import admin
 from django.db import models
+from django.db.models import Count, Prefetch
+
 from django.shortcuts import redirect
 from django.urls import path
 from django.utils.html import format_html
@@ -605,8 +607,35 @@ class TreatmentSessionAdmin(admin.ModelAdmin):
         ),
     )
 
+    def get_queryset(self, request):
+        # Annotate the queryset with the number of turns for each session
+        queryset = super().get_queryset(request)
+
+        # Use select_related for single-object relationships and prefetch_related for reverse/multiple-object relationships
+        queryset = (
+            queryset.select_related("cycle")
+            .select_related("cycle__client")  # Assuming a ForeignKey to CustomUser exists
+            .prefetch_related(
+                # Prefetch the related TreatmentSessionState and Turn objects
+                Prefetch(
+                    "progress",  # Prefetch related progress objects
+                    queryset=TreatmentSessionState.objects.prefetch_related(
+                        "turns"
+                    ),  # Prefetch related turns
+                )
+            )
+            .annotate(
+                # Annotate the queryset with the count of related turns
+                n_turns_count=Count(
+                    "progress__turns", distinct=True
+                )  # Use distinct if there are potential duplicates
+            )
+        )
+        return queryset
+
     def n_turns(self, obj):
-        return obj.turns.count()
+        # Use the annotated value
+        return obj.n_turns_count
 
     def clinical_notes(self, obj):
         notes = Note.objects.filter(turn__session_state__session=obj)
