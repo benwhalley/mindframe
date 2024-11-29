@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mindframe"
-version = "0.1.12"
+version = "0.1.13"
 description = "A Python package for the `mindframe` project"
 authors = [
     "Ben Whalley <ben.whalley@plymouth.ac.uk>",
@@ -10,7 +10,6 @@ authors = [
 [tool.poetry.dependencies]
 python = ">=3.11, <4.0"
 Django = "^5.0.6"
-magentic = "^0.32.0"
 pydantic = "^2.9.2"
 pandoc = "^2.4"
 psycopg2 = {markers = "sys_platform == 'linux'", version = "~=2.9"}
@@ -42,8 +41,6 @@ haystack-ai = "^2.7.0"
 pgvector-haystack = "^1.2.0"
 haystack-experimental="0.3.0"
 ollama-haystack = "^2.0.0"
-
-
 
 [tool.poetry.scripts]
 mindframe-bot = "mindframe.chatbot:main"
