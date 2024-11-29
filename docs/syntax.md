@@ -176,18 +176,53 @@ The `speak` response is more direct an the AI is requested to use spoken idioms.
 These different styles of responses are achieved by adding hints to the call to the AI model.
 
 
-Two other prefixes are also supported:
+### Classification responses
+
+Two other prefixes are also supported to allow for classification responses:
 
 ```
 [[boolean:response]]
-[[pick:response|option1,option2,option3]]
+
+[[pick:response|option1, option2, option3, default=null]]
+
 ```
+
+Or, a multiline version:
+
+```
+[[pick:response
+    option1
+    option2
+    option3
+    default=null]]
+```
+
 
 - `pick` guarantees that the response is one of the options provided, after the `|` character, separated by commas.
 - `boolean` guarantees that the response is either True or False.
 
 These are useful when making classifications, or for Judgements that determine whether a 
 step transition should take place.
+
+Finally, advanced users can pass extra parameters to `[[response]]` slots, using the following syntax:
+
+```
+[[think:planning]]{max_tokens=50}
+
+[[bool:is_upset]]{allow_null=true}
+```
+
+
+## Comments in templates
+
+```
+\\ This is a comment and won't be visible to the AI model
+You are an AI therapist.
+Help the client with their problem.
+[[speak:response]]
+
+```
+
 
 
 ## More examples
