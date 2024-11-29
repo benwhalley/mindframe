@@ -10,7 +10,8 @@ packages = \
 
 package_data = \
 {'': ['*'],
- 'mindframe': ['static/mindframe/css/*',
+ 'mindframe': ['fixtures/*',
+               'static/mindframe/css/*',
                'static/mindframe/js/*',
                'templates/*',
                'templates/admin/*',
@@ -57,7 +58,7 @@ entry_points = \
 
 setup_kwargs = {
     'name': 'mindframe',
-    'version': '0.1.15',
+    'version': '0.1.16',
     'description': 'A Python package for the `mindframe` project',
     'long_description': 'None',
     'author': 'Ben Whalley',
