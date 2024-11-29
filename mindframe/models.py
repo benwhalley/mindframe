@@ -328,7 +328,7 @@ class Transition(models.Model):
             raise ValidationError("from_step and to_step must belong to the same intervention.")
 
     class Meta:
-        unique_together = [("from_step", "to_step")]
+        unique_together = [("from_step", "to_step", "conditions")]
 
     def __str__(self):
         return f"{self.from_step} -> {self.to_step}"
@@ -660,7 +660,7 @@ class TreatmentSessionState(models.Model):
         ordering = ["timestamp"]
 
     def __str__(self):
-        return f"{self.session}: {self.step.title}"
+        return f"{self.step.title}"
 
 
 class Turn(models.Model):
