@@ -30,7 +30,6 @@
         <div class="col-4"><h5>Thoughts</h5></div>
         <div class="col-3"><h5>Notes/LLM Calls</h5></div>
 
-
         <style>
             pre {
                 white-space: pre-wrap; /* Enable wrapping */
@@ -69,10 +68,11 @@
     </div>
 
     <div class="col-3 small">
-        {% if turn.notes.all.count %}
+        {% with turn.notes.all as turnnotes %}
+        {% if turnnotes %}
         <p>Notes</p>
         {% endif %}
-        {% for note in turn.notes.all %}
+        {% for note in turnnotes %}
                 <p>
                     <code>{{note.judgement.variable_name}}</code>: {{note.data.value}}
                     <!-- <pre class="small">{{note.data|pretty_json}}</pre> -->
@@ -80,15 +80,18 @@
                 </a>
             </p>
         {% endfor %}
-
-        {% if turn.llm_calls.all.count %}
+        {% endwith %}
+            
+        {% with turn.llm_calls.all as turncalls %}
+        {% if turncalls %}
         <p>LLM Calls</p>
         {% endif %}
-        {% for call in turn.llm_calls.all %}
+        {% for call in turncalls %}
             <p>
                 <a href="{% url 'admin:mindframe_llmlog_change' call.id %}">{{call.message}}</a>
             </p>
         {% endfor %}
+        {% endwith %}
 
         <a  class='btn btn-sm btn-outline-success mb-4 float-end ' href="{% url 'admin:start_again_from_turn' turn.pk %}">Start again from here</a>
     </div>
