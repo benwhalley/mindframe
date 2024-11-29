@@ -251,4 +251,5 @@ def hyde_examples(
     )
     logger.info(f"Hypothetical document embedded and used for search:\n\n {results['llm_first']}")
 
-    return results["window_retriever"]["context_windows"]
+    # return tuple with results and llm generated query
+    return results["window_retriever"]["context_windows"], results["llm_first"]

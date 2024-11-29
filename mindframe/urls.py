@@ -3,8 +3,9 @@ from mindframe.views import (
     create_public_session,
     SyntheticConversationDetailView,
     TreatmentSessionDetailView,
+    RAGHyDEComparisonView,
+    IndexView,
 )
-
 
 urlpatterns = [
     # Other URLs
@@ -23,4 +24,6 @@ urlpatterns = [
         TreatmentSessionDetailView.as_view(),
         name="treatment_session_detail",
     ),
+    path("rag-test/", RAGHyDEComparisonView.as_view(), name="rag_test"),
+    path("", IndexView.as_view(), name="index"),  # Index page
 ]

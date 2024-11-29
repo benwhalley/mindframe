@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Compare RAG and HyDE</h1>
+
+{% if intervention %}
+    <h3>Intervention: {{ intervention.title }}</h3>
+{% endif %}
+<div class="row">
+    <div class="col-4">
+        
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Compare</button>
+        </form>
+        
+    </div>
+    
+    <div class="col-8">
+        
+        
+        <div class="row">
+            
+            <div class="col-6">
+                <h5>RAG Results</h5>
+                {% if not rag_results %}
+                        <p>No results</p>
+                        {% endif %}
+                <ul>
+                    {% for result in rag_results %}
+                        <li>{{ result }}</li>
+                    {% endfor %}
+                </ul>
+                
+            </div>
+            
+            <div class="col-6">
+                <h5>HyDE Results</h5>
+                    
+                    <div>
+                        {% if hyde_query %}
+                            <p class="small"><em>Hypothetical document</em>: {{hyde_query.output}}</p>
+                        {% endif %}
+                    </div>
+                
+                    {% if not hyde_results %}
+                    <p>No results</p>
+                    {% endif %}
+                    <ul>
+                        {% for result in hyde_results %}
+                            <li>{{ result }}</li>
+                        {% endfor %}
+                    </ul>
+        
+        
+            </div>
+            
+        </div>
+        
+    </div>
+    
+    
+</div>
+
+
+
+{% endblock %}
