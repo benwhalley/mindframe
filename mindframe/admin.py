@@ -311,15 +311,19 @@ class NoteAdmin(admin.ModelAdmin):
 
 @admin.register(Judgement)
 class JudgementAdmin(admin.ModelAdmin):
-    list_display = ("variable_name", "title", "task_summary", "slug", "intervention")
+    list_display = (
+        "variable_name",
+        "title",
+        "prompt_template",
+        "task_summary",
+        "slug",
+        "intervention",
+    )
     autocomplete_fields = [
         "intervention",
     ]
     search_fields = ["title", "variable_name", "intervention__title"]
-    list_editable = [
-        "title",
-        "task_summary",
-    ]
+    list_editable = ["title", "prompt_template", "task_summary"]
 
 
 @admin.register(Example)
@@ -356,7 +360,10 @@ class InterventionAdmin(admin.ModelAdmin):
 
     def start_session_button(self, obj):
         url = reverse("admin:start_session", args=[obj.id])
-        return format_html(f'<a class="button" href="{url}">New Session</a>')
+        anon_url = reverse("public_start_session", args=[obj.slug])
+        return format_html(
+            f'<a class="button" href="{url}">New Session</a> &nbsp;  <a class="button" href="{anon_url}">New Anonymous Session</a> '
+        )
 
     start_session_button.short_description = "Start Session"
     start_session_button.allow_tags = True
@@ -531,6 +538,7 @@ class InterventionAdmin(admin.ModelAdmin):
     def change_view(self, request, object_id, form_url="", extra_context=None):
 
         extra_context = extra_context or {}
+        obj = self.get_object(request, object_id)
         extra_context.update(
             {
                 "new_session": reverse(
@@ -545,7 +553,9 @@ class InterventionAdmin(admin.ModelAdmin):
                         object_id,
                     ],
                 ),
-                "mermaid": self.mermaid_diagram(self.get_object(request, object_id)),
+                "mermaid": self.mermaid_diagram(obj),
+                "start_new_chat_link": settings.WEB_URL
+                + reverse("public_start_session", args=[obj.slug]),
             }
         )
 

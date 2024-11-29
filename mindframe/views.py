@@ -39,7 +39,7 @@ class RAGHyDEComparisonForm(forms.Form):
         initial="therapist leading vivid imagery exercise",
     )
     top_k = forms.IntegerField(label="Top K Results", min_value=1, max_value=20, initial=3)
-    window_size = forms.IntegerField(label="Window Size", min_value=1, max_value=10, initial=2)
+    window_size = forms.IntegerField(label="Window Size", min_value=0, max_value=10, initial=2)
     intervention = forms.ModelChoiceField(
         queryset=Intervention.objects.all(),
         label="Select Intervention",

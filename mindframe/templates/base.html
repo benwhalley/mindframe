@@ -14,7 +14,7 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/admin">MindFrame</a>
+            <a class="navbar-brand" href="/">MindFrame</a>
             <button
                 class="navbar-toggler"
                 type="button"
@@ -26,22 +26,20 @@
             >
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <!-- <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
+                    
                     <li class="nav-item">
-                        <a class="nav-link" href="/">Home</a>
+                        <a class="nav-link" href="/admin/">Admin</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/sessions/">Sessions</a>
+                        <a class="nav-link" href="/admin/mindframe/intervention/">Interventions</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/interventions/">Interventions</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/about/">About</a>
+                        <a class="nav-link" href="{% url 'rag_test' %}">RAG testing</a>
                     </li>
                 </ul>
-            </div> -->
+            </div>
         </div>
     </nav>
 
@@ -55,7 +53,7 @@
 
     <footer class="text-center mt-4 py-4 bg-light">
         <div class="container">
-            <p>&copy; 2024 MindFrame. All rights reserved.</p>
+
         </div>
     </footer>
 
