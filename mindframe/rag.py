@@ -34,10 +34,10 @@ from haystack import component
 from haystack.components.embedders import AzureOpenAITextEmbedder, AzureOpenAIDocumentEmbedder
 from haystack.components.generators import AzureOpenAIGenerator
 
-from haystack_integrations.components.embedders.ollama import (
-    OllamaDocumentEmbedder,
-    OllamaTextEmbedder,
-)
+# from haystack_integrations.components.embedders.ollama import (
+#     OllamaDocumentEmbedder,
+#     OllamaTextEmbedder,
+# )
 
 from haystack.document_stores.types import DuplicatePolicy
 from haystack.components.preprocessors import DocumentSplitter
@@ -48,7 +48,8 @@ from typing import List, Optional
 from haystack.tracing.logging_tracer import LoggingTracer
 
 from mindframe.models import TreatmentSession, Example
-from mindframe.settings import OLLAMA_URL
+
+# from mindframe.settings import OLLAMA_URL
 
 from django.conf import settings
 
