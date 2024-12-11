@@ -29,11 +29,12 @@ install_requires = \
  'django-shortuuidfield>=0.1.3,<0.2.0',
  'gevent>=24.11,<25.0',
  'gradio>=5.5.0,<6.0.0',
- 'gunicorn>=22.0.0,<23.0.0',
  'haystack-ai>=2.7.0,<3.0.0',
  'haystack-experimental==0.3.0',
  'honcho>=1.1.0,<2.0.0',
  'instructor>=1.6.4,<2.0.0',
+ 'langchain>=0.3.9,<0.4.0',
+ 'langfuse>=2.55.0,<3.0.0',
  'ollama-haystack>=2.0.0,<3.0.0',
  'pandoc>=2.4,<3.0',
  'pgvector',
@@ -45,8 +46,8 @@ install_requires = \
  'redis>=5.2,<6.0',
  'ruamel-yaml>=0.18.6,<0.19.0',
  'rules>=3.4,<4.0',
- 'sentence-transformers>=3.3.0,<4.0.0',
  'shortuuid>=1.0.13,<2.0.0',
+ 'tiktoken>=0.8.0,<0.9.0',
  'uvicorn>=0.30.1,<0.31.0']
 
 extras_require = \
@@ -58,7 +59,7 @@ entry_points = \
 
 setup_kwargs = {
     'name': 'mindframe',
-    'version': '0.1.16',
+    'version': '0.1.18',
     'description': 'A Python package for the `mindframe` project',
     'long_description': 'None',
     'author': 'Ben Whalley',
