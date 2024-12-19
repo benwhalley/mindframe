@@ -7,12 +7,12 @@ from typing import Optional, List
 
 from mindframe.llm_calling import *
 
+mini, _ = LLM.objects.get_or_create(model_name="gpt-4o-mini")
+local, _ = LLM.objects.get_or_create(model_name="llama3.2")
 
-mini, _ = LLM.objects.get_or_create(provider_name="AZURE", model_name="gpt-4o-mini", nickname=",mini")
+chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]", mini)[0]['JOKE']
 
-local, _ = LLM.objects.get_or_create(provider_name="OLLAMA", model_name="llama3.2", nickname=",local")
-
-
+simple_chat
 
 # this raises an exception
 split_multipart_prompt("one[[]]two[[RESP]]dddd")
@@ -28,10 +28,7 @@ rr[1]
 
 chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]", mini)[0]['JOKE']
 
-
 chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[poem:JOKE]]", mini)[0]['JOKE']
-
-
 
 simple_chat("tell a joke", mini)[0]
 simple_chat("tell a joke", local)[0]
@@ -103,6 +100,13 @@ from mindframe.return_type_models import (
     PoeticalResponse,
     ExtractedResponse,
 )
+
+from langfuse.decorators import observe
+
+from django.db.models import Model
+from langfuse.decorators import langfuse_context
+
+langfuse_context.configure(debug=False)
 
 
 dotenv.load_dotenv(".env")
@@ -261,6 +265,7 @@ def parse_prompt(prompt_text) -> OrderedDict:
     )
 
 
+@observe(capture_input=False, capture_output=False)
 def structured_chat(
     prompt,
     llm,
@@ -273,6 +278,8 @@ def structured_chat(
     """
 
     from mindframe.models import LLMLog, LLMLogTypes
+
+    langfuse_context.update_current_observation(input=prompt)
 
     try:
         res, com = llm.provider.chat.completions.create_with_completion(
@@ -303,6 +310,7 @@ def structured_chat(
     return res, com, llm_call_log
 
 
+@observe(capture_input=False, capture_output=False)
 def simple_chat(prompt, llm, log_context={}):
     """For a text prompt and LLM model, return a string completion.
 
@@ -312,6 +320,8 @@ def simple_chat(prompt, llm, log_context={}):
     # we can't use chat_with_completion because it needs a response model
     # so we return the first string completion, plus the completion object
     from mindframe.models import LLMLog, LLMLogTypes
+
+    langfuse_context.update_current_observation(input=prompt)
 
     try:
         res = llm.provider.chat.completions.create(
@@ -357,6 +367,7 @@ TEMPLATE_PREFIX = """
 """
 
 
+@observe(capture_input=False, capture_output=False)
 def chatter(multipart_prompt, model, context={}, log_context={}):
     """
     Parse and execute a prompt template specifying multiple completions.

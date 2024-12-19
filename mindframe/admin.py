@@ -86,7 +86,9 @@ class SyntheticConversationAdmin(admin.ModelAdmin):
 @admin.register(LLM)
 class LLMAdmin(admin.ModelAdmin):
     search_fields = ["model_name"]
-    list_display = ["model_name", "provider_name", "nickname"]
+    list_display = [
+        "model_name",
+    ]
 
 
 @admin.register(LLMLog)

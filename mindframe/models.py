@@ -28,7 +28,19 @@ import shortuuid
 from django_lifecycle import LifecycleModel, hook, AFTER_UPDATE
 
 import instructor
-from openai import AzureOpenAI, OpenAI
+
+# from openai import AzureOpenAI, OpenAI
+# use langfuse for tracing
+from langfuse.openai import AzureOpenAI, OpenAI
+
+
+from django.db.models import Model
+from langfuse.decorators import langfuse_context
+
+langfuse_context.configure(debug=False)
+
+
+from langfuse.decorators import observe
 
 from mindframe.llm_calling import chatter, structured_chat
 from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
@@ -284,8 +296,13 @@ class Step(models.Model):
     def get_model(self, session):
         return session.cycle.intervention.default_conversation_model
 
+    @observe(capture_input=False, capture_output=False)
     def spoken_response(self, turn) -> OrderedDict:
         """Use an llm to create a spoken response to clients, using session data as context."""
+
+        langfuse_context.update_current_observation(
+            name=f"Response ({self})",
+        )
 
         session = turn.session_state.session
         ctx = self.get_step_context(session)
@@ -360,6 +377,7 @@ class Judgement(models.Model):
     )
     prompt_template = models.TextField()
 
+    @observe(capture_input=False, capture_output=False)
     def make_judgement(self, turn):
         """
 
@@ -367,6 +385,8 @@ class Judgement(models.Model):
         self = Judgement.objects.first()
         self.make_judgement(s)
         """
+        langfuse_context.update_current_observation(name=f"Judgement: {self}")
+
         session = turn.session_state.session
         logger.debug(f"Making judgement {self.title} for {session}")
         try:
@@ -588,8 +608,13 @@ class TreatmentSession(models.Model):
 
         return step
 
+    @observe(capture_input=False, capture_output=True)
     def respond(self):
         """Respond to the client's last utterance (and manage transitions)."""
+
+        langfuse_context.update_current_observation(
+            name=f"Respond: {self.state}", session_id=self.uuid
+        )
 
         bot = CustomUser.objects.filter(role=RoleChoices.THERAPIST).first()
         if not bot:
@@ -792,30 +817,14 @@ class LLMProvider(models.TextChoices):
 class LLM(models.Model):
     """Store details of Language Models used for Step and Judgement execution"""
 
-    nickname = models.SlugField(unique=False, editable=True)
-    provider_name = models.CharField(choices=LLMProvider.choices)
-    model_name = models.CharField(max_length=255)
-
-    azure = instructor.from_openai(AzureOpenAI())
-    ollama = instructor.from_openai(
-        OpenAI(
-            base_url=os.environ.get("OLLAMA_API_BASE", "http://localhost:11434/v1"),
-            api_key=os.environ.get("OLLAMA_API_KEY", "ollama"),  # required, but unused
-        ),
-        # required to workaround bug in ollama tool returns
-        mode=instructor.Mode.JSON,
+    model_name = models.CharField(
+        max_length=255, help_text="Litellm model name, e.g. ollama/llama3.2 or azure/gpt-4o"
     )
 
     def __str__(self) -> str:
-        return f"{self.nickname} | {self.provider_name}/{self.model_name}"
-
-    def chatter(self, prompt):
-        return chatter(prompt, self)[0]  # only return completions, not logs
-
-    def instruct(self, prompt, response_model, *args, **kwargs):
-        res, compl_, log_ = structured_chat(prompt, self, response_model, *args, **kwargs)
-        return res
+        return self.model_name
 
     @property
     def provider(self):
-        return {"AZURE": self.azure, "OLLAMA": self.ollama}.get(self.provider_name)
+        # this is an Azure instance, but is used to query litellm proxy
+        return instructor.from_openai(AzureOpenAI())

@@ -34,11 +34,6 @@ from haystack import component
 from haystack.components.embedders import AzureOpenAITextEmbedder, AzureOpenAIDocumentEmbedder
 from haystack.components.generators import AzureOpenAIGenerator
 
-# from haystack_integrations.components.embedders.ollama import (
-#     OllamaDocumentEmbedder,
-#     OllamaTextEmbedder,
-# )
-
 from haystack.document_stores.types import DuplicatePolicy
 from haystack.components.preprocessors import DocumentSplitter
 from haystack.components.retrievers import SentenceWindowRetriever
@@ -48,8 +43,6 @@ from typing import List, Optional
 from haystack.tracing.logging_tracer import LoggingTracer
 
 from mindframe.models import TreatmentSession, Example
-
-# from mindframe.settings import OLLAMA_URL
 
 from django.conf import settings
 
@@ -74,7 +67,8 @@ if settings.DEBUG and False:
     )
 
 
-doc_store = PgvectorDocumentStore(
+examples_doc_store = PgvectorDocumentStore(
+    table_name="haystack_example_embeddings",
     connection_string=Secret.from_token(settings.DATABASE_URL),
     embedding_dimension=1024,
     vector_function="cosine_similarity",
@@ -83,9 +77,18 @@ doc_store = PgvectorDocumentStore(
 )
 
 
-def embed_examples(examples):
+turns_doc_store = PgvectorDocumentStore(
+    table_name="haystack_turn_embeddings",
+    connection_string=Secret.from_token(settings.DATABASE_URL),
+    embedding_dimension=1024,
+    vector_function="cosine_similarity",
+    search_strategy="hnsw",
+    recreate_table=False,
+)
+
+
+def embed_examples(examples, doc_store):
     doc_splitter = DocumentSplitter(split_by="sentence", split_length=2, split_overlap=1)
-    # doc_embedder = OllamaDocumentEmbedder(model="nomic-embed-text", url=OLLAMA_URL)
     doc_embedder = AzureOpenAIDocumentEmbedder(
         dimensions=1024,
         azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT"),
@@ -109,12 +112,39 @@ def embed_examples(examples):
     doc_store.write_documents(chunks_embedded.get("documents"), policy=DuplicatePolicy.OVERWRITE)
 
 
+def embed_turns(turns, doc_store):
+    doc_splitter = DocumentSplitter(split_by="sentence", split_length=2, split_overlap=1)
+    doc_embedder = AzureOpenAIDocumentEmbedder(
+        dimensions=1024,
+        azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT"),
+        api_key=Secret.from_token(os.environ.get("AZURE_OPENAI_API_KEY")),
+        azure_deployment="text-embedding-3-large",
+    )
+    docs = [
+        Document(
+            content=i.text,
+            meta={
+                "id": i.id,
+                "intervention": i.intervention.id,
+                "content_type": "mindframe.Example",
+            },
+        )
+        for i in examples
+    ]
+
+    chunks = doc_splitter.run(documents=docs)
+    chunks_embedded = doc_embedder.run(chunks["documents"])
+    doc_store.write_documents(chunks_embedded.get("documents"), policy=DuplicatePolicy.OVERWRITE)
+
+
+# embed_examples(Example.objects.all(), examples_doc_store)
+
+
 # SIMPLE RAG
 
 
-def rag_pipeline():
+def rag_pipeline(doc_store):
     rag = Pipeline()
-    # rag.add_component("text_embedder", OllamaTextEmbedder(model="nomic-embed-text", url=OLLAMA_URL))
     rag.add_component(
         "text_embedder",
         AzureOpenAITextEmbedder(
@@ -136,25 +166,21 @@ def rag_pipeline():
 # CRUDE IMPLEMENTATION OF HYDE
 
 
-def hyde_pipeline():
+def hyde_pipeline(doc_store):
     hyde = Pipeline()
     hyde.add_component("hyde_prompt", PromptBuilder(template=""))
 
     # TODO: enable user to specify model/provider
-    # hyde.add_component("llm", OllamaGenerator(model="llama3.2", url=OLLAMA_URL))
     hyde.add_component(
         "llm",
         AzureOpenAIGenerator(
             azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT"),
             api_key=Secret.from_token(os.environ.get("AZURE_OPENAI_API_KEY")),
             # TODO allow user to specify hyde model
-            azure_deployment="gpt-4o-mini",
+            azure_deployment="gpt-4o",
         ),
     )
 
-    # hyde.add_component(
-    #     "query_embedder", OllamaTextEmbedder(model="nomic-embed-text", url=OLLAMA_URL)
-    # )
     hyde.add_component(
         "query_embedder",
         AzureOpenAITextEmbedder(
@@ -164,13 +190,12 @@ def hyde_pipeline():
             azure_deployment="text-embedding-3-large",
         ),
     )
+    # ensure that the first completion is extracted and passed into the pipeline (there should only be one anyway, but completions are returned as a list)
     hyde.add_component("llm_first", OutputAdapter(template="{{ replies[0] }}", output_type=str))
-
     hyde.add_component("retriever", PgvectorEmbeddingRetriever(document_store=doc_store))
     hyde.add_component(
         "window_retriever", SentenceWindowRetriever(document_store=doc_store, window_size=1)
     )
-
     hyde.connect("hyde_prompt.prompt", "llm")
     hyde.connect("llm.replies", "llm_first")
     hyde.connect("llm_first", "query_embedder")
@@ -215,11 +240,14 @@ def rag_examples(query, top_k=3, window_size=2, similarity_threshold=0.2, interv
     return results["window_retriever"]["context_windows"]
 
 
+DEFAULT_HYDE_PROMPT_TEMPLATE = "Imagine a client/therapist are talking. Simulate some text of their dialogue. The topic/example should be of: \n{text}.\n\nSimulate realistic dialogue: 3 or 4 turns/utterances in the conversation, ending with the client's response."
+
+
 def hyde_examples(
     query,
     top_k=2,
     window_size=2,
-    hyde_prompt_template="Imagine a client/therapist are talking. We need to simulate some text of their dialogue. The topic/example should be of: \n{text}.\n\nSimulate some realistic dialogue. No more than 3 utterances.",
+    hyde_prompt_template=DEFAULT_HYDE_PROMPT_TEMPLATE,
     interventions=None,
 ):
     """
