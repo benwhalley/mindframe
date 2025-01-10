@@ -9,3 +9,5 @@ __pycache__
 demo-website/src/.env
 *.pgdump
 mindframe.egg-info
+presentation_files
+

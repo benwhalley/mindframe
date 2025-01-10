@@ -11,7 +11,94 @@ date: 15 Oct 2024
 
 ## `mindframe`: Architecture
 
-- **Goal**: Develop a flexible and scalable chatbot system to support psychologically-informed interventions (esp. FIT).
+Goal: Flexible and scalable chatbot framework to deliver psychologically-informed interventions and *facilitate research*.
+
+
+
+## History
+
+- 1960s: Eliza (dialog via pattern matching and substitution)
+
+- 1970s: Tree based 'expert systems' (structured inputs)
+
+- 1980/90s: Knowledge representation (PROLOG), Bayesian networks (DAGs; PathFinder)
+
+- <2017: Sentiment analysis, ML, NLP etc to inform rules-based systems
+
+
+<!-- prolog example:
+
+parent(X, Y) :- father(X, Y).
+father(john, mary).
+Query: parent(john, mary).
+
+
+
+DAG - Baysian network example:
+
+P(Fever | Flu) = 0.8
+P(No Fever | Flu) = 0.2
+
+
+ PathFinder
+Domain: Medical Pathology
+Description:
+Developed to assist pathologists in diagnosing lymph-node diseases.
+One of the earliest expert systems to use Bayesian networks for medical decision-making.
+How It Worked:
+Nodes in the DAG represented diseases, symptoms, and test results.
+Conditional probabilities were assigned to the edges to capture relationships between diseases and symptoms.
+The system computed the likelihood of various diagnoses based on the input evidence (e.g., symptoms, lab test results).
+Key Features:
+Explained its reasoning process by showing probabilistic dependencies.
+Suggested additional tests to reduce diagnostic uncertainty.
+
+-->
+
+
+## Commercial ML-therapists
+
+Woebot 2017 (CBT, initially rule based, now LLM)
+
+Wysa  (CBT, DBT, IAPT waitlist)
+
+Replika (commercial AI 'friend')
+
+Flow/control structures not documented (?)
+
+
+## Related
+
+- Interactive Voice Response telephony (VoiceXML, Twilio)
+- Workflow/business process automation (airflow, luigi)
+- Chatbot frameworks (Rasa, Botpress, Dialogflow)
+
+
+## Google Dialogflow
+
+![](google-cx-page.svg)
+
+
+## Open source
+
+- `EmoCareAI/ChatPsychiatrist` (llama fine tune)
+- `avocadopelvis/pandora` (gpt3 fine tune)
+- `scofield7419/EmpathyEar` (multimodal fine-tune)
+- amrita-thakur/mental-healthcare-chatbot (RAG based)
+- `nmichaud0/TherapistGPT` (django app, prompt-based, hard-coded, incomplete/not working/abandoned)
+
+
+
+
+## Approaches
+
+- Tree-based systems/Flows/DAGs (structured inputs)
+- Fine-tuning/multimodal models (therapy-like)
+- Exemplar based (semantic search/RAG)
+- LLM base-models + prompt-engineering 
+
+
+<!---
 
 ## Key Features
 
@@ -34,15 +121,18 @@ Different UI/UX to support each type of user
 
 ---
 
+-->
+
+
 
 ## Overview
 
-The biggest challenges are not technical
-(collaboration, introspection, validation).
+The biggest challenges are not technical: collaboration, introspection, validation
 
-We need orchestration tools and ideas.
+We need *constructs* to collaborate and *tools* to orchestrate.
 
 
+<!--
 
 ## Therapy is a state-dependent directed graph
 
@@ -60,71 +150,34 @@ $g$ aggregates the history of the interactions to date.
 - 'Pacing' the therapy means managing these cycles and explicitly defining  transition rules
 
 
+
+
 ## ...
 
 ![](mermaid-diagram-2024-10-14-160723.png)
 
 
-
-## Key Primitives in the FIT-Chatbot System
-
-- Steps (nodes)
-- Turns (cycles on a node)
-- Transition conditions
-- Goals
-- Indicators
-- Actions (side effects)
+-->
 
 
 
-## Nodes and edges
+## Core elements
 
-**Steps** (nodes) in the intervention (e.g., establish_rapport, explore_goals). Therapist and client take **turns** to talk within each step.
-
-**Goals** define criteria for **transitions** between steps. To evaluate goals the system uses responses directly, along with other **indicators**.
-
-
-## Key 'state records'
-
-These can be saved and accessed during cycles on a given step
-
-- Turns (i.e. what client/therapist said)
-- Notes (classifications, summaries, internal thoughts of the therapist)
-- Measurements (data reported by or taken from the client)
-
-
-These provide *context* for therapist speech: real-time, client-specific adaptation.
-
-
-
-
+![](steps.png)
 
 <!--
-- **Steps**: Defined points in the therapy process (e.g., `establish_rapport`).
-- **Turns**: Client or system utterances within a session.
-- **Goals**: Achievements required for therapy progress (e.g., `build_self_efficacy`).
-- **Transitions**: Moves between steps based on conditions or goal completions.
-- **Indicators**: Continuous assessments (e.g., `client_engaged`).
-- **Measurements**: Direct questions or sensor readings from clients.
-- **Actions**: Non-conversational system operations (e.g., logging, triggering supervision).
-- **Examples**: Case studies or few-shot learning examples pulled into prompts.
-
-. -->
-
-
-
 
 ## Non-Linear progress
 
-Because the intervention is a **Directed Graph** there are multiple possible paths through the steps.
+**Directed Graph**: multiple possible paths.
 
-Need to think more about implications of cycles between nodes (as well as on the same node).
+- Implications of cycles?
+- How do we ensure completion?
 
-How do we manage transitions and ensure completion? Does this matter?
+-->
 
 
-
-## Templating prompts
+## Templates & prompt engineering
 
 Requirements:
 
@@ -142,37 +195,66 @@ Trade-off between
 
 Lightweight markup designed for human readability and structural simplicity.
 
-- common language to define prompts, transitions, steps, and goals
+- common language for steps, judgements
 - easy to read and write
 - machine-readable/parsable
 - extensible
 
 
-## `mindframe` extensions
-
-- `{turns:10}`: Inserts the last 10 turns.
-- `{notes:*}`: Retrieves relevant session notes.
-- `{meta:client_name}`: Fetches client metadata.
-- `{examples:"prompt"}`: Searches for and inserts examples based on specified topics.
+## Templates
 
 
-## Multi-step prompting
 
-Facilitate chain of thought/chain of reasoning (COT/COR)
+```
 
-Use `[[DISCUSSION]]` and `[[RESPONSE]]` to break down the reasoning process.
+-----------
+
+You are a therapist working with {client_name}
+This is the conversations so far:
+
+{{turns}}
+
+Your task: 
+
+- Help them work on  {{desired_change}}
+- Ask them to think about barriers to {{desired_change}}
+
+[[RESPONSE]]
+```
+
+
+## Exemplars
+
+```
+
+-----------
+
+[...]
+
+Previously, in cases like this, therapists said things like:
+
+{% examples "therapists asking clients about {desired_change}" %}
+
+Use the examples to inform what you say next:
+
+[[RESPONSE]]
+```
+
 
 
 ## Multistep promoting
 
 ```
+
+-----------
+
 You are a therapist treating a patient for anxiety.
 They describe feeling overwhelmed by their workload.
 
 These are the last few things the client said:
 
-CLIENT: "I have so much to do, and it feels like I’ll never get through it.
-  I don’t even know where to start."
+CLIENT: "I have so much to do, and it feels like I’ll 
+never get through it. I don’t even know where to start."
 
 Before responding, think step by step about the situation:
 
@@ -190,18 +272,72 @@ Before responding, think step by step about the situation:
 
 
 ```
-2. How does this relate to their anxiety?
+
+-----------
+
+[...]
 3. What might be a helpful therapeutic response?
 
 [[DISCUSSION]]
 
-Now, based on your reasoning, craft a response that
+Based on your reasoning, craft a response that
 validates their feelings and helps them move forward.
 Be concise and respond in 1 or MAX 2 sentences.
 
 [[UTTERANCE]]
 ```
 
+
+## Judgements (templated LLM calls)
+
+```
+
+-----------
+
+This is the conversation:
+
+{{turns}}
+
+Has the client described a behaviour they would like to change?
+Respond using structured data, using these options only:
+
+- No=no
+- Briefly=brief
+- At length=full
+```
+
+
+## Magentic constrains classification
+
+<br>
+
+```python
+class ClinicalJudgement(BaseModel):
+    response: Literal["no", "brief", "full"]
+    explanation: str
+```
+
+
+## Transitions
+
+Python expressions based on stored judgements:
+
+```
+
+-----------
+
+welcome_done is True
+emotional_state == "neutral"
+n_turns_step > 5
+```
+
+## Template syntax
+
+- `{meta:client_name}`: Client metadata
+- `{turns:10}`: Conversation history
+- `{turns "QUERY"}`: Semantically related conversation history
+- `{notes:VAR_NAME}`: Retrieves Judgements
+- `{examples:"QUERY"}`: Searches for and inserts examples based on specified topics.
 
 
 
@@ -213,17 +349,21 @@ Be concise and respond in 1 or MAX 2 sentences.
 
 ## Output filters (prompt)
 
-
 ```
-This is something a therapist said in an example manual.
-In current form it's too complex and has too many parts.
+
+-----------
+
+{{TEXT}}
+
+This is something an AI therapist said.
+It is too complex and has too many parts.
 No real therapist would say this much.
-Make this more spoken-like.
-Make it fit into a more naturalistic dialogue.
-Use UK English idiom and colloquialisms
-Always use question marks for questions.
-Avoid any repetition (either directly, or where 2 sentences do the same job).
-Ideally only 2 or 3 sentences (MAX).
+
+Make this more realistic.
+Make it fit the dialogue.
+Avoid repetition.
+Ideally only 1 sentence response 
+(we can say more later)
 ```
 
 
@@ -233,29 +373,60 @@ Ideally only 2 or 3 sentences (MAX).
 
 
 
-## Note taking
 
-We can attach actions to steps or transitions to make notes or perform other actions.
-
-E.g. on completing a step, we might use an LLM to summarise the conversation and store it in the client's record.
-
-
-## Notes prompt
+## Clinical notes
 
 ```
-You are a motivational interviewing expert helping a client
-to {note:primary_problem}.
-We have just completed the "Elicit current/future discrepancy" step in FIT.
-We need to keep good notes of the conversation so we can remember later.
-This is the conversation from this step of the treatment:
+
+-----------
+
+You are doing MI with a client
+We have just completed the "Elicit current/future discrepancy" step.
+We need to keep good notes so we can remember later.
+This is the conversation:
 
 {turns:step:previous}
 {turns:step:current}
 
-Summarise this conversations. Make a note which will be useful later.
-Focus on: what the client said and what the client's goals are.
-Respond in no more than 2 paragraphs:
+Summarise this conversations. 
+Make a note which will be useful later.
+Focus on: 
+- what the client said and 
+- what the client's goals are.
+
+Respond in < 3 paragraphs.
+[[NOTE]]
+
+Respond in a single line
+[[SUMMARY]]
 ```
+
+
+
+## Fake clients
+
+![](fakeclient.png)
+
+
+
+## Synthetic data
+
+![](synthetic.png)
+
+
+
+
+<!--
+
+## Cost implications
+
+Optimise for quality first (token budget not important)
+
+Latency more of an issue but:
+
+- hardware getting faster (100s tokens/s)
+- parallelise 'thinking' and 'speaking'?
+
 
 
 ## Costs
@@ -273,42 +444,21 @@ Assume
 
 
 
-## Cost implications
 
-Optimise for quality first (token budget not important)
+## Roadmap
 
-Latency more of an issue but:
+- Pilot system
+- Work with Tx developers to build prompts
+- Evaluate synthetic and real data
+- Iterate templates
 
-- hardware getting faster (100s tokens/s)
-- paralelise 'thinking' and 'speaking'?
+- Fine tune open models?
+- Performance tuning?
 
-
-
-
-
-
+- Factorial intervention evaluation
 
 
 
-```{r}
-library(tidyverse)
-```
 
 
-```{r}
-
-datarium::jobsatisfaction
-
-
-``````
-
-
-
-```{r}
-
-development %>%
-  filter(year < 1960) %>%
-  ggplot(aes(life_expectancy, gdp_per_capita)) + geom_smooth() +
-  facet_grid(year ~ continent)
-
-```
+`
