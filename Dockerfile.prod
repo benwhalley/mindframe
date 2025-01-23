@@ -15,21 +15,23 @@ RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir poetry
 RUN poetry config virtualenvs.create false
 
-COPY poetry.lock pyproject.toml /app
-RUN poetry install --without dev -vvv
+COPY poetry.lock pyproject.toml /app/
+RUN poetry install --no-root -vvv
 RUN pip install --no-cache-dir ruamel.yaml
 RUN pip install --no-cache-dir watchdog[watchmedo]
 
-RUN pip install --no-cache-dir git+https://github.com/benwhalley/mindframe.git@$MINDFRAME_COMMIT
 
+# install latest from main
+RUN git clone https://github.com/benwhalley/mindframe /build/mindframe
+RUN pip install -e /build/mindframe
 
 # Create a non-root user and group
 # Change ownership of the application directory to the new user
 # Create home directory for appuser
 # Ensure /app and other relevant directories are writable by the non-root user
 # Switch to the non-root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-RUN mkdir -p /app/static && chown -R appuser:appuser /app
-USER appuser
-COPY . /app
+# RUN groupadd -r appuser && useradd -r -g appuser appuser
+# RUN mkdir -p /app/static && chown -R appuser:appuser /app
+# USER appuser
+
 WORKDIR /app
