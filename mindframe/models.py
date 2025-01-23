@@ -29,17 +29,16 @@ from django_lifecycle import LifecycleModel, hook, AFTER_UPDATE
 
 import instructor
 
-# from openai import AzureOpenAI, OpenAI
-# use langfuse for tracing
-from langfuse.openai import AzureOpenAI, OpenAI
 
+# use langfuse for tracing
+# TODO: currently broken because doesn't report audio_tokens in usage properly
+# from langfuse.openai import AzureOpenAI, OpenAI
+from openai import AzureOpenAI, OpenAI
 
 from django.db.models import Model
 from langfuse.decorators import langfuse_context
 
 langfuse_context.configure(debug=False)
-
-
 from langfuse.decorators import observe
 
 from mindframe.llm_calling import chatter, structured_chat

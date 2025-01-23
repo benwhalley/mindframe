@@ -7,7 +7,9 @@ MindFrame coordinates multiple models, orchestrating their outputs into coherent
 Using a graph-based representation of interventions, MindFrame allows for more control over the treatment flow, and for services to be more easily validated against guidelines and best pratice, tested for efficacy, and refined to suit the local context. Mindframe is not a 'black box': it is designed to ensure that services are grounded in psychological theory, are evidence-based, and can be properly supervised and audited by human clinicians.
 
 
-<!-- For developers looking to setup a local instance of mindframe, see: https://github.com/benwhalley/mindframe-demo -->
+---
+
+For developers looking to setup a local instance of mindframe, see: [this page](development.md)
 
 ### Key Features
 

@@ -12,10 +12,20 @@
     <div class="row mb-4">
         <div class="col-6">
             <p>
-                Session: 
-                    {{ session }} [<code>{{session.uuid}}</code>]    
+                Session:
+                    {{ session }} [<code>{{session.uuid}}</code>]
                     <a href="{% url 'admin:mindframe_treatmentsession_change' session.pk %}">+</a>
             </p>
+
+            <p>
+                Intervention: <a href="{% url 'admin:mindframe_intervention_change' session.cycle.intervention.pk %}">{{ session.cycle.intervention }}</a>
+            </p>
+
+            <p>
+                Current step:
+                <a href="{% url 'admin:mindframe_step_change' session.current_step.pk %}">{{ session.current_step.title }}</a>
+            </p>
+
         </div>
 
         <div class="col-6">
@@ -81,7 +91,7 @@
             </p>
         {% endfor %}
         {% endwith %}
-            
+
         {% with turn.llm_calls.all as turncalls %}
         {% if turncalls %}
         <p>LLM Calls</p>

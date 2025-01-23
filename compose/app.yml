@@ -1,0 +1,60 @@
+services:
+  base:
+    build:
+      context: ../
+      dockerfile: Dockerfile
+      args:
+        MINDFRAME_COMMIT: main
+    image: mindframe-base:latest
+
+  web:
+    ports:
+      - "8080:8000"
+    image: mindframe-base:latest
+    command:
+      [
+        "sh",
+        "-c",
+        "uvicorn config.asgi:application --workers 1 --host 0.0.0.0 --port 8000 --log-level debug --reload"
+      ]
+    depends_on:
+      - redis
+      - postgres
+    env_file: [secrets.env]
+    environment:
+      - APP_MODE=web
+    volumes:
+      - ~/dev/mindframe/mindframe:/app/mindframe
+
+  chat:
+    depends_on:
+      - redis
+      - postgres
+    image: mindframe-base:latest
+    ports: ["8081:8000"]
+    command:
+      [
+        "sh",
+        "-c",
+        "cp /app/mindframe/chatbot.py /app/chatbot.py && watchmedo auto-restart --directory=/app/mindframe --pattern=*.py --recursive -- python chatbot.py"
+      ]
+    env_file: [secrets.env]
+    environment:
+      - APP_MODE=chat
+    restart: unless-stopped
+    volumes:
+      - ~/dev/mindframe/mindframe:/app/mindframe
+
+  worker:
+    image: mindframe-base:latest
+    command:
+      [
+        "sh",
+        "-c",
+        "watchmedo auto-restart --directory=/app/mindframe --pattern=*.py --recursive -- celery --app mindframe worker --pool=solo --loglevel=debug"
+      ]
+    env_file: [secrets.env]
+    environment:
+      - APP_MODE=worker
+    volumes:
+      - ~/dev/mindframe/mindframe:/app/mindframe

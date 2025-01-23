@@ -8,8 +8,8 @@
     "slug": "fit",
     "version": "38e2ff543e40a45c4e96c7587f8c8f69e76a6312436425a0803321554d55262a",
     "sem_ver": "1.0.1",
-    "default_conversation_model": 3,
-    "default_judgement_model": 2
+    "default_conversation_model": 1,
+    "default_judgement_model": 1
   }
 },
 {
@@ -21,8 +21,8 @@
     "slug": "demo",
     "version": null,
     "sem_ver": "1",
-    "default_conversation_model": 3,
-    "default_judgement_model": 3
+    "default_conversation_model": 1,
+    "default_judgement_model": 1
   }
 },
 {
@@ -34,8 +34,8 @@
     "slug": "fit_student",
     "version": null,
     "sem_ver": "1",
-    "default_conversation_model": 3,
-    "default_judgement_model": 3
+    "default_conversation_model": 1,
+    "default_judgement_model": 1
   }
 },
 {
@@ -182,7 +182,7 @@
     "slug": "5wly3kczqst2fdjsgrnheu",
     "variable_name": "preferred_name",
     "task_summary": "The client's preferred name",
-    "prompt_template": "# CONVERSATION HISTORY\r\n\r\n{{turns}}\r\n\r\n\r\n# YOUR TASK\r\nRead the conversation. What is the client's preferred name? \r\nThey should explicitly confirm their preferred name. \r\nJust return the name they give\r\n\r\n[[extract:name]]"
+    "prompt_template": "# CONVERSATION HISTORY\r\n\r\n{% turns %}\r\n\r\n\r\n# YOUR TASK\r\nRead the conversation. What is the client's preferred name? \r\nThey should explicitly confirm their preferred name. \r\nJust return the name they give\r\n\r\n[[extract:name]]"
   }
 },
 {
@@ -194,7 +194,7 @@
     "slug": "z5hcmebg8heiaqdzcxdvbd",
     "variable_name": "brief_note",
     "task_summary": "A brief note of the conversation so far",
-    "prompt_template": "Make a brief (one line) clinical note of the following information:\r\n>>>\r\n{{turns}}\r\n<<<\r\nIf no information is given, return an empty note.\r\nUse the tools/json."
+    "prompt_template": "Make a brief (one line) clinical note of the following information:\r\n>>>\r\n{% turns %}\r\n<<<\r\nIf no information is given, return an empty note.\r\nUse the tools/json."
   }
 },
 {
@@ -206,7 +206,7 @@
     "slug": "siaanxqnbe5ebuwiyhpryw",
     "variable_name": "welcome",
     "task_summary": "Is the welcome phase of the first session complete?",
-    "prompt_template": "This is a conversation between client and therapist:\r\n\r\n{{turns}}\r\n\r\nIs this client ready to move on and get started with the therapy? \r\nReturn True if they explicitly say they are ready to continue.\r\n\r\n[[decide: done]]"
+    "prompt_template": "This is a conversation between client and therapist:\r\n\r\n{% turns %}\r\n\r\nIs this client ready to move on and get started with the therapy? \r\nReturn True if they explicitly say they are ready to continue.\r\n\r\n[[decide: done]]"
   }
 },
 {
@@ -218,7 +218,7 @@
     "slug": "elajrm6alwp4n438ywuust",
     "variable_name": "emotional_state",
     "task_summary": "What is the client's emotional state?",
-    "prompt_template": "This is a conversation between two people we are evaluating for a research project.\r\n\r\n{{turns}}\r\n\r\nWhat is the emotional state of person labelled CLIENT?\r\nRespond in a single word, using JSON and using the tools.\r\nOnly respond with an emotion if you are sure. Use neutral as the default.\r\nUse the tools/json."
+    "prompt_template": "This is a conversation between two people we are evaluating for a research project.\r\n\r\n{% turns %}\r\n\r\nWhat is the emotional state of person labelled CLIENT?\r\nRespond in a single word, using JSON and using the tools.\r\nOnly respond with an emotion if you are sure. Use neutral as the default.\r\nUse the tools/json."
   }
 },
 {
@@ -230,7 +230,7 @@
     "slug": "problem-elicited",
     "variable_name": "problem",
     "task_summary": "Has the client's problem been elicited?",
-    "prompt_template": "{{turns}}\r\n\r\nHas the client identified a problem they want to work on? The therapist must have reflected this back to them, and they must have confirmed.\r\n\r\n[[bool:elicited]]\r\n\r\nBy elaborated, I mean that the client and therapist have discussed it for a while. The therapist will have asked questions about the problem, and the clients feelings about it: i.e. they will reflect the problem described back to the client. The client must have provided some extra information about the problem and their feelings about it.\r\n\r\n[[bool:elaborated]]"
+    "prompt_template": "{% turns %}\r\n\r\nHas the client identified a problem they want to work on? The therapist must have reflected this back to them, and they must have confirmed.\r\n\r\n[[bool:elicited]]\r\n\r\nBy elaborated, I mean that the client and therapist have discussed it for a while. The therapist will have asked questions about the problem, and the clients feelings about it: i.e. they will reflect the problem described back to the client. The client must have provided some extra information about the problem and their feelings about it.\r\n\r\n[[bool:elaborated]]"
   }
 },
 {
@@ -242,7 +242,7 @@
     "slug": "problem-elaborated",
     "variable_name": "problem_elaborated",
     "task_summary": "Has the client's problem been elaborated?",
-    "prompt_template": "{{turns}}\r\n\r\nThe client has said they want to work on a problem.\r\n\r\nHas the client elaborated the problem they want to work on?\r\nBy elaborated, I mean that the client and therapist have discussed it for a while.\r\nThe therapist will have asked questions about the problem, and the clients feelings about it: i.e. they will reflect the problem described back to the client.\r\nThe client must have provided some extra information about the problem and their feelings about it."
+    "prompt_template": "{% turns %}\r\n\r\nThe client has said they want to work on a problem.\r\n\r\nHas the client elaborated the problem they want to work on?\r\nBy elaborated, I mean that the client and therapist have discussed it for a while.\r\nThe therapist will have asked questions about the problem, and the clients feelings about it: i.e. they will reflect the problem described back to the client.\r\nThe client must have provided some extra information about the problem and their feelings about it."
   }
 },
 {
@@ -254,7 +254,7 @@
     "slug": "step-summary",
     "variable_name": "summary",
     "task_summary": "Summarise the whole conversation so far.",
-    "prompt_template": "# CONVERSATION BETWEEN THERAPIST AND CLIENT\r\n\r\n{{ session|turns:\"all\" }}\r\n\r\n# SUMMARISATION TASK\r\n\r\nWrite a brief summary of the conversation so far. \r\n\r\nAlways make a note of\r\n\r\n- problems the client wants to work on\r\n- barriers identified to progress\r\n- positive outcomes desired\r\n- imagery to be used to achieve goals\r\n- previous failures\r\n- previous successes and challenges overcome\r\n\r\n\r\nONLY make notes from the conversation history. \r\nDO NOT include any details not shown above.\r\nInclude quotes or examples from conversations to aid your memory."
+    "prompt_template": "# CONVERSATION BETWEEN THERAPIST AND CLIENT\r\n\r\n{% turns %}\r\n\r\n# SUMMARISATION TASK\r\n\r\nWrite a brief summary of the conversation so far. \r\n\r\nAlways make a note of\r\n\r\n- problems the client wants to work on\r\n- barriers identified to progress\r\n- positive outcomes desired\r\n- imagery to be used to achieve goals\r\n- previous failures\r\n- previous successes and challenges overcome\r\n\r\n\r\nONLY make notes from the conversation history. \r\nDO NOT include any details not shown above.\r\nInclude quotes or examples from conversations to aid your memory."
   }
 },
 {
@@ -397,29 +397,35 @@
 },
 {
   "model": "mindframe.llm",
-  "pk": 1,
+  "pk": 2,
   "fields": {
-    "nickname": "cheap",
-    "provider_name": "AZURE",
     "model_name": "gpt-4o-mini"
   }
 },
 {
   "model": "mindframe.llm",
-  "pk": 2,
+  "pk": 1,
   "fields": {
-    "nickname": "free",
-    "provider_name": "OLLAMA",
-    "model_name": "llama3.2"
+    "model_name": "gpt-4o"
   }
 },
 {
-  "model": "mindframe.llm",
-  "pk": 3,
+  "model": "mindframe.customuser",
+  "pk": 5,
   "fields": {
-    "nickname": "good",
-    "provider_name": "AZURE",
-    "model_name": "gpt-4o"
+    "password": "92099536af9d4554aab8c03fe76a2f4b",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "Linda",
+    "first_name": "Linda",
+    "last_name": "Girblos",
+    "email": "linda@example.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2025-01-23T10:12:49Z",
+    "role": "therapist",
+    "groups": [],
+    "user_permissions": []
   }
 }
 ]

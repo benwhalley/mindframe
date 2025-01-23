@@ -7,8 +7,9 @@ from typing import Optional, List
 
 from mindframe.llm_calling import *
 
-mini, _ = LLM.objects.get_or_create(model_name="gpt-4o-mini")
-local, _ = LLM.objects.get_or_create(model_name="llama3.2")
+mini, _ = LLM.objects.filter(model_name="gpt-4o-mini")
+# mini, _ = LLM.objects.get_or_create(model_name="gpt-4o-mini")
+# local, _ = LLM.objects.get_or_create(model_name="llama3.2")
 
 chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]", mini)[0]['JOKE']
 
@@ -78,6 +79,7 @@ df[['out', 'metadata__usage__prompt_tokens']].sum()
 
 """
 
+import traceback
 import logging
 import re
 from collections import namedtuple, OrderedDict, defaultdict
@@ -292,8 +294,8 @@ def structured_chat(
 
     except Exception as e:
         res, com, msg, lt, meta = None, None, str(e), LLMLogTypes.ERROR, str(log_context)
-        logger.warning(f"Error calling LLM: {e}")
-        # raise e
+        full_traceback = traceback.format_exc()
+        logger.warning(f"Error calling LLM: {e}\n{full_traceback}")
 
     llm_call_log = LLMLog.objects.create(
         log_type=lt,
