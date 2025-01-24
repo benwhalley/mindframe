@@ -34,4 +34,7 @@ RUN pip install -e /build/mindframe
 # RUN mkdir -p /app/static && chown -R appuser:appuser /app
 # USER appuser
 
+RUN mkdir -p /app /app/static
+COPY . /app
+
 WORKDIR /app
