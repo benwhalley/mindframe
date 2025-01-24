@@ -29,7 +29,7 @@ services:
     depends_on:
       - redis
       - postgres
-    env_file: 
+    env_file:
       - ../secrets/mindframe.env
     environment:
       - APP_MODE=web
@@ -50,14 +50,14 @@ services:
       - redis
       - postgres
     image: mindframe-prod:latest
-    
+
     command:
       [
         "sh",
         "-c",
         "python chatbot.py"
       ]
-    env_file: 
+    env_file:
       - ../secrets/mindframe.env
     environment:
       - APP_MODE=chat
@@ -76,7 +76,7 @@ services:
         "-c",
         "celery --app mindframe worker --pool=solo --loglevel=debug"
       ]
-    env_file: 
+    env_file:
       - ../secrets/mindframe.env
     environment:
       - APP_MODE=worker
