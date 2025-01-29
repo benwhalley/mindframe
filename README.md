@@ -9,7 +9,7 @@ Using a graph-based representation of interventions, MindFrame allows for more c
 
 ---
 
-For developers looking to setup a local instance of mindframe, see: [this page](development.md)
+For developers looking to setup a local instance of mindframe, see: [this page](docs/development.md)
 
 ### Key Features
 
