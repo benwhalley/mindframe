@@ -1,0 +1,32 @@
+{
+  "name": "mindframe-lang",
+  "displayName": "mindframe-lang",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "mindframe",
+      "aliases": ["mindframe", "mindframe"],
+      "extensions": [".md",".mf"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "mindframe",
+      "scopeName": "source.mindframe-markup",
+      "path": "./syntaxes/mindframe.tmLanguage.json"
+    }],
+    "themes": [
+      {
+        "label": "Mindframe Theme",
+        "uiTheme": "vs-dark",
+        "path": "./themes/mindframe-theme.json"
+      }
+    ]
+  }
+}
