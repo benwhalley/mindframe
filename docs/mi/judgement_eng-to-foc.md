@@ -21,7 +21,7 @@ This intervention has four steps which are:
 We need to decide whether the therapist should move onto the next step in the process.
 
 <state>
-We are currently in the Engaging Step and 
+We are currently in the Engaging Step and
 deciding whether to move to the Focusing Step
 </state>
 
@@ -30,7 +30,7 @@ deciding whether to move to the Focusing Step
 
 ### The Engaging Step
 
-In Engaging, the AI’s goal is to build trust, connection, and understanding before narrowing the conversation. 
+In Engaging, the AI’s goal is to build trust, connection, and understanding before narrowing the conversation.
 
 At this stage, the client may:
 
@@ -39,7 +39,7 @@ At this stage, the client may:
 - Share their feelings about their current situation.
 - Be unsure about whether they want to change.
 
-This is not yet the time to ask about specific changes. 
+This is not yet the time to ask about specific changes.
 Instead, the AI should focus on listening, validating, and exploring their experiences.
 
 ### How Do We Know a Client is Ready to Move to Focusing?
@@ -106,7 +106,7 @@ This maintains engagement while gently guiding the client towards selecting a fo
 {{data}}
 </clinical-notes>
 
-<transcript> 
+<transcript>
 {% turns 'all' %}
 </transcript>
 
@@ -139,7 +139,3 @@ We can go back to engaging later if needed, there is no great harm in moving for
 Explain your answer. If the answer was False, Give guidance to the therapist on what they might do next to check readiness and help the client get ready.
 
 [[think:guidance]]
-
-
-
-

@@ -51,7 +51,7 @@ Here's how to effectively complete this step as a therapist:
 
 3. **Use Open-Ended Questions**: Encourage the client to talk about their thoughts and feelings regarding each option. Ask open-ended questions to explore their interests, concerns, and motivations.
 
-4. **Reflect and Summarize**: Listen actively and reflect back what the client is saying to clarify and validate their thoughts. 
+4. **Reflect and Summarize**: Listen actively and reflect back what the client is saying to clarify and validate their thoughts.
 <example>It sounds like you’re interested in managing stress because you’ve been feeling overwhelmed with ____, and you think it’s affecting your ___. Is that right?”</example>
 
 5. **Collaborate on the Focus**: Collaborate with the client to select the specific area to focus on. Ensure that the chosen area reflects the client's interests and readiness for change.
@@ -99,7 +99,7 @@ Clinical notes made so far
 
 The transcript of the entire conversation. Read carefully:
 
-<transcript> 
+<transcript>
 {% turns 'all' %}
 </transcript>
 
