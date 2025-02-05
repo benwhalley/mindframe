@@ -9,12 +9,9 @@ from decouple import config, Csv
 
 logger = logging.getLogger(__name__)
 
-
 REDIS_URL = config("REDIS_URL", default="redis://redis:6379/0")
 CHAT_URL = config("CHAT_URL", default=None)
 WEB_URL = config("WEB_URL", default=None)
-
-OPENAI_API_VERSION = config("OPENAI_API_VERSION")
 
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*.llemma.net,localhost,127.0.0.1", cast=Csv())
 
@@ -59,6 +56,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Application definitions
 INSTALLED_APPS = [
+    "llmtools",
     "mindframe",
     "debug_toolbar",
     "hijack",

@@ -1,5 +1,126 @@
 
 # TODO
 
-remove dotenv
-remove ollama dependency
+Encourage Strategic Use of Silence and Pauses
+In human MI practice, silence is a powerful tool. While AI can’t be truly silent, it could be prompted to say something like:
+"That’s really important. I want to give you a moment to think about that before we continue."
+
+
+
+
+Make some judgement tasks async. Allow them to happen an feed data back in, which can be used in later turns to reduce latency.
+
+
+
+Better validation of prompt templates. Try running them against a dummy session on save to validate any template syntax errors? Show a preview?
+
+
+Approach to validation of outputs:
+For turn-level validation:
+
+
+- Find a corpus of high quality examples of MI, this doesn't need to be huge. Maybe 500 short examples (2-3 turns).
+
+- Optionally categorise each turn by type of response. 
+
+- Score each turn in the corpus for quality
+
+- For each item generate responses using MF intervention
+
+- Embed original and generated responses using a transformer model
+
+- Use similarity metrics to compare the original and generated responses
+
+- Iterate on the model prompts to improve the similarity scores?
+
+
+
+For structure-level validation:
+
+- Collect longer responses for the corpus and repeat?
+- i.e. import the whole conversation and generate responses for later responses
+- allow judgements to move the client through the DAG, generate clinical notes etc. These feed into later completions...
+
+- Also do this with a non-DAG based prompt and with MF, to compare the two
+
+
+
+
+
+
+
+
+Conversation Trees?
+
+Perhaps we can have a similarity metric across
+
+
+https://django-treebeard.readthedocs.io/en/latest/mp_tree.html
+
+
+
+https://chatgpt.com/c/67a340d2-7da4-8001-aac5-d0f8a7fa5d88
+
+
+
+from django.db import models
+from treebeard.mp_tree import MP_Node
+
+class ConversationNode(MP_Node):
+    SPEAKER_CHOICES = [('AI', 'AI'), ('HUMAN', 'Human')]
+
+    speaker_type = models.CharField(max_length=5, choices=SPEAKER_CHOICES)
+    text = models.TextField()
+    quality_rating = models.FloatField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.speaker_type}[{self.quality_rating or '-'}]: {self.text[:40]}"
+
+
+
+def choose_preferred_path(root):
+    """
+    From 'root' to a leaf, always pick the first child that meets:
+    1) Human
+    2) Good AI (quality_rating >= 4.0)
+    3) If none match, pick any child or stop.
+    Returns a list of nodes from root -> chosen leaf.
+    """
+    path = [root]
+    current = root
+
+    while True:
+        children = list(current.get_children())
+        if not children:
+            # We reached a leaf
+            break
+
+        # Sort or filter children to match preferences
+        human_children = [c for c in children if c.speaker_type == 'HUMAN']
+        good_ai_children = [c for c in children
+                            if c.speaker_type == 'AI' and (c.quality_rating or 0) >= 4.0]
+        other_children = [c for c in children
+                          if c not in human_children + good_ai_children]
+
+        if human_children:
+            chosen = human_children[0]
+        elif good_ai_children:
+            chosen = good_ai_children[0]
+        else:
+            # Either pick any child or stop. Let's pick the first child:
+            if other_children:
+                chosen = other_children[0]
+            else:
+                # No children at all => leaf
+                break
+
+        path.append(chosen)
+        current = chosen
+
+    return path
+    
+    
+root_node = ConversationNode.objects.get(pk=123)  # or however you find your root
+path = choose_preferred_path(root_node)
+for node in path:
+    print(node)

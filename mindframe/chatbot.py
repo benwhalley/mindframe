@@ -2,47 +2,29 @@ import sys
 import os
 import django
 import gradio as gr
-import logging
-
-# import whisper
-
 from django.urls import reverse
 from django.conf import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def main():
-    project_root = os.getcwd()
-    sys.path.append(project_root)
-    print(project_root)
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     django.setup()
-    from django.conf import settings
-
-    # if settings.MINDFRAME_AUDIO_INPUT:
-    #     try:
-    #         model = whisper.load_model("turbo")
-    #     except Exception as e:
-    #         logger.warning(f"Error loading whisper model: {e}")
-    #         model = None
-    # else:
-    #     model = None
-    model = None
-
-    logger = logging.getLogger(__name__)
 
     from mindframe.models import TreatmentSession, RoleChoices, Turn
 
     def get_session(id):
         return TreatmentSession.objects.get(uuid=id)
 
-    # Function to initialize chat history based on session_id from request
     def initialize_chat(request: gr.Request):
         session_id = request.query_params.get("session_id")
         session = get_session(session_id)
-        print(f"Selected session: {session}")
 
-        # Prepopulate history from existing turns in this session
         history = []
+        log_history = ["#### Bot's thoughts:\n\n"]
+
         for turn in Turn.objects.filter(session_state__session=session).order_by("timestamp"):
             role = "assistant" if turn.speaker.role == RoleChoices.THERAPIST else "user"
             if role == "user":
@@ -51,87 +33,88 @@ def main():
                 history.append(("", turn.text))
 
         if session.turns.all().count() == 0:
-            history.append(("", session.respond()))
+            bot_response = session.respond()
+            history.append(("", bot_response.get("utterance", "Error: No response")))
+            thoughts = bot_response.get("thoughts", "")
+            if thoughts:
+                log_history.append(f"\n\n{thoughts}\n---\n")
 
-        # Generate the URL to the treatment session detail view
         session_detail_url = (
             f"{settings.WEB_URL}{reverse('treatment_session_detail', args=[session_id])}"
         )
         session_link = f"[View Treatment Session Details]({session_detail_url})"
 
-        return history, session_id, session_link
+        formatted_log_history = "\n".join(log_history) if log_history else ""
+        print(formatted_log_history)
+        return history, session_id, session_link, formatted_log_history
 
-    # External API call for audio transcription
-    def transcribe_audio(audio_file):
-        transcription = model.transcribe(audio_file)
-        return transcription
-
-    # Chat function to handle user input and bot responses
-    def chat_with_bot(session_id, history, user_input, audio_input):
+    def chat_with_bot(session_id, history, user_input, current_log):
         session = get_session(session_id)
         user = session.cycle.client
 
-        # TODO: Add more sanity checking and cleaning for the audio input here
-        if audio_input is not None:
-            transcription = transcribe_audio(audio_input).get("text", "Audio not transcribed")
-            logger.info(f"Transcribed audio input: {transcription}")
-            if transcription:  # Process only if there's valid input
-                user_input = transcription
-
         session.listen(speaker=user, text=user_input)
         bot_response = session.respond()
-        history.append((user_input, bot_response))
+        utterance = bot_response.get("utterance", "Error: No response")
+        thoughts = "\n\n".join(bot_response.get("thoughts", ""))
 
-        return history, "", None  # Clear text and audio inputs
+        history.append((user_input, utterance))
 
-    with gr.Blocks() as iface:
-        # Markdown component for the session link, placed at the top
+        if thoughts:
+            new_log_entry = f"{thoughts}\n\n---"
+            updated_log = f"{current_log}\n\n{new_log_entry}" if current_log else new_log_entry
+        else:
+            updated_log = current_log
+
+        return history, "", updated_log
+
+    # Custom CSS for the markdown window
+    custom_css = """
+    .markdown-window {
+        size: 10pt !important;
+        font-weight: normal !important;
+        height: 80vh !important;
+        overflow-y: auto !important;
+        padding: 1rem !important;
+        background-color: white !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 0.5rem !important;
+    }
+    """
+
+    with gr.Blocks(css=custom_css) as iface:
         session_link_md = gr.Markdown()
 
-        chatbot = gr.Chatbot()
-        user_input = gr.Textbox(show_label=False, placeholder="Type your message here...")
+        with gr.Row(equal_height=True):
+            with gr.Column(scale=2):
+                chatbot = gr.Chatbot()
+                user_input = gr.Textbox(show_label=False, placeholder="Type your message here...")
 
-        if model is not None:
-            logger.info("Adding audio input")
-            audio_input = gr.Audio(
-                sources=["microphone"], type="filepath", label="Speak your message"
-            )
-        else:
-            logger.warning("No audio input shown as whisper model is not available")
-            audio_input = gr.Textbox(visible=False)
+            with gr.Column(scale=1):
+                log_window = gr.Markdown(label="Bot's Thoughts", elem_classes=["markdown-window"], visible=False)
 
-        session_id_box = gr.Textbox(visible=False)  # Hidden textbox for session_id
+        session_id_box = gr.Textbox(visible=False)
 
-        # Initialize chat history with session_id from query string and store session_id in hidden textbox
-        iface.load(initialize_chat, inputs=None, outputs=[chatbot, session_id_box, session_link_md])
+        iface.load(
+            initialize_chat,
+            inputs=None,
+            outputs=[chatbot, session_id_box, session_link_md, log_window],
+        )
 
-        # Function to handle input selection logic
-        def handle_input(session_id, history, text_input, audio_path):
+        def handle_input(session_id, history, text_input, current_log):
             try:
-
-                if text_input.strip():  # Prioritize text input if available
-                    return chat_with_bot(session_id, history, text_input, None)
-                elif audio_path:  # Process audio input only if no text is provided
-                    return chat_with_bot(session_id, history, "", audio_path)
-                else:  # Do nothing if no input is provided
-                    return (
-                        history,
-                        text_input,
-                        audio_path,
-                    )  # Preserve current state without resetting
+                if text_input.strip():
+                    return chat_with_bot(session_id, history, text_input, current_log)
+                else:
+                    return history, text_input, current_log
             except Exception as e:
-                # TODO work out better error handling in the gradio client
-                # for the moment just dump the exception to to the chat stream shown to the user
                 logger.error(f"Error handling input: {e}")
                 history.append(("", str(e)))
-                return history, text_input, audio_path
+                return history, text_input, current_log
 
-        # Bind the input submission to the shared logic
-        inputs = [session_id_box, chatbot, user_input, audio_input]
-        outputs = [chatbot, user_input, audio_input]
+        inputs = [session_id_box, chatbot, user_input, log_window]
+        outputs = [chatbot, user_input, log_window]
 
         user_input.submit(handle_input, inputs, outputs)
-        audio_input.change(handle_input, inputs, outputs)
 
     iface.launch(server_name="0.0.0.0", server_port=int(os.environ.get("CHAT_PORT", 8000)))
 

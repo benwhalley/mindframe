@@ -35,13 +35,14 @@ from .models import (
     Transition,
     Turn,
     Note,
-    Example,
     TreatmentSessionState,
     Judgement,
     StepJudgement,
     LLM,
     SyntheticConversation,
     LLMLog,
+    Memory,
+    MemoryChunk,
 )
 
 
@@ -73,13 +74,27 @@ class CustomUserAdmin(admin.ModelAdmin):
     search_fields = ("username", "email")
 
 
-class ExampleInline(admin.TabularInline):
-    model = Example
-    extra = 1
-
-
 @admin.register(SyntheticConversation)
 class SyntheticConversationAdmin(admin.ModelAdmin):
+    pass
+
+
+class MemoryChunkInline(admin.TabularInline):
+    model = MemoryChunk
+    extra = 0
+    max_num = 0
+    readonly_fields = [
+        "memory",
+    ]
+
+
+@admin.register(Memory)
+class MemoryAdmin(admin.ModelAdmin):
+    inlines = [MemoryChunkInline]
+
+
+@admin.register(MemoryChunk)
+class MemoryChunkAdmin(admin.ModelAdmin):
     pass
 
 
@@ -214,7 +229,7 @@ class TurnAdmin(admin.ModelAdmin):
         "text",
         "timestamp",
     )
-    list_filter = ("speaker", "timestamp")
+    list_filter = ("speaker", "timestamp", "session_state__session__cycle__intervention")
     search_fields = (
         "session_state__session__cycle__client__username",
         "session_state__session__uuid",
@@ -330,18 +345,6 @@ class JudgementAdmin(admin.ModelAdmin):
     list_editable = ["title", "prompt_template", "task_summary"]
 
 
-@admin.register(Example)
-class ExampleAdmin(admin.ModelAdmin):
-    list_display = ("intervention", "title")
-    list_filter = ("intervention",)
-    autocomplete_fields = ["intervention"]
-    search_fields = (
-        "title",
-        "intervention__title",
-        "text",
-    )
-
-
 @admin.register(TreatmentSessionState)
 class TreatmentSessionStateAdmin(admin.ModelAdmin):
     list_display = ("session", "step", "timestamp")
@@ -352,9 +355,13 @@ class TreatmentSessionStateAdmin(admin.ModelAdmin):
 class InterventionAdmin(admin.ModelAdmin):
     list_display = ("title_version", "ver", "slug", "short_title", "start_session_button")
     search_fields = ("title",)
-    inlines = [ExampleInline]
+
     readonly_fields = ["slug", "version"]
-    autocomplete_fields = ["default_conversation_model", "default_judgement_model"]
+    autocomplete_fields = [
+        "default_conversation_model",
+        "default_judgement_model",
+        "default_chunking_model",
+    ]
 
     def title_version(self, obj):
         return f"{obj.title} ({obj.sem_ver})"
@@ -421,7 +428,7 @@ class InterventionAdmin(admin.ModelAdmin):
         # all fields except id
         step_fields = [f.name for f in Step._meta.get_fields() if f.name != "id"]
         judgement_fields = [f.name for f in Judgement._meta.get_fields() if f.name != "id"]
-        example_fields = [f.name for f in Example._meta.get_fields() if f.name != "id"]
+        memory_fields = [f.name for f in Memory._meta.get_fields() if f.name != "id"]
 
         related_objects = {
             "intervention": model_to_dict(intervention, fields=Intervention.exported_fields),
@@ -431,7 +438,7 @@ class InterventionAdmin(admin.ModelAdmin):
                     *Judgement.exported_fields
                 )
             ),
-            "examples": list(intervention.examples.values(*Example.exported_fields)),
+            "memories": list(intervention.memories.values(*Memory.exported_fields)),
             # note we need to handle these differently on import
             "transitions": list(
                 Transition.objects.filter(to_step__intervention=intervention).values(

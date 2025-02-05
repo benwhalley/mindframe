@@ -1,8 +1,8 @@
 # Mindframe
 
-MindFrame is a Python package designed to help treatment developers implement psychologically informed chatbots that leverage the power of large language models (LLMs) to generate high-quality individual and group interventions. The system is developed to remain introspectable, verifiable, and adaptable to complex interventions.
+MindFrame is an integrated system for treatment developers. It makes it possible to implement psychologically informed chatbots built on large language models (LLMs), capable of high-quality individual and group intervention. The system is designed to be introspectable, verifiable, and adaptable to complex interventions and varied clinical settings.
 
-MindFrame coordinates multiple models, orchestrating their outputs into coherent, structured, conversations with clients. The system allows intervention developers to define sessions as directed graphs, with nodes representing different stages of the intervention. Complex interventions can be broken-down into smaller, more manageable components for development, testing and refinement, and the system can track client progress and adjust interventions based on historical data.
+MindFrame coordinates multiple AI models, orchestrating their outputs into coherent, structured, conversations with clients. The system allows intervention developers to define sessions as directed graphs, with nodes representing different stages of the intervention. Complex interventions can be broken-down into smaller, more manageable components for development, testing and refinement, and the system can track client progress and adjust interventions based on historical data.
 
 Using a graph-based representation of interventions, MindFrame allows for more control over the treatment flow, and for services to be more easily validated against guidelines and best pratice, tested for efficacy, and refined to suit the local context. Mindframe is not a 'black box': it is designed to ensure that services are grounded in psychological theory, are evidence-based, and can be properly supervised and audited by human clinicians.
 
@@ -10,6 +10,7 @@ Using a graph-based representation of interventions, MindFrame allows for more c
 ---
 
 For developers looking to setup a local instance of mindframe, see: [this page](development.md)
+
 
 ### Key Features
 
@@ -28,7 +29,7 @@ For developers looking to setup a local instance of mindframe, see: [this page](
 
 ### Graph-based interventions
 
-What makes mindframe different from other chatbot systems based on fine-tuning with large datasets is its ability to represent therapy as a directed graph. This allows for complex interventions to be broken down into smaller, more manageable components, and for the system to track client progress and adjust interventions based on historical data.  Defining interventions in this way also makes the system more flexible, and rapidly adaptable to new research, or to local guidelines and requirements.
+Mindframe is different from other chatbot systems — especially those based on fine-tuning with large datasets — because it represents therapy as a _directed graph_ of interactions. This allows for complex interventions to be broken down into smaller, more manageable components, and for the system to track client progress and adjust interventions based on historical data.  Defining interventions in this way also makes the system more flexible, and rapidly adaptable to new research, or to local guidelines and requirements.
 
 Unlike systems which fine-tune language models to produce output similar in tone of style to that of a therapist, mindframe focusses on the structure of the therapy itself. This allows for more control over the therapy flow, and for interventions to be more easily validated and tested.
 

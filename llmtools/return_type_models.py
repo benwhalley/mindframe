@@ -29,7 +29,7 @@ class SpokenResponse(BaseModel):
 
     response: str = Field(
         ...,
-        description="A spoken response, continuing the previous conversation. Don't label the speaker or use quotes, just the words spoken.",
+        description="A spoken response, continuing the previous conversation. Don't label the speaker or use quotes, just produce the words spoken.",
     )
 
 
@@ -38,7 +38,7 @@ class InternalThoughtsResponse(BaseModel):
 
     response: str = Field(
         ...,
-        description="Your thoughts. Never a spoken response yet -- just careful step by step thinking, planning and reasoning, written in very concise note form. Always on topic and relevant to the task at hand.",
+        description="Your thoughts. Never a spoken response, yet -- just careful step by step thinking, planning and reasoning, written in super-concise note form. Always on topic and relevant to the task at hand.",
     )
 
 
@@ -48,6 +48,21 @@ class PoeticalResponse(BaseModel):
     response: str = Field(
         ...,
         description="A response, continuing the previous conversation but always in POETRICAL form - often a haiku.",
+    )
+
+
+class ConversationSegment(BaseModel):
+    description: str = Field(description="A short description of the segment.")
+    start: int
+    end: int
+
+
+class ChunkedConversationResponse(BaseModel):
+    """A spoken response, continuing the previous conversation, in 16th C style."""
+
+    response: List[ConversationSegment] = Field(
+        ...,
+        description="Returns a list of ConversationSegments, each with a description",
     )
 
 

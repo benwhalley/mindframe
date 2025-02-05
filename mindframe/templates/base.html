@@ -38,7 +38,21 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'rag_test' %}">RAG testing</a>
                     </li>
+                
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'synthetic_conversation_create' %}">Import a transcript</a>
+                    </li>
+                    <!-- a menu item for tools -->
+                    <li>
+                        <a class="nav-link" href="{% url 'admin:llmtools_tool_changelist' %}">Tools</a>
+                    </li>
+                    
+                        
+                
                 </ul>
+                
+                
+                
             </div>
         </div>
     </nav>

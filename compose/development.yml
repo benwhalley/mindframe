@@ -25,6 +25,7 @@ services:
       - APP_MODE=web
     volumes:
       - ~/dev/mindframe/mindframe:/app/mindframe
+      - ~/dev/mindframe/llmtools:/app/llmtools
 
   chat:
     depends_on:
@@ -36,7 +37,7 @@ services:
       [
         "sh",
         "-c",
-        "cp /app/mindframe/chatbot.py /app/chatbot.py && watchmedo auto-restart --directory=/app/mindframe --pattern=*.py --recursive -- python chatbot.py"
+        "watchmedo auto-restart --directory=/app --pattern=*.py --recursive -- python chatbot.py"
       ]
     env_file: [secrets.env]
     environment:
@@ -44,6 +45,8 @@ services:
     restart: unless-stopped
     volumes:
       - ~/dev/mindframe/mindframe:/app/mindframe
+      - ~/dev/mindframe/llmtools:/app/llmtools
+      - ~/dev/mindframe/mindframe/chatbot.py:/app/chatbot.py
 
   worker:
     image: mindframe-base:latest
@@ -51,7 +54,7 @@ services:
       [
         "sh",
         "-c",
-        "watchmedo auto-restart --directory=/app/mindframe --pattern=*.py --recursive -- celery --app mindframe worker --pool=solo --loglevel=debug"
+        "watchmedo auto-restart --directory=/app --pattern=*.py --recursive -- celery --app mindframe worker --pool=solo --loglevel=debug"
       ]
     env_file: [secrets.env]
     environment:

@@ -12,28 +12,30 @@ import shortuuid
 from autoslug import AutoSlugField
 from django.conf import settings
 from django.utils.safestring import mark_safe
+from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.urls import reverse
-from django.db import models
+
 from django.db.models import Count, Q
 
 
-from django.template import Context, Template
 from django.utils import timezone
 from django.utils.text import slugify
 from pydantic import BaseModel
 from pgvector.django import VectorField, HnswIndex
+from decouple import config
+
 import shortuuid
-from django_lifecycle import LifecycleModel, hook, AFTER_UPDATE
+from django_lifecycle import LifecycleModel, hook, AFTER_UPDATE, AFTER_CREATE
 
 import instructor
-
+from mindframe.chunking import CHUNKER_TEMPLATE
 
 # use langfuse for tracing
 # TODO: currently broken because doesn't report audio_tokens in usage properly
-# from langfuse.openai import AzureOpenAI, OpenAI
-from openai import AzureOpenAI, OpenAI
+# from langfuse.openai import OpenAI
+from openai import OpenAI
 
 from django.db.models import Model
 from langfuse.decorators import langfuse_context
@@ -41,10 +43,10 @@ from langfuse.decorators import langfuse_context
 langfuse_context.configure(debug=False)
 from langfuse.decorators import observe
 
-from mindframe.llm_calling import chatter, structured_chat
+from llmtools.llm_calling import chatter, structured_chat, get_embedding, simple_chat
 from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
 
-from mindframe.tasks import generate_embedding
+from mindframe.tasks import example_generate_embedding
 
 
 logger = logging.getLogger(__name__)
@@ -156,6 +158,14 @@ class Intervention(LifecycleModel):
         related_name="default_for_judgements",
     )
 
+    default_chunking_model = models.ForeignKey(
+        "LLM",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="default_for_chunking",
+    )
+
     def transitions(self):
         return Transition.objects.filter(
             Q(from_step__intervention=self) | Q(to_step__intervention=self)
@@ -180,23 +190,12 @@ class Example(LifecycleModel):
     title = models.CharField(max_length=255)
     text = models.TextField()
 
-    # embedding = VectorField(dimensions=384, null=True, blank=True)
-
-    # class Meta:
-    #     indexes = [
-    #         HnswIndex(
-    #             name="example_embedding_index",
-    #             fields=["embedding"],
-    #             m=16,
-    #             ef_construction=64,
-    #             opclasses=["vector_l2_ops"],
-    #         ),
-    #     ]
-
     @hook(AFTER_UPDATE)
+    @hook(AFTER_CREATE)
     def on_text_change(self):
-        return generate_embedding.delay(self.pk)
+        return example_generate_embedding.delay(self.pk)
 
+    class Meta:
         unique_together = [("intervention", "title")]
 
     def __str__(self):
@@ -306,7 +305,7 @@ class Step(models.Model):
         session = turn.session_state.session
         ctx = self.get_step_context(session)
 
-        completions, llm_calls = chatter(
+        completions = chatter(
             self.prompt_template,
             context=ctx,
             model=self.get_model(session),
@@ -318,8 +317,7 @@ class Step(models.Model):
                 "context": ctx,
             },
         )
-        # returns an OrderedDict of completions (intermediate 'thougts' and the RESPONSE_)
-        return completions, llm_calls
+        return completions
 
     class Meta:
         unique_together = [("intervention", "title"), ("intervention", "slug")]
@@ -405,7 +403,7 @@ class Judgement(models.Model):
         newnote = Note.objects.create(judgement=self, turn=turn, inputs=None)
         session = turn.session_state.session
 
-        llm_result, logs = chatter(
+        llm_result = chatter(
             self.prompt_template,
             model=self.get_model(session),
             context=inputs,
@@ -637,21 +635,36 @@ class TreatmentSession(models.Model):
 
         step = self.evaluate_transitions_and_update_step(newturn, step, transitions, client_data)
 
-        completions, llm_logs = step.spoken_response(newturn)
-
-        # the final completion is the response to return
-        key, utterance = next(reversed(completions.items()))
-
+        completions = step.spoken_response(newturn)
+        utterance = completions.response
         # save the generated response and other data to the new Turn
         newturn.session_state = self.state  # update in case we changed step
         newturn.text = utterance
         newturn.metadata = dict(completions.items())
         newturn.save()
 
+        # .values('prompt_text', 'message')
+        thoughts = [
+            f"""
+## LLM Call For: {i.step and ("Step "+ str(i.step)) or i.judgement and ("Judgement " + str(i.judgement)) or "Unknown"}
+
+#### PROMPT
+```
+{i.prompt_text}
+```
+
+#### RESPONSE
+
+```
+{i.message}
+```
+            """
+            for i in newturn.llm_calls.all().order_by("timestamp")
+        ]
         # return the response only (this gets used by the gradio app)
         # perhaps we should return the Turn object and allow the gradio app to
         # use other attributes of it?
-        return utterance
+        return {"utterance": utterance, "thoughts": thoughts}
 
     def get_absolute_url(self):
         return reverse("treatment_session_detail", args=[str(self.uuid)])
@@ -808,22 +821,288 @@ class SyntheticConversation(models.Model):
         return f"Synthetic conversation between Session {self.session_one.id} and Session {self.session_two.id} starting at {self.start_time}"
 
 
-class LLMProvider(models.TextChoices):
-    AZURE = auto()
-    OLLAMA = auto()
-
-
 class LLM(models.Model):
     """Store details of Language Models used for Step and Judgement execution"""
 
     model_name = models.CharField(
-        max_length=255, help_text="Litellm model name, e.g. ollama/llama3.2 or azure/gpt-4o"
+        max_length=255, help_text="Litellm model name, e.g. llama3.2 or gpt-4o"
+    )
+
+    api_key = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Litellm API key, defaults to LITELLM_API_KEY",
+    )
+    base_url = models.CharField(
+        max_length=1024,
+        blank=True,
+        null=True,
+        help_text="Litellm base URL defaults to LITELLM_ENDPOINT",
     )
 
     def __str__(self) -> str:
         return self.model_name
 
+    def chatter(self, prompt, context=None):
+        from llmtools.llm_calling import chatter
+
+        return chatter(prompt, self, context={}, log_context={})
+
     @property
-    def provider(self):
-        # this is an Azure instance, but is used to query litellm proxy
-        return instructor.from_openai(AzureOpenAI())
+    def client(self):
+        # this is an Azure/OpenAI clent instance, but is used to query the litellm
+        # proxy. It must provide chat.completions.create_with_completion and
+        # client.chat.completions.create
+        # TODO: currently the langfuse version is not working properly so tracing
+        # won't work either
+        return instructor.from_openai(
+            OpenAI(api_key=config("LITELLM_API_KEY"), base_url=config("LITELLM_ENDPOINT"))
+        )
+
+
+from pgvector.django import L2Distance
+from django.db.models import Window, F
+
+from django.template import Context, Template
+from django.db.models.functions import RowNumber
+from itertools import groupby
+
+
+### QuerySet for MemoryChunk (Supports Chaining)
+class MemoryChunkQuerySet(models.QuerySet):
+    def search(self, query, method="semantic", llm=None, top_k=5):
+        """
+        Generalized search function supporting both HyDE and semantic search.
+
+        Args:
+            query (str): The input text query to search for.
+            method (str): The search method, either "semantic" or "hyde".
+            llm (LLM): The language model used for HyDE (ignored for semantic search).
+            top_k (int): Number of closest matches to return.
+
+        Returns:
+            QuerySet: The top_k MemoryChunk objects closest to the query.
+        """
+        if method not in ["semantic", "hyde"]:
+            raise ValueError(f"Invalid search method: {method}. Use 'semantic' or 'hyde'.")
+
+        # Generate the embedding for semantic search
+        if method == "semantic":
+            query_embedding = get_embedding([query])[0]
+
+        # Generate the hypothetical document for HyDE, then embed it
+        elif method == "hyde":
+            if not llm:
+                raise ValueError("HyDE search requires an LLM instance.")
+            hyde_prompt = f"""
+            Imagine conversations between a therapist and client about {query}.
+            Provide a concise imagined dialogue that captures key ideas and discussions.
+            No more than 5 utterances.
+            """
+            hyde_completion = simple_chat(hyde_prompt, llm)[0]
+            query_embedding = get_embedding([hyde_completion])[0]
+
+        # Perform search using vector similarity
+        return (
+            self.alias(distance=L2Distance("embedding", query_embedding)).order_by("distance")[
+                :top_k
+            ],
+            query,
+            method == "hyde" and hyde_completion or None,
+        )
+
+    def windows(self, before=1, after=2):
+        """
+        Expands the queryset by including up to `before` chunks before and `after` chunks after each chunk.
+
+        Args:
+            before (int): Number of chunks before each chunk.
+            after (int): Number of chunks after each chunk.
+
+        Returns:
+            QuerySet: Expanded queryset including all chunks in windows around the originals.
+        """
+        # Get distinct memory IDs in the queryset
+
+        qs_ids = list(self.values_list("pk", flat=True))
+        qs_mems = list(set(self.values_list("memory", flat=True)))
+        memory_chunks = MemoryChunk.objects.filter(memory_id__in=qs_mems).annotate(
+            rank=Window(
+                expression=RowNumber(), partition_by=F("memory_id"), order_by=F("start").asc()
+            )
+        )
+
+        desired_item_ranks = [
+            (i.memory, list(range(i.rank - before, i.rank + after)))
+            for i in memory_chunks
+            if i.pk in qs_ids
+        ]
+
+        out = []
+        for mem, rnks in desired_item_ranks:
+            out.extend(memory_chunks.filter(memory=mem, rank__in=rnks).values_list("pk", flat=True))
+
+        return memory_chunks.filter(pk__in=out).order_by("memory_id", "rank")
+
+    def window_texts(self):
+        """
+        Groups contiguous MemoryChunks and returns their combined text.
+
+        Returns:
+            List[str]: A list of concatenated texts from contiguous MemoryChunks.
+        """
+        chunks = list(self.order_by("memory_id", "chunk_start"))
+
+        grouped_texts = []
+        for _, group in groupby(chunks, key=lambda c: c.memory_id):
+            group = list(group)
+            combined_texts = []
+            buffer = [group[0].text]
+
+            # Iterate through sorted chunks and merge contiguous ones
+            for prev, current in zip(group, group[1:]):
+                if prev.chunk_end == current.chunk_start:  # Contiguous
+                    buffer.append(current.text)
+                else:  # Discontinuous, start new grouping
+                    combined_texts.append(" ".join(buffer))
+                    buffer = [current.text]
+
+            combined_texts.append(" ".join(buffer))
+            grouped_texts.extend(combined_texts)
+
+        return grouped_texts
+
+
+### Custom Manager for MemoryChunk
+class MemoryChunkManager(models.Manager):
+    def get_queryset(self):
+        return MemoryChunkQuerySet(self.model, using=self._db)
+
+
+### MemoryChunk Model
+class MemoryChunk(models.Model):
+    memory = models.ForeignKey("Memory", on_delete=models.CASCADE, related_name="chunks")
+    embedded_text = models.TextField(
+        blank=True,
+        null=True,
+        help_text="The actual text embedded (may include extra tokens to contextualise/summarise passage to aid matching)",
+    )
+    start = models.IntegerField(help_text="The start position of the chunk in the memory (chars)")
+    end = models.IntegerField(help_text="The end position of the chunk in the memory")
+    embedding = VectorField(dimensions=1024, null=True)
+
+    objects = MemoryChunkManager()  # Use custom manager
+
+    def __str__(self):
+        return self.text
+
+    @property
+    def text(self):
+        return self.memory.text[self.start : self.end]
+
+    class Meta:
+        indexes = [
+            HnswIndex(
+                name="embedding_index",
+                fields=["embedding"],
+                m=16,
+                ef_construction=64,
+                opclasses=["vector_cosine_ops"],
+            )
+        ]
+
+
+### Memory QuerySet (For Searching Across Memories)
+class MemoryQuerySet(models.QuerySet):
+    def search(self, query, method="semantic", llm=None, top_k=5):
+        """
+        Allows Memory.objects.search() to return MemoryChunks matching the query.
+
+        Args:
+            query (str): The input text query to search for.
+            method (str): The search method, either "semantic" or "hyde".
+            llm (LLM): The language model used for HyDE (ignored for semantic search).
+            top_k (int): Number of closest matches to return.
+
+        Returns:
+            QuerySet: A queryset of MemoryChunk objects that match the query.
+        """
+        return MemoryChunk.objects.filter(memory__in=self).search(
+            query=query, method=method, llm=llm, top_k=top_k
+        )
+
+
+### Custom Manager for Memory
+class MemoryManager(models.Manager):
+    def get_queryset(self):
+        return MemoryQuerySet(self.model, using=self._db)
+
+
+### Memory Model
+class Memory(LifecycleModel):
+    text = models.TextField()
+    intervention = models.ForeignKey(
+        "Intervention", on_delete=models.CASCADE, related_name="memories"
+    )
+    session = models.ForeignKey("TreatmentSession", blank=True, null=True, on_delete=models.CASCADE)
+
+    objects = MemoryManager()  # Use custom manager
+
+    def __str__(self):
+        return self.text[:100]
+
+    class Meta:
+        verbose_name_plural = "Memories"
+
+    @hook(AFTER_CREATE)
+    @hook(AFTER_UPDATE)
+    def make_chunks(self, method="llm"):
+        self.chunks.all().delete()
+        llm = self.intervention.default_chunking_model or LLM.objects.first()
+
+        # Split text into lines and compute cumulative character offsets
+        textlines = self.text.split("\n")
+        line_start_positions = [0]  # First line always starts at character 0
+
+        for line in textlines:
+            line_start_positions.append(line_start_positions[-1] + len(line) + 1)  # +1 for '\n'
+
+        # Generate chunks using the LLM chunking model
+        numbered_text = "\n".join([f"{i+1}: {l}" for i, l in enumerate(textlines)])
+        chunks = llm.chatter(CHUNKER_TEMPLATE.format(source=numbered_text)).response
+
+        embedding_texts = []
+        chunk_objects = []
+
+        for i in chunks:
+            # Convert line indices to character positions
+            char_start = line_start_positions[i.start]
+            char_end = (
+                line_start_positions[i.end] if i.end < len(line_start_positions) else len(self.text)
+            )
+
+            # Extract text using character positions
+            t_ = self.text[char_start:char_end]
+            embtex = f"{i.description}\n\n{t_}"
+
+            embedding_texts.append(embtex)
+            chunk_objects.append(
+                MemoryChunk(
+                    memory=self,
+                    start=char_start,  # Now in character positions
+                    end=char_end,  # Now in character positions
+                    embedded_text=embtex,
+                )
+            )
+
+        # Batch process embeddings
+        embeddings = get_embedding(embedding_texts)
+
+        # Assign embeddings to chunk objects
+        for chunk, embedding in zip(chunk_objects, embeddings):
+            chunk.embedding = embedding
+
+        MemoryChunk.objects.bulk_create(chunk_objects)
+
+        return self.chunks.all()

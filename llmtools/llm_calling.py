@@ -2,16 +2,32 @@
 # Define your desired output structure
 
 from pydantic import BaseModel, Field
-from mindframe.llm_calling import structured_chat
+from llmtools.llm_calling import structured_chat
 from typing import Optional, List
 
-from mindframe.llm_calling import *
+from llmtools.llm_calling import *
 
-mini, _ = LLM.objects.filter(model_name="gpt-4o-mini")
-# mini, _ = LLM.objects.get_or_create(model_name="gpt-4o-mini")
-# local, _ = LLM.objects.get_or_create(model_name="llama3.2")
+
+smart = LLM.objects.get(model_name="gpt-4o")
+mini = LLM.objects.get(model_name="gpt-4o-mini")
+
+
 
 chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]", mini)[0]['JOKE']
+
+
+convo = """ """
+chunktmpl = """ """
+
+chnks = chatter(chunktmpl.format(source=convo), model=smart)
+chnks.response
+
+
+for i in chnks.response:
+    i.text= convo.split('\n')[i.start-1:i.end-1]["]
+chnks
+
+
 
 simple_chat
 
@@ -24,7 +40,7 @@ split_multipart_prompt("one[[talk:y]]two[[RESP]]dddd")['talk:y'] == 'one'
 
 
 rr = chatter("Pick an ancient civilisation: [[thoughts]] Now pick one of art, science or magic. Just one of those three words [[pick:topic]] Now tell me a SINGLE interesting fact[[speak:]]", mini)
-rr[0]['RESPONSE_']
+rr.response
 rr[1]
 
 chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]", mini)[0]['JOKE']
@@ -65,9 +81,6 @@ structured_chat("Create a list of 3 fake users. Use consistent field names for e
                 llm=local,
                 return_type=UserList)
 
-
-
-
 # do some accounting on tokens on one chatter call from above
 import pandas as pd
 df = pd.DataFrame(
@@ -75,7 +88,6 @@ list(rr[1].values('metadata__usage__total_tokens', 'metadata__usage__prompt_toke
 )
 df['out'] = df['metadata__usage__total_tokens'] - df['metadata__usage__prompt_tokens']
 df[['out', 'metadata__usage__prompt_tokens']].sum()
-
 
 """
 
@@ -88,12 +100,10 @@ from typing import List
 from types import FunctionType
 from django.apps import apps
 
-import dotenv
-import tiktoken
 from django.conf import settings
 from django.template import Context, Template
 from pydantic import BaseModel, Field
-from mindframe.return_type_models import (
+from llmtools.return_type_models import (
     SpokenResponse,
     InternalThoughtsResponse,
     selection_response_model,
@@ -101,19 +111,18 @@ from mindframe.return_type_models import (
     DefaultResponse,
     PoeticalResponse,
     ExtractedResponse,
+    ChunkedConversationResponse,
 )
 
 from langfuse.decorators import observe
-
-from django.db.models import Model
 from langfuse.decorators import langfuse_context
 
 langfuse_context.configure(debug=False)
+# from openai import OpenAI
+from langfuse.openai import openai  # OpenAI integration
+from decouple import config
 
-
-dotenv.load_dotenv(".env")
 logger = logging.getLogger(__name__)
-encoding = tiktoken.encoding_for_model("gpt-4o-mini")
 
 
 # a lookup dict of return types for different actions specified in prompt templates
@@ -128,6 +137,7 @@ ACTION_LOOKUP.update(
         "boolean": BooleanResponse,
         "bool": BooleanResponse,
         "poem": PoeticalResponse,
+        "chunked_conversation": ChunkedConversationResponse,
     }
 )
 
@@ -284,13 +294,13 @@ def structured_chat(
     langfuse_context.update_current_observation(input=prompt)
 
     try:
-        res, com = llm.provider.chat.completions.create_with_completion(
+        res, com = llm.client.chat.completions.create_with_completion(
             model=llm.model_name,
             response_model=return_type,
             messages=[{"role": "user", "content": prompt}],
             max_retries=max_retries,
         )
-        msg, lt, meta = str(res)[:30], LLMLogTypes.USAGE, com.dict()
+        msg, lt, meta = res.response, LLMLogTypes.USAGE, com.dict()
 
     except Exception as e:
         res, com, msg, lt, meta = None, None, str(e), LLMLogTypes.ERROR, str(log_context)
@@ -298,6 +308,7 @@ def structured_chat(
         logger.warning(f"Error calling LLM: {e}\n{full_traceback}")
 
     llm_call_log = LLMLog.objects.create(
+        variable_name=log_context.get("variable_name", "?"),
         log_type=lt,
         session=log_context.get("session", None),
         judgement=log_context.get("judgement", None),
@@ -326,7 +337,7 @@ def simple_chat(prompt, llm, log_context={}):
     langfuse_context.update_current_observation(input=prompt)
 
     try:
-        res = llm.provider.chat.completions.create(
+        res = llm.client.chat.completions.create(
             model=llm.model_name,
             response_model=None,
             messages=[{"role": "user", "content": prompt}],
@@ -345,6 +356,7 @@ def simple_chat(prompt, llm, log_context={}):
         logger.error(f"Error calling LLM: {e}")
 
     el = LLMLog.objects.create(
+        variable_name=log_context.get("variable_name", None),
         log_type=lt,
         session=log_context.get("session", None),
         judgement=log_context.get("judgement", None),
@@ -363,10 +375,18 @@ def simple_chat(prompt, llm, log_context={}):
 TEMPLATE_PREFIX = """
 {% load pretty %}
 {% load guidance %}
+{% load rag %}
 {% load turns %}
 {% load examples %}
 {% load notes %}
 """
+
+
+class ChatterResult(OrderedDict):
+    @property
+    def response(self):
+        # return the RESPONSE_ or last item in the dict
+        return self["RESPONSE_"] or next(reversed(self.items()))[1]
 
 
 @observe(capture_input=False, capture_output=False)
@@ -377,7 +397,7 @@ def chatter(multipart_prompt, model, context={}, log_context={}):
     Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next.
     """
     pprompt = parse_prompt(multipart_prompt)
-    results_dict = OrderedDict()
+    results_dict = ChatterResult()
 
     prompt_parts = []
     llm_calls = []
@@ -395,8 +415,11 @@ def chatter(multipart_prompt, model, context={}, log_context={}):
             rt = prompt_part.return_type
 
         # this suffix is not _required_ by helps guide the llm to return json
-        template = Template(TEMPLATE_PREFIX + prompt + "\nAlways use the tools/JSON response.")
+        template = Template(
+            TEMPLATE_PREFIX + prompt + """\nAlways use the tools/JSON response.\n\n```json\n"""
+        )
         pmt = template.render(Context(context))
+
         res, completion_obj, log = structured_chat(
             pmt,
             model,
@@ -404,10 +427,15 @@ def chatter(multipart_prompt, model, context={}, log_context={}):
             log_context=log_context,
         )
         res = res and res.response or None
+        log_context["variable_name"] = key
+
+        if key in ["RESPONSE_", "response"]:
+            logger.info(f"""\033[32mCompletion: {key}\n{res}\n\033[0m""")
+        else:
+            logger.info(f"""Completion: {key}\n{res}\n""")
 
         results_dict[key] = res
         prompt_parts.append(res)
-        llm_calls.append(log)
 
     # duplicate the last item as the RESPONSE_ so we have a
     # predictable key to access the final completion, but can still
@@ -416,19 +444,32 @@ def chatter(multipart_prompt, model, context={}, log_context={}):
     if lastkey != "RESPONSE_":
         results_dict["RESPONSE_"] = results_dict[lastkey]
 
-    LLMLog = apps.get_model("mindframe", "LLMLog")
+    return results_dict
 
-    return (results_dict, LLMLog.objects.filter(pk__in=[i.pk for i in llm_calls]))
+
+def get_embedding(texts, dimensions=1024) -> list:
+    """
+
+    get_embedding(["gello"])
+
+    """
+    client = OpenAI(api_key=config("LITELLM_API_KEY"), base_url=config("LITELLM_ENDPOINT"))
+    response = client.embeddings.create(
+        input=texts,
+        model="text-embedding-3-large",
+        dimensions=dimensions,
+    )
+    return [i.embedding for i in response.data]
 
 
 if False:
     from pprint import pprint
     from mindframe.models import LLM
-    from mindframe.llm_calling import chatter, parse_prompt
+    from llmtools.llm_calling import chatter, parse_prompt
 
     mini = LLM.objects.filter(provider_name="AZURE", model_name="gpt-4o-mini").first()
 
-    t4, logs = chatter(
+    t4 = chatter(
         """
     Say something funny [[speak:A]]
     And another thing: [[B]]
@@ -440,7 +481,7 @@ if False:
     )
     t4
 
-    t5, logs = chatter(
+    t5 = chatter(
         """
     Tell a joke [[speak:A]]
     Think about this chat session. What is happening here? [[think:D]]

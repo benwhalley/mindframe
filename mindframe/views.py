@@ -11,17 +11,20 @@ from mindframe.models import (
     Cycle,
     CustomUser,
     TreatmentSession,
+    Memory,
+    MemoryChunk,
     SyntheticConversation,
     Turn,
     LLMLog,
     Note,
+    LLM,
 )
 from django.views.generic.detail import DetailView
+from langfuse.decorators import observe
 from django.views.generic.base import TemplateView
 from django import forms
 from django.views.generic.edit import FormView
 from django.urls import reverse_lazy
-from mindframe.rag import rag_examples, hyde_examples
 from django.contrib.auth.mixins import LoginRequiredMixin
 
 from django.utils.safestring import mark_safe
@@ -37,16 +40,37 @@ class RAGHyDEComparisonForm(forms.Form):
         max_length=255,
         required=True,
         initial="therapist leading vivid imagery exercise",
+        widget=forms.Textarea(attrs={"rows": 3, "cols": 20}),
     )
-    top_k = forms.IntegerField(label="Top K Results", min_value=1, max_value=20, initial=3)
-    window_size = forms.IntegerField(label="Window Size", min_value=0, max_value=10, initial=2)
-    intervention = forms.ModelChoiceField(
+    top_k = forms.IntegerField(
+        label="Top K Results",
+        min_value=1,
+        max_value=20,
+        initial=3,
+        help_text="Number of results to return",
+    )
+    window_size = forms.IntegerField(
+        label="Window Size",
+        min_value=0,
+        max_value=5,
+        initial=1,
+        help_text="Number of sentences to return around the matched sentence",
+    )
+    intervention = forms.ModelMultipleChoiceField(
         queryset=Intervention.objects.all(),
         label="Select Intervention",
-        empty_label="Select an Intervention",
-        required=True,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
         initial=lambda: Intervention.objects.first(),
     )
+    # multiple choice field of "examples" and "turns"
+    # search_in = forms.MultipleChoiceField(
+    #     label="Search In",
+    #     choices=[("examples", "Examples"), ("turns", "Turns")],
+    #     widget=forms.CheckboxSelectMultiple,
+    #     initial=["examples"],
+    #     required=True,
+    # )
 
 
 class RAGHyDEComparisonView(LoginRequiredMixin, FormView):
@@ -56,29 +80,31 @@ class RAGHyDEComparisonView(LoginRequiredMixin, FormView):
 
     def form_valid(self, form):
         # Fetch the intervention using the provided slug
-        intervention = form.cleaned_data["intervention"]
-
-        interventions = Intervention.objects.filter(pk__in=[intervention.pk])
-        # Extract form data
-        query = form.cleaned_data["query"]
-        top_k = form.cleaned_data["top_k"]
-        window_size = form.cleaned_data["window_size"]
+        interventions = form.cleaned_data["intervention"]
+        if interventions:
+            memories = Memory.objects.filter(intervention__in=interventions)
+        else:
+            memories = Memory.objects.all()
 
         # Call RAG and HyDE functions
-        rag_results = rag_examples(
-            query, top_k=top_k, window_size=window_size, interventions=interventions
+        rag_results, _, _ = memories.search(
+            form.cleaned_data["query"], top_k=form.cleaned_data["top_k"]
         )
-        hyde_results, hyde_query = hyde_examples(
-            query, top_k=top_k, window_size=window_size, interventions=interventions
+
+        hyde_results, _, hyp_doc = memories.search(
+            form.cleaned_data["query"],
+            method="hyde",
+            llm=LLM.objects.get(model_name="gpt-4o"),
+            top_k=form.cleaned_data["top_k"],
         )
 
         # Add results to the context
         context = self.get_context_data(form=form)
         context["rag_results"] = rag_results
         context["hyde_results"] = hyde_results
-        context["hyde_query"] = hyde_query
-        context["query"] = query
-        context["intervention"] = intervention
+        context["hyde_hypothetical_document"] = hyp_doc
+        context["query"] = form.cleaned_data["query"]
+        context["interventions"] = interventions
         return self.render_to_response(context)
 
 

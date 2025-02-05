@@ -16,6 +16,14 @@
                     {{ session }} [<code>{{session.uuid}}</code>]
                     <a href="{% url 'admin:mindframe_treatmentsession_change' session.pk %}">+</a>
             </p>
+            
+            {% if session.synthetic_conversations.count %}
+            <p>
+                {% for i in session.synthetic_conversations %}
+                Part of a synthetic conversation: <a href="{% url 'fake_conversation_detail' i.pk %}">{{ i.pk }}</a>
+                {% endfor %}
+            </p>
+            {% endif %}
 
             <p>
                 Intervention: <a href="{% url 'admin:mindframe_intervention_change' session.cycle.intervention.pk %}">{{ session.cycle.intervention }}</a>
@@ -36,9 +44,8 @@
     <hr>
     <div class="row">
 
-        <div class="col-5"><h5>Conversation</h5></div>
-        <div class="col-4"><h5>Thoughts</h5></div>
-        <div class="col-3"><h5>Notes/LLM Calls</h5></div>
+        <div class="col-6"><h5>Conversation</h5></div>
+        <div class="col-6"><h5>Notes/LLM Calls</h5></div>
 
         <style>
             pre {
@@ -49,57 +56,63 @@
         </style>
     {% regroup turns by session_state as state_turns %}
     {% for group, turns in state_turns %}
+    
+    <div class="row">
     <div class="col-12">
-       <hr>
-        <h5>{{group.step.title}}
-        </h5>
+       <h6>Step: {{group.step.title}}
+    </h6>    
     </div>
+    </div>
+    
+    <style>
+        .speech { font-family: 'Courier New', Courier, monospace;
+    font-size:16pt;}
+        
+    </style>
     {% for turn in turns %}
     <hr>
     <div class="col-6">
     <div class="row">
         <div class="col-1">
-            {{forloop.counter}}.
-        </div>
-        <div class="col-2">
-            {{turn.speaker.username.upper}}:
-        </div>
-        <div class="col">
-             {{turn.text}}
-             <a href="{% url 'admin:mindframe_turn_change' turn.id %}">[+]
+            <a href="{% url 'admin:mindframe_turn_change' turn.id %}">{{forloop.counter}}.
             </a>
         </div>
+        
+        <div class="col mb-4 speech">
+            <b>{{turn.speaker.username.upper}}: &nbsp;&nbsp;&nbsp;&nbsp;</b>
+            
+            {{turn.text}}
+            
+        </div>
 
     </div>
 
     </div>
-    <div class="col-3 small">
-        {{turn.metadata.THOUGHTS}}
-    </div>
 
-    <div class="col-3 small">
-        {% with turn.notes.all as turnnotes %}
-        {% if turnnotes %}
-        <p>Notes</p>
-        {% endif %}
-        {% for note in turnnotes %}
-                <p>
-                    <code>{{note.judgement.variable_name}}</code>: {{note.data.value}}
-                    <!-- <pre class="small">{{note.data|pretty_json}}</pre> -->
-                <a href="{% url 'admin:mindframe_note_change' note.id %}">[+]
-                </a>
-            </p>
-        {% endfor %}
-        {% endwith %}
 
+    <div class="col-6 small">
         {% with turn.llm_calls.all as turncalls %}
-        {% if turncalls %}
-        <p>LLM Calls</p>
-        {% endif %}
+        
         {% for call in turncalls %}
-            <p>
-                <a href="{% url 'admin:mindframe_llmlog_change' call.id %}">{{call.message}}</a>
-            </p>
+        <b>
+            {% if call.step %}
+            <span class="badge bg-success">Step</span>
+            {{call.step.title}}: <code>{{call.variable_name}}</code>
+            {% endif %}
+            {% if call.judgement %}
+             <span class="badge bg-danger">Judgement</span>            
+            {{call.judgement.title|default:""}}: <code>{{call.variable_name}}</code>
+            {% endif %}
+            
+            
+        </b>    
+        <a href="{% url 'admin:mindframe_llmlog_change' call.id %}">+</a>
+        <p>
+<pre style="color: rgb(60, 60, 60);">
+{{call.message}}
+</pre>
+
+</p>
         {% endfor %}
         {% endwith %}
 

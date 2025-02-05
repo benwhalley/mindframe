@@ -1,91 +1,110 @@
 {% extends "base.html" %}
+{% load crispy_forms_tags %}
 {% block content %}
 <h1>Compare RAG and HyDE</h1>
 
 
 <div class="row">
-    <div class="col-4 ">
-        
+    <div class="col-3 ">
+
         <form method="post" class="form">
             {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit">Compare</button>
+            {{ form|crispy }}
+            <button type="submit" class="btn btn-lg btn-success">Compare</button>
         </form>
-        
+
     </div>
-    
-    <div class="col-8">
-        
-        
+
+    <div class="col-9">
+
+
         <div class="row">
             <div>
-                {% if intervention %}
-                    <h4>Intervention: {{ intervention.title }}</h4>
+                {% if interventions %}
+                    <h4>Interventions: {{ interventions }}</h4>
                 {% endif %}
             </div>
-            
+
             <div class="col-6">
-                <h5>Semantically similar examples</h5>
+                {% if query %}
                 {% if rag_results %}
+                <h5>Semantically similar examples</h5>
                     <div class="card">
                         <div class="card-body">
                             <h6 class="card-title">Results similar to original query</h6>
+                     
                             <ul>
+                                {% for result in rag_results %}{{result.pk}}, {% endfor %}
                                 {% for result in rag_results %}
-                                    <li>{{ result }}</li>
+                                    <li>
+                                        <pre style="white-space: pre-wrap;">{{ result.embedded_text }}</pre>
+                                        <hr>
+                                    </li>
                                 {% endfor %}
                             </ul>
-                                
+
                         </div>
                     </div>
                 {% else %}
-                        <p>No results</p>
+                    <p>No results</p>
                 {% endif %}
-                
-                
             </div>
-            
+
+
             <div class="col-6">
                 <h5>HyDE results</h5>
-                {% if hyde_results %}
-            
-                
-                
+
+
+                {% if hyde_query.output %}
                 <div class="card">
                     <div class="card-body">
                         <h6 class="card-title">Hypothetical document</h6>
-                        <p class="small">{{hyde_query.output}}</p>
-                            
                     </div>
                 </div>
-                
+                {% endif %}
+
+
+                {% if hyde_results %}
                 <div class="card">
                     <div class="card-body">
                         <h6 class="card-title">Results similar to hypothetical document</h6>
-                        <ul>
+                            
+                        {% for result in hyde_results %}{{result.pk}}, {% endfor %}
+                        
+                        <hr>
+                        Hypothetical document used to query:
+                        <code>{{hyde_hypothetical_document}}</code>
+                        <hr>
+                        
+                        <ul>    
+                           
+                            
                             {% for result in hyde_results %}
-                                <li>{{ result }}</li>
+                            <li>
+                                <pre style="white-space: pre-wrap;">{{ result.embedded_text }}</pre>
+                                <hr>
+                            </li>
                             {% endfor %}
                         </ul>
-                            
+
                     </div>
                 </div>
-                            
-                
+
+
                 {% else %}
                     <p>No results</p>
-                
+
                 {% endif %}
-                
-        
-        
+
+            {% endif %}
+
             </div>
-            
+
         </div>
-        
+
     </div>
-    
-    
+
+
 </div>
 
 

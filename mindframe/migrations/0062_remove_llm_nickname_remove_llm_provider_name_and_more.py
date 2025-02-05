@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
             model_name="llm",
             name="model_name",
             field=models.CharField(
-                help_text="Litellm model name, e.g. ollama/llama3.2 or azure/gpt-4o", max_length=255
+                help_text="Litellm model name, e.g. llama3.2 or azure/gpt-4o", max_length=255
             ),
         ),
     ]

@@ -4,6 +4,7 @@ from django.urls import path
 
 urlpatterns = [
     path("", include("mindframe.urls")),
+    path("", include("llmtools.urls")),
     path("auth/", include("magiclink.urls", namespace="magiclink")),
     path("hijack/", include("hijack.urls")),
     path("accounts/", include("django.contrib.auth.urls")),

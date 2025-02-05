@@ -11,3 +11,5 @@ presentation_files
 build
 dist
 mindframe.egg-info
+docs/mi/transcripts/*
+sources/AnnoMI-full.csv
