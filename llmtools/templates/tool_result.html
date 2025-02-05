@@ -5,21 +5,21 @@
 {% block content %}
 <div class="container">
     <div class="row">
-          
+
         <h4 class="col-6">Inputs</h4>
         <h4 class="col-6">Results for {{ tool.name }}</h4>
-        
-        
+
+
         <div class="col-md-6 mt-3">
-            
+
             <form method="POST">
                 {% csrf_token %}
                 {{ form|crispy }}
                 <button type="submit" class="btn btn-primary">Submit</button>
             </form>
-            
+
         </div>
-        
+
         <div class="col-md-6">
             <!-- bootstrap card -->
             <div class="card mt-5">
@@ -27,26 +27,26 @@
             <pre style="white-space: pre-wrap;">
                 {{ results.response }}
             </pre>
-        </div> 
-    </div>  
         </div>
-        
-        
+    </div>
+        </div>
+
+
         <div class="col-12">
             <hr>
             <h4>Prompt
-                
+
                 <a href="{% url 'admin:llmtools_tool_change' tool.id %}" class="btn btn-outline-success btn-sm pl-4">Edit</a>
             </h4>
-            
-            
-            
-            
+
+
+
+
             <code style="white-space: pre-wrap;">
                 {{tool.prompt|safe}}
             </code>
         </div>
-        
+
     </div>
 </div>
 {% endblock %}

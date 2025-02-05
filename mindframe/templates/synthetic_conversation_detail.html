@@ -41,7 +41,7 @@
 </head>
 <body class="bg-light">
     <div class="container mt-4">
-        
+
         <!-- bootstrap warning banner -->
         {% if conversation.additional_turns_scheduled > 0 %}
             <div class="alert alert-warning" role="alert">
@@ -49,16 +49,16 @@
             </div>
             <!-- meta refresh every 3 seconds - go to #addmore tag -->
             <meta http-equiv="refresh" content="3;url=#addmore">
-            
+
         {% endif %}
-        
+
         <h1 class="conversation-title text-center">Synthetic Conversation #{{ conversation.pk }}</h1>
         <p class="text-center text-muted">Started at: {{ conversation.start_time|date:"F j, Y, g:i a" }}</p>
         <hr>
-    
+
         <p>Therapist: <a href="{{conversation.session_one.get_absolute_url}}">{{conversation.session_one}}</a></p>
         <p>Client: <a href="{{conversation.session_two.get_absolute_url}}">{{conversation.session_two}}</a></p>
-    
+
         <!-- <p>
             Last speaker turn: <span>{{ conversation.last_speaker_turn }}</span>
         </p>
@@ -66,7 +66,7 @@
         <hr>
         <div class="conversation">
             {% for turn in turns %}
-                <div class="turn">                    
+                <div class="turn">
                     <span class="speaker">{{ turn.speaker.role }}</span>
                     <span class="timestamp">{{ turn.timestamp|date:"g:i:s a" }}
                         <div class="badge badge-secondary float-end">{{turn.source_type}}</div>
@@ -74,23 +74,23 @@
                     <div class="dialogue">
                         {{ turn.text }}
                     </div>
-                    
+
                 </div>
                 <hr>
             {% endfor %}
         </div>
-        
-        
+
+
         {% if conversation.additional_turns_scheduled > 0 %}
             <div class="alert alert-warning" role="alert">
                 {{conversation.additional_turns_scheduled}} additional turns are scheduled to be generated for this conversation. Page will refresh periodically.
             </div>
             <!-- meta refresh every 3 seconds - go to #addmore tag -->
             <meta http-equiv="refresh" content="3;url=#addmore">
-            
+
         {% endif %}
-        
-        
+
+
         <a name="addmore"></a>
             <form method="post">
                 {% csrf_token %}
@@ -98,7 +98,7 @@
                 <button type="submit" class="btn btn-primary">Add Turns</button>
             </form>
     </div>
-    
+
     <div>&nbsp;</div>
 
     <!-- Bootstrap JS and dependencies -->

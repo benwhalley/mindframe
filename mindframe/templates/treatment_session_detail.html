@@ -16,7 +16,7 @@
                     {{ session }} [<code>{{session.uuid}}</code>]
                     <a href="{% url 'admin:mindframe_treatmentsession_change' session.pk %}">+</a>
             </p>
-            
+
             {% if session.synthetic_conversations.count %}
             <p>
                 {% for i in session.synthetic_conversations %}
@@ -56,18 +56,18 @@
         </style>
     {% regroup turns by session_state as state_turns %}
     {% for group, turns in state_turns %}
-    
+
     <div class="row">
     <div class="col-12">
        <h6>Step: {{group.step.title}}
-    </h6>    
+    </h6>
     </div>
     </div>
-    
+
     <style>
         .speech { font-family: 'Courier New', Courier, monospace;
     font-size:16pt;}
-        
+
     </style>
     {% for turn in turns %}
     <hr>
@@ -77,12 +77,12 @@
             <a href="{% url 'admin:mindframe_turn_change' turn.id %}">{{forloop.counter}}.
             </a>
         </div>
-        
+
         <div class="col mb-4 speech">
             <b>{{turn.speaker.username.upper}}: &nbsp;&nbsp;&nbsp;&nbsp;</b>
-            
+
             {{turn.text}}
-            
+
         </div>
 
     </div>
@@ -92,7 +92,7 @@
 
     <div class="col-6 small">
         {% with turn.llm_calls.all as turncalls %}
-        
+
         {% for call in turncalls %}
         <b>
             {% if call.step %}
@@ -100,12 +100,12 @@
             {{call.step.title}}: <code>{{call.variable_name}}</code>
             {% endif %}
             {% if call.judgement %}
-             <span class="badge bg-danger">Judgement</span>            
+             <span class="badge bg-danger">Judgement</span>
             {{call.judgement.title|default:""}}: <code>{{call.variable_name}}</code>
             {% endif %}
-            
-            
-        </b>    
+
+
+        </b>
         <a href="{% url 'admin:mindframe_llmlog_change' call.id %}">+</a>
         <p>
 <pre style="color: rgb(60, 60, 60);">

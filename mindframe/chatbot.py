@@ -90,7 +90,9 @@ def main():
                 user_input = gr.Textbox(show_label=False, placeholder="Type your message here...")
 
             with gr.Column(scale=1):
-                log_window = gr.Markdown(label="Bot's Thoughts", elem_classes=["markdown-window"], visible=False)
+                log_window = gr.Markdown(
+                    label="Bot's Thoughts", elem_classes=["markdown-window"], visible=False
+                )
 
         session_id_box = gr.Textbox(visible=False)
 

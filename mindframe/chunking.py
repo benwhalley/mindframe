@@ -1,5 +1,5 @@
 CHUNKER_TEMPLATE = """
-# Context 
+# Context
 This is a transcript of a conversation is broken into utterances, one per line.
 So on each line you will see;
 
@@ -20,7 +20,7 @@ So on each line you will see;
 # Your task now
 
 Split this conversation into chunks or 5-10 utterances
-make the splits flexibly, but ideally break where the topic changes 
+make the splits flexibly, but ideally break where the topic changes
 each chunk should be locally coherent
 just return the utterance ids that separate the start and end of chunks as a list of lists
 e.g. [[1,6], [5,12], ...]

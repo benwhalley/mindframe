@@ -21,7 +21,7 @@ For turn-level validation:
 
 - Find a corpus of high quality examples of MI, this doesn't need to be huge. Maybe 500 short examples (2-3 turns).
 
-- Optionally categorise each turn by type of response. 
+- Optionally categorise each turn by type of response.
 
 - Score each turn in the corpus for quality
 
@@ -118,8 +118,8 @@ def choose_preferred_path(root):
         current = chosen
 
     return path
-    
-    
+
+
 root_node = ConversationNode.objects.get(pk=123)  # or however you find your root
 path = choose_preferred_path(root_node)
 for node in path:

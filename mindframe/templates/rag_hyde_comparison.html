@@ -32,7 +32,7 @@
                     <div class="card">
                         <div class="card-body">
                             <h6 class="card-title">Results similar to original query</h6>
-                     
+
                             <ul>
                                 {% for result in rag_results %}{{result.pk}}, {% endfor %}
                                 {% for result in rag_results %}
@@ -68,17 +68,17 @@
                 <div class="card">
                     <div class="card-body">
                         <h6 class="card-title">Results similar to hypothetical document</h6>
-                            
+
                         {% for result in hyde_results %}{{result.pk}}, {% endfor %}
-                        
+
                         <hr>
                         Hypothetical document used to query:
                         <code>{{hyde_hypothetical_document}}</code>
                         <hr>
-                        
-                        <ul>    
-                           
-                            
+
+                        <ul>
+
+
                             {% for result in hyde_results %}
                             <li>
                                 <pre style="white-space: pre-wrap;">{{ result.embedded_text }}</pre>

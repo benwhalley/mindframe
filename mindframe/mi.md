@@ -50,7 +50,7 @@ This next example highlights a man’s ambivalence toward joining a tennis club 
 “I know I’ve got to get back into a regular exercise routine if I want to gain back my full function. My physical therapist says I’m ready, but I just don’t know now. I guess I don’t want to push myself. There’s a lot of stuff I just can’t do. But I know if I don’t do anything, it will just get worse.”
 Spending time with ambivalence tends to help a client move through it. People tend to avoid it because it can be frustrating and uncomfortable to focus on conflicting priorities without making a decision. As a guide, you can shine a light on your client’s ambivalence. When you home in on the ambivalence in a nonjudgmental way, your client can acknowledge the discrepancy, free from pressure. If ready to make a change, your client
  Feeling two opposing ways about a behavior change is a normal part of the change process.
- 
+
 14 MI BASICS
 may want to start discussing strategies to adapt the change into everyday life.
 listening for Ambivalence: the heart of MI
@@ -92,7 +92,7 @@ ing the client full autonomy to attend
 the yoga class or not attend the yoga
 class.
  Motivation for change is likely to increase when the client recognizes there is a discrepancy between a current choice and a personal goal.
- 
+
 16 MI BASICS
 There were several examples of change talk in this brief dialogue, including “I want to be healthy,” “I want to feel like I can join in on their conversation,” and “I could use a way to de-stress.” In short, MI techniques highlight for clients where they are and where they hope to be.
 AMBIvAlence In dIsguIse: when your clIent wAnts the QuIck FIx
@@ -111,7 +111,7 @@ Clients often experience black-and-white thinking when it comes to nutrition and
 Presenting an Alternative Approach to the Quick-Fix diet
  How do you help clients recognize the emotionally exhausting consequences of dieting and replace this pattern with long-term solutions? Invite cli- ents to share their stories, reflect on their dieting woes, and offer a new approach where lifestyle changes can be about variety, balance, and
 Invite clients to share their stories, reflect on their dieting woes, and offer a new approach focused on variety, balance, and moderation, instead of restriction, avoidance, and desperation.
- 
+
 18
 MI BASICS
  Negative Thoughts
@@ -380,7 +380,7 @@ perks his ears to listen for opportuni- ties to affirm. In doing so, he creates 
 Affirmations are statements regarding a client’s positive attributes. Affirmations sprinkled throughout an MI session empower clients. At times, opportunities to affirm are
 obvious, and at other times they are
  An MI practitioner best serves his clients when he acts as a hound dog, sniffing around for opportunities to affirm them.
- 
+
 34 MI BASICS
 respected, validated, and encouraged. In the following script, the practi- tioner affirms his client noticing both the obvious and more subtle client strengths.
 client: It’s not that I can’t cook. My girlfriend actually raves when I cook for her and her roommates. She even said that I should be on cooking shows after I made this Italian stuffed shells dish the other night. It’s just that I hate doing dishes.
@@ -411,7 +411,7 @@ evocAtIon
 Just as the term motivational interviewing implies, the counselor does do a great deal of interviewing to enhance motivation to change. The intent of the questioning is not to quiz or collect data from the client but to elicit or draw out certain feelings about a behavior change.
 The practitioner is in some ways like a journalist. A journalist inter- views experts in order to write a story. A good journalist is never the expert on the story. There’s no way for a journalist to be an authority on every topic written. The journalist becomes informed on a topic only through
  The practitioner conveys compassion through giving priority to the client’s needs and by actively promoting the client’s welfare.
- 
+
 36 MI BASICS
 researching it and interviewing individuals closest to the story. A journalist has to maintain an unbiased stance and an aura of curiosity. In addition, a journalist must use evocative questions to draw out the experiences, opin- ions, and emotions of his sources.
 On the other hand, the intentions of the interviewing conducted by an MI practitioner are much different than those of a journalist. In journal- ism, the interviewing is for the journalist; in behavior change counseling, the interviewing is for the client. The interviewing is meant to prompt the client to talk about the behavior change. Motivation for change resides within the client. The practitioner elicits beliefs, feelings, ideas, and motiva- tions from the client, often bringing the unconscious to the conscious mind. In doing so, the client is able to discuss the behavior change in relation to what she cares about.
@@ -881,7 +881,7 @@ client: Yeah, it’s not like I want a heart attack or anything. I just don’t 
 pRactitioneR: You’re aware of the risks of high cholesterol and hav- ing a heart attack is one risk that concerns you. [reflection]
 client: Yeah, I would like to stick around a little longer. I’m good at popping pills. It’s the whole cooking thing that gets me. Plus, I like food, and I like to eat and you’re just going to tell me to stop eating, or something.
 pRactitioneR: You’re someone who is consistent when it comes to
-           
+
 66
 THE FOUR PROCESSES OF MI
 taking medication, so you feel that might be your most viable option at this point. You’re concerned that making changes to lower your cholesterol would involve having to eliminate foods you like. You seem to care about your health and want to improve your cholesterol. I appreciate your honesty in sharing some reser- vations you had about seeing me today. Some of my clients have found that by making a few small changes, they’ve been able to lower their cholesterol without having to revamp their entire diets. Even making a few small changes can be hard, though. Ultimately, it’s your choice what you’d like to do. [summary]
@@ -895,7 +895,7 @@ client: I like a good burger and French fries. I also get burritos from the Mexi
 pRactitioneR: You have many restaurant favorites. [reflection] Before we start talking about finding a few small changes in what you order to lower your cholesterol, can we talk for a moment about your health concerns? [asking permission]
 client: Yeah, that’s fine. Evoking
 pRactitioneR: You mentioned earlier that you don’t want to have a heart attack. [summary] What else motivates you to make choices
-  
+
 Evoking 67
 that support your health right now? [open-ended question to evoke more change talk]
 client: I have this new girlfriend who’s pretty special. We really have a good time together. And things are just getting good, so I don’t want to die on her.
@@ -912,7 +912,7 @@ client: Yes, plus these doctors’ visits cost a fortune and that’s one fortun
 pRactitioneR: Cost of medical bills if your health declines also moti- vates you to stay healthy. [reflection of change talk]
 client: Yeah, I have a hard enough time as it is making my bills each month; I don’t need medical debt.
 pRactitioneR: Thank you for explaining what motivates you to change. [affirmation] You mentioned that being healthy and active
-  
+
 68
 THE FOUR PROCESSES OF MI
 for your girlfriend are important, as well as cost. [summary] What else? [open-ended question to evoke change talk]
@@ -994,7 +994,7 @@ It’s important to note that if a client does not accept your request to give i
  The benefits of motivational interviewing are apparent when clients take an active role, taking responsibility for making changes in their lives.
 time engaging the client, or that the client feels forced to select a particu- lar behavior change that doesn’t align with his interests.
 It has been our experience that clients typically do not refuse sugges- tions outright. It is more likely that the client will agree to listen to your
- 
+
 Planning for Change 75
 suggestions, but if unready to make a change, he may explain why each idea you provide will not work. If a client turns down your offer to provide strategies that might help him along in the behavior change process, or expresses disinterest in a wide variety of tips and ideas, back up and revisit the engaging, focusing, or evoking processes.
 elicit–Provide–elicit
@@ -1044,7 +1044,7 @@ giving Advice
 The client benefits most if the practitioner is in a trusted but equal posi- tion, and gives the client a sense of unconditional acceptance. Advice giving is discouraged in an MI session because it makes the client feel that you have all the answers. While you may in fact have many solutions that you believe can help your client move for-
  ward, your goal within an MI session is to support your client to develop his own action plan. You are there to clarify misinformation, offer sug- gestions, and guide the client to make meaningful and effective changes. Giving advice, especially without
 While you may in fact have many solutions that you believe can help your client move forward, your goal within an MI session is to support your client to develop his own action plan.
- 
+
 78 THE FOUR PROCESSES OF MI
 asking permission first, will likely result in sustain talk, and possible dis- cord within the counseling relationship, ultimately slowing the client’s pro- cess toward change.
 Even if the client asks you what he should do, he may not necessarily be ready to make changes. If he is in a contemplative or preparation stage of change it may be more helpful to respond by eliciting the client’s own thoughts and feelings.
@@ -1201,7 +1201,7 @@ The acronym GAB is a useful memory technique to remember the final conversation 
 Goals: Invite the client to share one last time what behavior or thought pattern he will attempt to change.
 Assess confidence: Use a scaling question to assess the client’s
  Remember that motivation is based on factors such as a client’s ability, confidence, and belief that efforts to change will work.
- 
+
 88
 THE FOUR PROCESSES OF MI
 confidence in his ability to make the proposed behavior change or
@@ -1604,7 +1604,7 @@ Affirmations are a type of complex reflection. Similar to a “continue the para
 Play it safe when crafting affirmations. Pick a characteristic you are certain the person possesses. If the client disagrees with you and begins to focus on why she does not agree with the statement, the whole focus of the appointment can be sidetracked.
  When crafting affirmations avoid starting with “I.” You are not the focus, the client is.
 Although affirmations are posi- tive statements regarding one’s char- acter or values, they are not the same as giving praise or compliments. There is a difference between giving
- 
+
 Affirmations 113
 compliments and strategically using affirmations. A compliment has a tone of judgment or evaluation made by the practitioner. When crafting affirma- tions avoid starting with “I.” You are not the focus, the client is. Here are some examples of compliments and affirmations:
 Compliment: “You look great!” versus
@@ -1765,7 +1765,7 @@ pRactitioneR: You’re not sure you need to make any changes to your
 diet. [amplified reflection]
 In reflecting change talk, clients hear their own positive feelings about change, ultimately fueling that desire.
 While simply reflecting sus- tain talk will make the client feel understood, reframing the sustain talk or using an amplified reflection can help nudge the client through
-  
+
 Reflections 123
 ambivalence. What you emphasize in your reflections depends on your cli- ent and his or her readiness to change.
 client: I don’t think my diet is that bad.
@@ -2355,7 +2355,7 @@ tain talk. A client might sit down and
 immediately say, “OK, I know I need
 to eat better. Tell me what to do. Give me a meal plan.” This may sound like a clear indication that you should get out a meal plan and start talking about what this person should and shouldn’t eat. However, this is a ruse. Although the client is voicing change talk, he or she also wants to take a passive role. It would be helpful to reflect the meaning of this statement and see what the client really wants.
 Only when the client has expressed a strong desire to change is it time to discuss how the client will proceed.
- 
+
 160 BEYOND THE BASICS
 the chat trap
 Lastly, spending a good amount of time making “small talk” may be a comfortable way to try to build rapport, but it is rarely helpful. Moreover, the flow of the appointment can feel jerky when you decide it’s time to get down to business. Building rapport happens through engaging the client in meaningful discussion about what brought him into the appointment. By spending time reflecting and asking open-ended questions, the client gets to know your style and becomes more comfortable talking about important issues with you. Then, as certain themes become more prevalent, you are able to guide him into focusing on some specific areas where change could occur. “Chatting” seems to distract more than it helps.
@@ -2438,7 +2438,7 @@ a change when she was ready.
 shortenIng the MI Process
 The four processes of MI—engage, focus, evoke, and plan—provide struc- ture to an MI session. (These four processes are covered in depth in Chap- ters 3–5.) It may take an MI practitioner several sessions before all four processes are covered, or only a few minutes. Timing depends on the cli- ent’s readiness to change and the practitioner’s availability.
 If the client is expressing sustain talk or a general lack of interest in making a behavior change, then it may be several sessions before he or she is ready to discuss tips and strategies for change. In that case, a practitio- ner who is short on time could offer brief interactions that revolve around exploring ambivalence and evoking change talk. Alternatively, if a client is expressing significant change talk and seems ready to discuss change strategies, then shorter sessions that emphasize the planning process may be sufficient.
-  
+
 166 BEYOND THE BASICS
 engage
 It’s tempting to jump into planning when time is limited. While you may not have time to explore the client’s back story with the leisurely pace of an hour’s visit, it’s still important to display the same warmth, compassion, and attentive listening. Some busy practitioners find that it’s best to avoid questions like, “How are you feeling?” or “How are you?” because they tend to result in answers that fail to assist much in building rapport and take the client in an unproductive direction. Instead use the time you do have to practice thoughtful, complex reflections that represent the true and intended meaning within your client’s statements. Engaging is not a process that begins and ends, but is clearly felt throughout your client interactions as you build a working relationship together.
@@ -2453,7 +2453,7 @@ client: Not easy, but at least easier than changing my food habits.
 Clients like to have choices. However, if there is one particular behav- ior you’re required to inform the client about, give the client autonomy
  When you have little time, the focusing process becomes essential.
 in deciding how he might go about making that change. For example, perhaps you are required by your supervisor to talk to your client about reducing the amount of soda he
- 
+
 What to Do When There’s Little Time 167
 drinks. You can still give him several different strategies for cutting back on soda and invite him to select a strategy that might work for him. Of course, in the spirit of autonomy, make it clear to the client that not reducing his soda intake at all is always an option.
 evoke
@@ -2577,7 +2577,7 @@ Clients are going to do more talking as a result of MI, especially with strategi
 result is a more motivated client.
 Even in the shortest interactions, the practitioner can maintain the spirit of MI by implementing a few key skills such as guiding the client to come up with his own goals, asking permission before providing informa- tion, and affirming him when oppor- tunities arise. While these strategies may take a few extra minutes, they are worth every second when the
  The key to short sessions is providing concise, mobilizing reflections and summaries that keep the conversations moving forward.
- 
+
  chAPter 12
 Clarifying Health Misinformation and Exploring Unhealthy Beliefs
 The most confused we ever get is when we try to convince our heads of something our hearts know is a lie.
@@ -2598,7 +2598,7 @@ You may detect beliefs based on misinformation within the first few minutes of a
 on misinformation within the first few minutes of a session.
 If you respond by immediately correcting the client you may set the stage for increased sustain talk and discord.
 by immediately correcting the client you may set the stage for increased sustain talk and discord. While he or she may be impressed with your knowledge of the scientific literature, you also risk coming across as arro- gant and unapproachable. Here are some strategies for correcting mis- information while at the same time emphasizing client autonomy.
- 
+
 Health Misinformation and Unhealthy Beliefs 177
 resIstIng the rIghtIng reFlex
 The righting reflex is the temptation to provide unsolicited advice or infor- mation that corrects something perceived as wrong in the client’s state- ment. It’s important to tame the righting reflex when you hear misinforma- tion and instead respond with compassion, respect, and an overall sense of curiosity. Consider the following interactions. The first dialogue showcases Practitioner A, a diabetes educator. He starts off on the right track but is thrown off course when he hears the client voice incorrect nutrition infor- mation.
@@ -2649,7 +2649,7 @@ Use Understandable Terms
 Medical terminology was developed for practitioners to easily communi- cate with one another. Latin root words are further described with pre- fixes and suffixes that fully explain the treatment, procedure, disease, or condition. Although useful in the medical field, medical terminology has a way of dismantling the client–counselor relationship by making the
  Although useful in the medical field, medical terminology has a way of dismantling the client– counselor relationship by making the counselor assume the expert role.
 counselor assume the expert role. Medical terminology belongs in the client’s medical chart, not in the information exchange between client and practitioner. Support the client’s role as the expert by using commonly understood words, such as those listed in Figure 12.1.
- 
+
 Health Misinformation and Unhealthy Beliefs 181
   avoid use instead
  • Sodium
@@ -2715,7 +2715,7 @@ exPlorIng unheAlthy BelIeFs ABout Food, Body IMAge, And exercIse
 Internal misinformation refers to that which your clients tell themselves about food, exercise, and their bodies. This type of information may or may not have come from another resource. It may even be a compilation of many sources. Detecting unhealthy
  beliefs, or those based on incorrect information, is an important focus within MI. Within the nutrition and fitness professions, a primary goal is to help clients improve their relation- ship with food and discover enjoyable
 Unhealthy beliefs about nutrition and exercise can negatively influence emotional and social health, thereby hurting one’s overall health and well-being.
- 
+
 184 BEYOND THE BASICS
 ways to move their bodies. Dietary and activity patterns are important, but physical health is only one dimension of health. Unhealthy beliefs about nutrition and exercise can negatively influence emotional and social health, thereby hurting one’s overall health and well-being.
 The spirit of MI is ideal for exploring unhealthy beliefs. You will notice a client’s belief system seems to slowly permeate the room as you start to engage, evoke, and reflect what you hear. Resist the righting reflex and focus on evoking those beliefs while expressing compassion, empathy, and self-worth whether or not you agree with them.
@@ -2776,7 +2776,7 @@ tures that require external forces to
 restrict their eating behaviors and protect them from themselves. Evoking these core beliefs about self-worth and the basic rights to feel nourished and whole must sometimes be addressed before meaningful change can occur.
 Whether destructive health beliefs arise from a pervasive culture that tells people that eating chocolate is indulgent and sinful or from caregivers who imply that children can’t trust their own hunger and fullness cues, mis- information clouds and confounds clients’ attempts to engage in changes that positively affect health and well-being. Knowing how to evoke and address external and internal misinformation can deepen engagement and foster an environment where clients feel free to discuss the issues that actu- ally have an effect on change.
  Evoking these core beliefs about self-worth and the basic rights to feel nourished and whole must sometimes be addressed before meaningful change can occur.
- 
+
  PArt v
 A Closer Look at Motivational Interviewing in Nutrition and Fitness Industries
 
@@ -3371,7 +3371,7 @@ hour at the gym, 5 days a week. It
 is reasonable, therefore, for physical
 activity to be too time consuming for some. Alternatively, by exploring the preconceived notions of physical activity, you can clarify any misinforma- tion and help your clients set goals that fit into their busy lives. The follow- ing script highlights a client and practitioner exploring physical activity while reviewing an exercise frequency questionnaire.
  People make time for the things that are important to them.
- 
+
 226
 MI IN NUTRITION AND FITNESS INDUSTRIES
 pRactitioneR: It says here that you are physically active once a week, and you’ve written in the margin “if I’m lucky.” What do you mean by “if I’m lucky”? [open-ended question]
@@ -3466,7 +3466,7 @@ Regardless of your clients’ weight or health status, motivating them through s
 IntroducIng A weIght-neutrAl APProAch
 If improving health is truly the focus within a nutrition and fitness coun- seling session, then it is in the client’s best interest for the practitioner to focus on nutrition and fitness behaviors and not on weight. The ultimate
  Motivating through shame and stigma is in direct opposition to the spirit of MI.
- 
+
 234 MI IN NUTRITION AND FITNESS INDUSTRIES
 goal is for clients to make sustainable changes and mounting evidence sug- gests that a non-diet approach is more conducive to adopting long-term changes while minimizing disordered eating patterns (Tylka et al., 2014). In addition, this nonjudgmental, nonstigmatizing approach is preferred by cli- ents, resulting in more return visits (Schaefer & Magnuson, 2014; Thomas, Lewis, Hyde, Castle, & Komesaroff, 2010).
 One such non-diet approach is the Health At Every Size® (HAES®) paradigm (Figure 15.1).* The HAES approach differs from traditional weight-focused paradigms in that clients are encouraged to tune in to hun- ger and fullness cues, energy levels, and cravings to guide eating and activ- ity timing and quantity (Bacon & Aphramor, 2011; Association for Size Diversity and Health, 2014). HAES is a weight-neutral approach, meaning that the focus is not on weight, but on helping the client make healthy life- style changes while allowing weight to stabilize at a number that is largely genetically driven and varies widely from person to person. Historically, the word “fat” has had a negative connotation; supporters of this move- ment advocate reclaiming this word as a descriptive term and not as a nega- tive judgment of character or physicality.
@@ -3478,7 +3478,7 @@ Poor health and disease affects individuals of all sizes. The HAES mes- sage is 
 5. life-enhancing movement: Support physical activities that allow people of all sizes, abilities, and interests to engage in enjoyable movement, to the degree that they choose.
 FIgure 15.1. The Health At Every Size (HAES) principles. From the Association for Size Diversity and Health (2014). Reprinted by permission.
 *Health At Every Size and HAES are registered trademarks of the Association for Size Diver- sity and Health and used with permission.
- 
+
 MI to Address Weight Concerns and Disordered Eating 235
   Diet Paradigm Non-Diet Paradigm
  Food
@@ -3532,7 +3532,7 @@ Gaining proficiency and confidence in body image counseling requires extensive t
 In the following script, the practitioner uses MI to invite a male client to explore the birth of his body dissatisfaction and how it may negatively affect his current health patterns. While reading this dialogue, notice how a few well-placed evoking questions can help increase the client’s awareness of his negative body image, and how it may be hurting rather than helping his overall health and well-being. Toward the end, the practitioner elicits change talk for jumping off the yo-yo diet bandwagon.
 pRactitioneR: You’ve already made some significant changes to the way you eat. You’ve said a couple things, though, that lead me to believe that you won’t feel successful unless you lose a certain amount of weight. [probing for body dissatisfaction] What do you think? [open-ended question]
  Unconditional positive regard for your client is communicated by emitting an aura of acceptance for the client’s physical attributes regardless of weight loss.
- 
+
 238
 MI IN NUTRITION AND FITNESS INDUSTRIES
 client: I need to lose 50 pounds.
@@ -3569,7 +3569,7 @@ a platform for eliciting change talk toward a wellness-focused approach:
 “How does dieting influence your emotional health?”
 Often clients won’t be interested in hearing an alternative non-diet approach until they’ve expressed dissatisfaction with a dieting experience.
  Health is about more than just diet and exercise.
- 
+
 MI to Address Weight Concerns and Disordered Eating 241
 By guiding the client to explore the costs of dieting, the client may become more open to the holistic messages of the HAES paradigm. In the follow- ing dialogue the practitioner elicits previous failed attempts at weight loss, highlighting the negative impact of dieting on emotional health with reflec- tions and summaries. The practitioner uses an E-P-E technique to present the client with a non-diet approach.
 pRactitioneR: You shared that you tried [commercial weight loss program] and it worked at first but then wasn’t something that worked for you in the long term. [simple reflection] What did you like and not like about that program? [open-ended question]

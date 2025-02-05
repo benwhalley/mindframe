@@ -1,5 +1,5 @@
 """
-./manage.py fake --turns=4 demo fake-client-eating 
+./manage.py fake --turns=4 demo fake-client-eating
 ./manage.py fake --turns=2 --continue 41
 """
 
