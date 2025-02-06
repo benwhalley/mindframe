@@ -2,7 +2,8 @@ import os
 import hashlib
 import json
 import logging
-from collections import defaultdict, OrderedDict, Iterable
+from collections import defaultdict, OrderedDict
+from collections.abc import Iterable
 
 from box import Box
 from enum import auto
@@ -292,7 +293,7 @@ class Step(models.Model):
         return completions
 
     @observe(capture_input=False, capture_output=False)
-    def respond_in_conversation(self, respond_to: ConversationNode, as_speaker: CustomUser):
+    def respond_in_conversation(self, respond_to, as_speaker):
 
         transcript = list(reversed(iter_conversation_path(respond_to, direction="up")))
         speaker_last_turn = respond_to.conversation.previous_turn_of_speaker(as_speaker)
