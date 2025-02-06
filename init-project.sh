@@ -1,6 +1,6 @@
 #! bash
 # on first run
-# cp compose/secrets.en-example compose/secrets.env
+# cp compose/secrets.env-example compose/secrets.env
 # EDIT secrets.env with your own values
 
 (echo "# \! AUTO GENERATED FILE DO NOT EDIT"; docker-compose -f compose/services.yml -f compose/development.yml -p mindframe config) > docker-compose.yml
