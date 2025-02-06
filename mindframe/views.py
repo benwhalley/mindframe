@@ -61,12 +61,17 @@ class RAGHyDEComparisonForm(forms.Form):
         help_text="Number of sentences to return around the matched sentence",
     )
     intervention = forms.ModelMultipleChoiceField(
-        queryset=Intervention.objects.all(),
         label="Select Intervention",
         required=False,
+        queryset=Intervention.objects.none(),
         widget=forms.CheckboxSelectMultiple,
-        initial=lambda: Intervention.objects.first(),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if Intervention.objects.exists():
+            self.fields["intervention"].queryset = Intervention.objects.all()
+            self.fields["intervention"].initial = Intervention.objects.first()
 
 
 class RAGHyDEComparisonView(LoginRequiredMixin, FormView):
@@ -177,28 +182,44 @@ class SyntheticConversationForm(forms.Form):
     )
 
     therapist = forms.ModelChoiceField(
-        queryset=CustomUser.objects.filter(role="therapist"),
         required=False,
-        initial=CustomUser.objects.filter(role="therapist").first(),
+        queryset=CustomUser.objects.none(),
         help_text="Optionally select an existing therapist user",
     )
+
     client = forms.ModelChoiceField(
-        queryset=CustomUser.objects.filter(role="client"),
+        queryset=CustomUser.objects.none(),
         required=False,
         help_text="Optionally select an existing client user",
     )
     therapist_intervention = forms.ModelChoiceField(
-        queryset=Intervention.objects.all(),
-        initial=Intervention.objects.filter(slug__istartswith="demo").first(),
         required=True,
+        queryset=Intervention.objects.none(),
         help_text="Select an intervention for the therapist",
     )
     client_intervention = forms.ModelChoiceField(
-        queryset=Intervention.objects.all(),
-        initial=Intervention.objects.filter(slug__istartswith="fake-client").first(),
         required=True,
+        queryset=Intervention.objects.none(),
         help_text="Select an intervention for the client",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if Intervention.objects.exists():
+            self.fields["therapist"].queryset = CustomUser.objects.filter(role="therapist")
+            self.fields["therapist"].initial = CustomUser.objects.filter(role="therapist").first()
+
+            self.fields["therapist"].queryset = CustomUser.objects.filter(role="client")
+
+            self.fields["client_intervention"].queryset = Intervention.objects.all()
+            self.fields["client_intervention"].initial = Intervention.objects.filter(
+                slug__istartswith="fake-client"
+            ).first()
+
+            self.fields["therapist_intervention"].queryset = Intervention.objects.all()
+            self.fields["therapist_intervention"].initial = Intervention.objects.filter(
+                slug__istartswith="demo"
+            ).first()
 
 
 class SyntheticConversationCreateView(LoginRequiredMixin, FormView):
