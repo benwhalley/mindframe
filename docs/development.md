@@ -1,4 +1,4 @@
-# Developing and Running Mindframe Localls
+# Developing and Running Mindframe Locally
 
 This repo includes code and instructions to set up mindframe for local development using Docker.
 
