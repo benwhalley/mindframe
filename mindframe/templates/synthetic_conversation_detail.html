@@ -91,12 +91,15 @@
         {% endif %}
 
 
+    <form method="post" style="width:30%;">
+        <h6>Add additional turns to the conversation</h6>
         <a name="addmore"></a>
-            <form method="post">
                 {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit" class="btn btn-primary">Add Turns</button>
-            </form>
+                {{ form|crispy }}
+                <button type="submit" class="btn btn-primary float-end">Add Turns</button>        
+        </form>
+
+    
     </div>
 
     <div>&nbsp;</div>

@@ -76,7 +76,7 @@ class CustomUserAdmin(admin.ModelAdmin):
 
 @admin.register(SyntheticConversation)
 class SyntheticConversationAdmin(admin.ModelAdmin):
-    pass
+    autocomplete_fields = ["session_one", "session_two", "last_speaker_turn"]
 
 
 class MemoryChunkInline(admin.TabularInline):

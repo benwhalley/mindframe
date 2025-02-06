@@ -5,6 +5,7 @@
 
 (echo "# \! AUTO GENERATED FILE DO NOT EDIT"; docker-compose -f compose/services.yml -f compose/development.yml -p mindframe config) > docker-compose.yml
 
+
 # build and start the containers
 docker-compose build base
 docker-compose up -d --build postgres redis

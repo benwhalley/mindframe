@@ -63,13 +63,13 @@ docker-compose up -d
 To remake the fixtures from current data, select these models and use a docker container to dump the data into the fixtures folder in the editable package folder:
 
 ```sh
-docker-compose run mindframe-base \
+docker-compose run web \
 	./manage.py dumpdata \
 	mindframe.Intervention \
 	mindframe.Step \
+	mindframe.StepJudgement \
 	mindframe.Transition \
 	mindframe.Judgement \
-	mindframe.Example \
 	mindframe.LLM \
 	--indent 2 > ~/dev/mindframe/mindframe/fixtures/test.json
 

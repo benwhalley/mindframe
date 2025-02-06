@@ -4,6 +4,7 @@ from mindframe.views import (
     SyntheticConversationDetailView,
     TreatmentSessionDetailView,
     RAGHyDEComparisonView,
+    SyntheticConversationCreateView,
     IndexView,
 )
 
@@ -15,9 +16,14 @@ urlpatterns = [
         name="public_start_session",
     ),
     path(
+        "import/fake/",
+        SyntheticConversationCreateView.as_view(),
+        name="synthetic_conversation_create",
+    ),
+    path(
         "fake/conversation/<int:pk>/",
         SyntheticConversationDetailView.as_view(),
-        name="fake_conversation_detail",
+        name="synthetic_conversation_detail",
     ),
     path(
         "sessions/<str:uuid>/",

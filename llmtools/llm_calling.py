@@ -118,8 +118,7 @@ from langfuse.decorators import observe
 from langfuse.decorators import langfuse_context
 
 langfuse_context.configure(debug=False)
-# from openai import OpenAI
-from langfuse.openai import openai  # OpenAI integration
+from langfuse.openai import OpenAI  # OpenAI integration with tracing
 from decouple import config
 
 logger = logging.getLogger(__name__)

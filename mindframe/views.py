@@ -1,10 +1,20 @@
 from django.utils.text import slugify
 from django.shortcuts import redirect
 from django.utils import timezone
-
+from django import forms
+from django.views.generic.edit import FormMixin
+from django.urls import reverse
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from mindframe.silly import silly_name
+from django.views.generic.detail import DetailView
+from django.views.generic.base import TemplateView
+from django.views.generic.edit import FormView
+from django.urls import reverse_lazy
+from django.contrib.auth.mixins import LoginRequiredMixin
+from itertools import cycle
+from mindframe.synthetic import add_turns_task
+
 import random
 from mindframe.models import (
     Intervention,
@@ -12,22 +22,16 @@ from mindframe.models import (
     CustomUser,
     TreatmentSession,
     Memory,
-    MemoryChunk,
     SyntheticConversation,
     Turn,
     LLMLog,
     Note,
     LLM,
 )
-from django.views.generic.detail import DetailView
-from langfuse.decorators import observe
-from django.views.generic.base import TemplateView
-from django import forms
-from django.views.generic.edit import FormView
-from django.urls import reverse_lazy
-from django.contrib.auth.mixins import LoginRequiredMixin
 
-from django.utils.safestring import mark_safe
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class IndexView(LoginRequiredMixin, TemplateView):
@@ -63,14 +67,6 @@ class RAGHyDEComparisonForm(forms.Form):
         widget=forms.CheckboxSelectMultiple,
         initial=lambda: Intervention.objects.first(),
     )
-    # multiple choice field of "examples" and "turns"
-    # search_in = forms.MultipleChoiceField(
-    #     label="Search In",
-    #     choices=[("examples", "Examples"), ("turns", "Turns")],
-    #     widget=forms.CheckboxSelectMultiple,
-    #     initial=["examples"],
-    #     required=True,
-    # )
 
 
 class RAGHyDEComparisonView(LoginRequiredMixin, FormView):
@@ -131,28 +127,6 @@ def create_public_session(request, intervention_slug):
     return redirect(chat_url)
 
 
-class SyntheticConversationDetailView(LoginRequiredMixin, DetailView):
-    model = SyntheticConversation
-    template_name = "synthetic_conversation_detail.html"
-    context_object_name = "conversation"
-
-    def get_object(self, queryset=None):
-        # Use the pk from the URL to fetch the conversation
-        return get_object_or_404(SyntheticConversation, pk=self.kwargs["pk"])
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-
-        # Fetch turns from each session in the conversation
-        conversation = self.get_object()
-
-        context["turns"] = Turn.objects.filter(
-            session_state__session=conversation.session_one
-        ).order_by("timestamp")
-
-        return context
-
-
 class TreatmentSessionDetailView(LoginRequiredMixin, DetailView):
     model = TreatmentSession
     template_name = "treatment_session_detail.html"
@@ -184,3 +158,181 @@ class TreatmentSessionDetailView(LoginRequiredMixin, DetailView):
         context["data"] = session.state.step.make_data_variable(session)
 
         return context
+
+
+class SyntheticConversationForm(forms.Form):
+    therapist_first = forms.BooleanField(
+        required=False, initial=True, help_text="Therapist speaks first"
+    )
+    transcript = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 10, "cols": 80}),
+        initial="Hi, welcome to the session. Do you have any questions about Mindframe?",
+        help_text="Paste conversation transcript, one row per speaker. Splits on line breaks and assumes client/therapist alternate turns.",
+    )
+    add_turns = forms.IntegerField(
+        help_text="Number of new turns to generate and add to the conversation transcript.",
+        initial=0,
+        min_value=0,
+        max_value=100,
+    )
+
+    therapist = forms.ModelChoiceField(
+        queryset=CustomUser.objects.filter(role="therapist"),
+        required=False,
+        initial=CustomUser.objects.filter(role="therapist").first(),
+        help_text="Optionally select an existing therapist user",
+    )
+    client = forms.ModelChoiceField(
+        queryset=CustomUser.objects.filter(role="client"),
+        required=False,
+        help_text="Optionally select an existing client user",
+    )
+    therapist_intervention = forms.ModelChoiceField(
+        queryset=Intervention.objects.all(),
+        initial=Intervention.objects.filter(slug__istartswith="demo").first(),
+        required=True,
+        help_text="Select an intervention for the therapist",
+    )
+    client_intervention = forms.ModelChoiceField(
+        queryset=Intervention.objects.all(),
+        initial=Intervention.objects.filter(slug__istartswith="fake-client").first(),
+        required=True,
+        help_text="Select an intervention for the client",
+    )
+
+
+class SyntheticConversationCreateView(LoginRequiredMixin, FormView):
+    template_name = "synthetic_conversation_form.html"
+    form_class = SyntheticConversationForm
+    success_url = reverse_lazy("synthetic_conversation_detail")
+
+    def form_valid(self, form):
+        transcript = form.cleaned_data["transcript"].strip().split("\n")
+        therapist = form.cleaned_data["therapist"]
+        client = form.cleaned_data["client"]
+        add_turns = form.cleaned_data["add_turns"]
+        therapist_intervention = form.cleaned_data["therapist_intervention"]
+        client_intervention = form.cleaned_data["client_intervention"]
+
+        # Create users if not provided
+        if not therapist:
+            therapist = CustomUser.objects.create(
+                username=f"therapist_{random.randint(1000, 9999)}", role="therapist"
+            )
+        if not client:
+            client = CustomUser.objects.create(
+                username=f"client_{random.randint(1000, 9999)}", role="client"
+            )
+
+        # Create treatment cycles and sessions
+        therapist_cycle = Cycle.objects.create(
+            client=therapist, intervention=therapist_intervention
+        )
+        client_cycle = Cycle.objects.create(client=client, intervention=client_intervention)
+        therapist_session = TreatmentSession.objects.create(
+            cycle=therapist_cycle, started=timezone.now()
+        )
+        client_session = TreatmentSession.objects.create(cycle=client_cycle, started=timezone.now())
+
+        # Create synthetic conversation link
+        conversation = SyntheticConversation.objects.create(
+            session_one=therapist_session, session_two=client_session, start_time=timezone.now()
+        )
+
+        # Process transcript and assign turns
+        speakers_ = (
+            form.cleaned_data["therapist_first"]
+            and [therapist_session, client_session]
+            or [client_session, therapist_session]
+        )
+        speakers = cycle(speakers_)
+        listeners = cycle(speakers_)
+        for line, spkr in list(zip(transcript, speakers)):
+            text = line.strip()
+            a = listeners.__next__()
+            b = listeners.__next__()
+            lt = a.listen(speaker=spkr.cycle.client, text=text)
+            b.listen(speaker=spkr.cycle.client, text=text)
+            conversation.last_speaker_turn = lt
+            conversation.save()
+
+        if int(add_turns) > 0:
+            conversation.additional_turns_scheduled += add_turns
+            conversation.save()
+            add_turns_task.delay(conversation.pk, add_turns)
+            logger.info(
+                f"Scheduled generting {add_turns} turns to conversation ID {conversation.pk}."
+            )
+
+        return redirect(
+            reverse_lazy("synthetic_conversation_detail", kwargs={"pk": conversation.pk})
+        )
+
+
+class AdditionalTurnsForm(forms.Form):
+    n_turns = forms.IntegerField(
+        label="Number of Turns",
+        min_value=1,
+        max_value=100,
+        help_text="Specify how many additional turns to generate.",
+        widget=forms.NumberInput(attrs={"class": "form-control"}),
+    )
+
+
+class SyntheticConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
+    model = SyntheticConversation
+    template_name = "synthetic_conversation_detail.html"
+    context_object_name = "conversation"
+    form_class = AdditionalTurnsForm  # Use the custom form
+
+    def get_object(self, queryset=None):
+        return get_object_or_404(SyntheticConversation, pk=self.kwargs["pk"])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        conversation = self.get_object()
+
+        context["turns"] = Turn.objects.filter(
+            session_state__session=conversation.session_one
+        ).order_by("timestamp")
+
+        context["form"] = self.get_form()
+        return context
+
+    def get_success_url(self):
+        return reverse("synthetic_conversation_detail", kwargs={"pk": self.object.pk})
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        if form.is_valid():
+            n_turns = form.cleaned_data["n_turns"]
+            self.object.additional_turns_scheduled += n_turns
+            self.object.save()
+
+            add_turns_task.delay(self.object.pk, n_turns)  # Adding N turns as specified
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
+
+
+# class SyntheticConversationDetailView(LoginRequiredMixin, DetailView):
+#     model = SyntheticConversation
+#     template_name = "synthetic_conversation_detail.html"
+#     context_object_name = "conversation"
+
+#     def get_object(self, queryset=None):
+#         # Use the pk from the URL to fetch the conversation
+#         return get_object_or_404(SyntheticConversation, pk=self.kwargs["pk"])
+
+#     def get_context_data(self, **kwargs):
+#         context = super().get_context_data(**kwargs)
+
+#         # Fetch turns from each session in the conversation
+#         conversation = self.get_object()
+
+#         context["turns"] = Turn.objects.filter(
+#             session_state__session=conversation.session_one
+#         ).order_by("timestamp")
+
+#         return context

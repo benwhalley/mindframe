@@ -20,7 +20,7 @@
             {% if session.synthetic_conversations.count %}
             <p>
                 {% for i in session.synthetic_conversations %}
-                Part of a synthetic conversation: <a href="{% url 'fake_conversation_detail' i.pk %}">{{ i.pk }}</a>
+                Part of a synthetic conversation: <a href="{% url 'synthetic_conversation_detail' i.pk %}">{{ i.pk }}</a>
                 {% endfor %}
             </p>
             {% endif %}

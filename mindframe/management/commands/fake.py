@@ -1,5 +1,5 @@
 """
-./manage.py fake --turns=4 demo fake-client-eating
+./manage.py fake --turns=4 demo fake-client-eating 
 ./manage.py fake --turns=2 --continue 41
 """
 
@@ -99,10 +99,6 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS(f"Started new conversation with ID {conversation.pk}.")
             )
-
-        # Continue or add new turns, starting with the client responding, up to the specified turn count
-        conversation.additional_turns_scheduled = turns
-        conversation.save()
 
         add_turns(conversation, turns)
 
