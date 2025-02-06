@@ -24,8 +24,8 @@ services:
     environment:
       - APP_MODE=web
     volumes:
-      - ~/dev/mindframe/mindframe:/app/mindframe
-      - ~/dev/mindframe/llmtools:/app/llmtools
+      - ~/dev/mindframe/mindframe:/app/mindframe:rw,rslave
+      - ~/dev/mindframe/llmtools:/app/llmtools:rw,rslave
 
   chat:
     depends_on:
@@ -44,9 +44,9 @@ services:
       - APP_MODE=chat
     restart: unless-stopped
     volumes:
-      - ~/dev/mindframe/mindframe:/app/mindframe
-      - ~/dev/mindframe/llmtools:/app/llmtools
-      - ~/dev/mindframe/mindframe/chatbot.py:/app/chatbot.py
+      - ~/dev/mindframe/mindframe:/app/mindframe:rw,rslave
+      - ~/dev/mindframe/llmtools:/app/llmtools:rw,rslave
+      - ~/dev/mindframe/mindframe/chatbot.py:/app/chatbot.py:rw,rslave
 
   worker:
     image: mindframe-base:latest
@@ -60,4 +60,4 @@ services:
     environment:
       - APP_MODE=worker
     volumes:
-      - ~/dev/mindframe/mindframe:/app/mindframe
+      - ~/dev/mindframe/mindframe:/app/mindframe:rw,rslave
