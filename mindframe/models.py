@@ -292,15 +292,13 @@ class Step(models.Model):
         return completions
 
     @observe(capture_input=False, capture_output=False)
-    def respond_in_conversation(
-        self, respond_to: ConversationNode, as_speaker: CustomUser
-    ):
-        
+    def respond_in_conversation(self, respond_to: ConversationNode, as_speaker: CustomUser):
+
         transcript = list(reversed(iter_conversation_path(respond_to, direction="up")))
         speaker_last_turn = respond_to.conversation.previous_turn_of_speaker(as_speaker)
-        
+
         step = speaker_last_turn.step
-        
+
         transitions = step.transitions_from.all()
         logger.info(f"Last used step: {step}.\nPossible transitions: {transitions}")
 
@@ -311,8 +309,7 @@ class Step(models.Model):
 
         # generate a new turn for the bot
         newturn = Turn.objects.create(
-            speaker=bot, session_state=self.state, 
-            source_type=TurnSourceTypes.AI
+            speaker=bot, session_state=self.state, source_type=TurnSourceTypes.AI
         )
         newturn.save()
 
@@ -1183,8 +1180,6 @@ def iter_conversation_path(node, direction="down"):
         raise ValueError("Invalid direction. Use 'down' or 'up'.")
 
 
-
-
 class Conversation(LifecycleModel):
     """
     Store conversations as a Tree
@@ -1197,13 +1192,13 @@ class Conversation(LifecycleModel):
 
     This setup would also allow for group conversations, even though we're not doing this right now.
     """
-    
+
     def previous_turn_of_speaker(self, start_node, speaker):
         for node in iter_conversation_path(start_node, direction="up"):
             if node.speaker_id == speaker.id:
                 return node
         return None
-    
+
     def get_conversation(self, from_turn=None) -> Iterable:
         """
         Get the conversation as an iterable of turns, starting from the root node to the end point.
