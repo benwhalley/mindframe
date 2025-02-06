@@ -42,3 +42,7 @@ For structure-level validation:
 - allow judgements to move the client through the DAG, generate clinical notes etc. These feed into later completions...
 
 - Also do this with a non-DAG based prompt and with MF, to compare the two
+
+
+
+Add fixture for first therapost user
