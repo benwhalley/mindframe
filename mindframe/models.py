@@ -1,13 +1,17 @@
-import os
 import hashlib
 import json
 import logging
-from collections import defaultdict, OrderedDict
 from collections.abc import Iterable
 
-from box import Box
+from treebeard.ns_tree import NS_Node
+from pgvector.django import L2Distance
+from django.db.models import Window, F
+
+from django.db.models.functions import RowNumber
+from itertools import groupby
+
 from enum import auto
-import shortuuid
+from mindframe.shortuuidfield import MFShortUUIDField as ShortUUIDField
 import instructor
 from autoslug import AutoSlugField
 from decouple import config
@@ -34,40 +38,21 @@ from django_lifecycle import LifecycleModel, hook, AFTER_UPDATE, AFTER_CREATE
 
 from mindframe.chunking import CHUNKER_TEMPLATE
 from llmtools.llm_calling import chatter, get_embedding, simple_chat
-from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
+from mindframe.settings import (
+    MINDFRAME_SHORTUUID_ALPHABET,
+    BranchReasons,
+    TurnTextSourceTypes,
+    RoleChoices,
+    StepJudgementFrequencyChoices,
+)
 
 logger = logging.getLogger(__name__)
 langfuse_context.configure(debug=False)
+
+import shortuuid
+
 shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
-
-
-def s_uuid():
-    return shortuuid.uuid()
-
-
-class TurnSourceTypes(models.TextChoices):
-    """Types of sources for a Turn object."""
-
-    HUMAN = "human", "Human"
-    AI = "AI", "AI"
-
-
-class RoleChoices(models.TextChoices):
-    """Defines various roles in the system such as developers, clients, and supervisors."""
-
-    SYSTEM_DEVELOPER = "system_developer", "System Developer"
-    INTERVENTION_DEVELOPER = "intervention_developer", "Intervention Developer"
-    CLIENT = "client", "Client"
-    SUPERVISOR = "supervisor", "Supervisor"
-    THERAPIST = "therapist", "Therapist"
-
-
-class StepJudgementFrequencyChoices(models.TextChoices):
-    """Specifies when/how frequently a judgement should be made during a step."""
-
-    TURN = "turn", "Each turn"
-    ENTER = "enter", "When entering the step"
-    EXIT = "exit", "When exiting the step"
+# len(shortuuid.uuid())
 
 
 class CustomUser(AbstractUser):
@@ -85,7 +70,7 @@ class Intervention(LifecycleModel):
     """A treatment/intervention, including steps, transitions, and related metadata."""
 
     def natural_key(self):
-        return slugify(self.short_title)
+        return slugify(self.title)
 
     def compute_version(self):
         """Compute a version hash based on all linked objects."""
@@ -93,7 +78,7 @@ class Intervention(LifecycleModel):
         hashed_fields = {
             "interventions": [
                 "title",
-            ],  # "short_title"],
+            ],
             "steps": ["title", "prompt_template"],
             "transitions": ["conditions"],  # "from_step__title", "to_step__title",
             "judgements": [
@@ -131,8 +116,7 @@ class Intervention(LifecycleModel):
         return reverse("admin:mindframe_export", args=[self.id])
 
     title = models.CharField(max_length=255)
-    short_title = models.CharField(max_length=20)
-    slug = AutoSlugField(populate_from="short_title", unique=True)
+    slug = AutoSlugField(populate_from="title", unique=True)
     version = models.CharField(max_length=64, null=True, editable=False)
     sem_ver = models.CharField(max_length=64, null=True, editable=True)
 
@@ -182,6 +166,7 @@ class StepJudgement(models.Model):
         "Judgement", related_name="stepjudgements", on_delete=models.CASCADE
     )
     step = models.ForeignKey("Step", related_name="stepjudgements", on_delete=models.CASCADE)
+
     when = models.CharField(
         choices=StepJudgementFrequencyChoices.choices,
         default=StepJudgementFrequencyChoices.TURN,
@@ -189,10 +174,6 @@ class StepJudgement(models.Model):
     )
     once = models.BooleanField(
         default=False, help_text="Once we have a non-null value returned, don't repeat."
-    )
-    use_as_guidance = models.BooleanField(
-        default=False,
-        help_text="Allow this judgement to be used as guidance when generating responses to the client. Exposed as a list of {{guidance}} in the prompt template.",
     )
 
     def natural_key(self):
@@ -222,133 +203,12 @@ class Step(models.Model):
     def get_absolute_url(self):
         return reverse("admin:mindframe_step_change", args=[str(self.id)])
 
-    def make_data_variable(self, session):
-        """This makes the `data` context variable, used in the prompt template.
-
-        The layout/structure of this object is important because end-users will access it in templates and it needs to be consistent/predictable and provide good defaults.
-        """
-
-        def getv(notes, v):
-            notes = notes.filter(judgement__variable_name=v)
-            r = {v: notes.last().data, v + "__all": notes}
-            return r
-
-        # get all notes for this session and flatten them so that we can access the latest
-        # instance of each Judgement/Note by variable name
-        notes = Note.objects.filter(turn__session_state__session__cycle=session.cycle)
-        vars = set(notes.values_list("judgement__variable_name", flat=True))
-        dd = {}
-        for i in vars:
-            dd.update(getv(notes, i))
-
-        return dd
-
-    def get_step_context(self, session) -> dict:
-
-        all_notes = Note.objects.filter(turn__session_state__session__cycle=session.cycle)
-        all_turns = Turn.objects.filter(session_state__session__cycle=session.cycle)
-
-        # ALI - THIS IS AN IMPORTANT PART BECAUSE IT PROVIDES CONTEXT FOR THE LLM WHEN RESPONDING TO CLIENTS AND ALSO WHEN MAKING JUDGEMENTS
-        # FOR SOME THINGS WE WILL BE ABLE TO EXTEND THIS FUNCTION AND PROVIDE MORE CONTEXT
-        # IN OTHER CASES (E.G. FOR RAG) WE WILL NEED TO MAKE A TEMPLATETAG AND USE THAT IN THE PROMPT TEMPLATE TO DYNAMICALLY EXTRACT EXTRA CONTEXT
-
-        context = {
-            "session": session,
-            "intervention": session.cycle.intervention,
-            "notes": all_notes.filter(turn__session_state__session=session).filter(
-                timestamp__gt=session.state.timestamp
-            ),
-            "session_notes": all_notes.filter(turn__session_state__session=session),
-            "all_notes": all_notes,
-            "data": self.make_data_variable(session),
-        }
-        return context
-
-    def get_model(self, session):
-        # TODO FIX DEFAULTING
-        m = session.cycle.intervention.default_conversation_model
-        if m:
-            return m
-        return LLM.objects.filter(model_name="gpt-4o").first()
-
-    @observe(capture_input=False, capture_output=False)
-    def spoken_response(self, turn) -> OrderedDict:
-        """Use an llm to create a spoken response to clients, using session data as context."""
-
-        session = turn.session_state.session
-        ctx = self.get_step_context(session)
-
-        completions = chatter(
-            self.prompt_template,
-            context=ctx,
-            model=self.get_model(session),
-            log_context={
-                "step": self,
-                "session": session,
-                "prompt": self.prompt_template,
-                "turn": turn,
-                "context": ctx,
-            },
-        )
-        return completions
-
-    @observe(capture_input=False, capture_output=False)
-    def respond_in_conversation(self, respond_to, as_speaker):
-
-        transcript = list(reversed(iter_conversation_path(respond_to, direction="up")))
-        speaker_last_turn = respond_to.conversation.previous_turn_of_speaker(as_speaker)
-
-        step = speaker_last_turn.step
-
-        transitions = step.transitions_from.all()
-        logger.info(f"Last used step: {step}.\nPossible transitions: {transitions}")
-
-        # for now, just get all the judgements that are run on every turn
-        turn_jgmnts = step.stepjudgements.filter(when=StepJudgementFrequencyChoices.TURN)
-        judgements_to_run = self.get_judgements_to_run(step, turn_jgmnts)
-        logger.info(f"TURN JUDGEMENTS TO RUN: {judgements_to_run}")
-
-        # generate a new turn for the bot
-        newturn = Turn.objects.create(
-            speaker=bot, session_state=self.state, source_type=TurnSourceTypes.AI
-        )
-        newturn.save()
-
-        logger.info(f"New turn created: {newturn}")
-
-        # do the judgements we need now
-        [j.make_judgement(newturn) for j in judgements_to_run]
-
-        client_data = self.build_client_data_dict(step)
-
-        step = self.evaluate_transitions_and_update_step(newturn, step, transitions, client_data)
-
-        completions = step.spoken_response(newturn)
-
-        utterance = completions.response
-        # save the generated response and other data to the new Turn
-        newturn.session_state = self.state  # update in case we changed step
-        newturn.text = utterance
-        newturn.metadata = dict(completions.items())
-        newturn.save()
-
-        thoughts = "TODO: ENSURE A SUMMARY OF MODEL THINKING IS MADE HERE?"
-
-        langfuse_context.update_current_observation(
-            name=f"Response: {self.state} ({self.cycle.intervention})",
-            session_id=self.uuid,
-            output=utterance,
-        )
-        langfuse_context.flush()
-
-        return {"utterance": utterance, "thoughts": thoughts}
-
     class Meta:
         unique_together = [("intervention", "title"), ("intervention", "slug")]
         ordering = ["intervention", "order", "title"]
 
     def __str__(self):
-        return f"{self.title} ({self.intervention.title}, {self.intervention.sem_ver}/{self.intervention.ver()})"
+        return f"{self.title} | {self.intervention.title}"
 
 
 class Transition(models.Model):
@@ -361,6 +221,8 @@ class Transition(models.Model):
         blank=True,
         help_text="Python code to evaluate before the transition can be be made. Each line is evaluated indendently and all must be True for the transition to be made. Variables created by Judgements are passed in as a dictionary.",
     )
+    
+    priority = models.PositiveSmallIntegerField(default=1)
 
     def clean(self):
         if self.from_step.intervention != self.to_step.intervention:
@@ -368,48 +230,41 @@ class Transition(models.Model):
 
     class Meta:
         unique_together = [("from_step", "to_step", "conditions")]
+        ordering = ["priority"]
 
     def __str__(self):
         return f"{self.from_step} -> {self.to_step}"
 
 
 class Judgement(models.Model):
-    """A Judgement to be made on the current session state.
+    """A Judgement to be made on the current Conversation state.
 
-        Judgements are defined by a prompt template and expected return type/acceptable return values.
-
-    jj =Judgement.objects.last()
-    ss = TreatmentSession.objects.last()
-    tt = ss.turns.all().last()
-    jr = jj.make_judgement(tt)
-    jr.items()
+    Judgements are defined by a prompt template and expected return type/acceptable return values.
     """
 
     def natural_key(self):
         return slugify(f"{self.variable_name}")
 
     intervention = models.ForeignKey("mindframe.Intervention", on_delete=models.CASCADE)
-    title = models.CharField(max_length=255)
-    slug = AutoSlugField(populate_from="title")
-    variable_name = models.CharField(max_length=255)
-    task_summary = models.TextField(
-        blank=True,
-        null=True,
-        help_text="A brief summary of the task or question asked by this judgement. E.g. 'Evaluate the client's emotional state'.",
-    )
     prompt_template = models.TextField()
+    title = models.CharField(max_length=255)
+    variable_name = AutoSlugField(
+        editable=True,
+        unique_with="intervention",
+        #   slugify=lambda value: value.replace(' ','_').replace('-','_').lower().strip(),
+        max_length=255,
+    )
 
     @observe(capture_input=False, capture_output=False)
     def make_judgement(self, turn):
         """
-
-        s = TreatmentSession.objects.last()
+        cn = Turn.objects.last()
+        c = cn.conversation
         self = Judgement.objects.first()
         self.make_judgement(s)
         """
 
-        session = turn.session_state.session
-        logger.info(f"Making judgement {self.title} for {session}")
+        get_step_context
         try:
             result = self.process_inputs(
                 turn, inputs=session.current_step().get_step_context(session)
@@ -425,9 +280,6 @@ class Judgement(models.Model):
             logger.error(traceback.print_exc())
             # TODO: find some way of making this error more obvious to users
             return None
-
-    def get_model(self, session):
-        return session.cycle.intervention.default_conversation_model
 
     def process_inputs(self, turn, inputs: dict):
 
@@ -446,10 +298,12 @@ class Judgement(models.Model):
         return newnote
 
     def __str__(self) -> str:
-        return f"<{self.variable_name}> {self.title} ({self.intervention.short_title} {self.intervention.sem_ver})"
+        return f"<{self.variable_name}> {self.title} ({self.intervention.title} {self.intervention.sem_ver})"
 
     class Meta:
-        unique_together = [("intervention", "title"), ("intervention", "slug")]
+        unique_together = [
+            ("intervention", "title"),
+        ]
 
 
 # ######################### #
@@ -458,325 +312,15 @@ class Judgement(models.Model):
 # Records made at runtime
 
 
-class Cycle(models.Model):
-    """A cycle of treatment for a client, linking multiple treatment sessions."""
-
-    client = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="cycles")
-    intervention = models.ForeignKey(
-        "mindframe.Intervention", on_delete=models.CASCADE, related_name="Cycles"
-    )
-    start_date = models.DateTimeField(default=timezone.now)
-    end_date = models.DateTimeField(null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.client} started {self.intervention.short_title}, {self.start_date}"
-
-
-class TreatmentSession(models.Model):
-    """An individual 'session' for a client within a treatment cycle."""
-
-    def natural_key(self):
-        return self.uuid
-
-    uuid = models.CharField(unique=True, default=s_uuid, editable=False, null=False)
-    cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name="sessions")
-    started = models.DateTimeField(default=timezone.now)
-    last_updated = models.DateTimeField(auto_now=True)
-
-    def chatbot_link(self):
-        return f"{settings.CHAT_URL}/?session_id={self.uuid}"
-
-    @property
-    def turns(self):
-        return self.state.turns
-
-    @property
-    def state(self):
-        # the state of the TreatmentSession is defined by TreatmentSessionState records (the last one represents our current position in the intervention)
-        prg = self.progress.all()
-        if prg.count() > 0:
-            # return the step of the last progress record (i.e. the current step)
-            return self.progress.last()
-        else:
-            # if there are no progress records, create one so we know we're on the first step
-            p_ = TreatmentSessionState.objects.create(
-                session=self, step=self.cycle.intervention.steps.first()
-            )
-            p_.save()
-            return p_
-
-    def synthetic_conversations(self):
-        return SyntheticConversation.objects.filter(Q(session_one=self) | Q(session_two=self))
-
-    def current_step(self):
-        return self.state.step
-
-    def listen(self, speaker, text, timestamp=None, source_type=TurnSourceTypes.HUMAN):
-        """Record a Turn in the session when the client speaks"""
-        timestamp = timestamp or timezone.now()
-
-        turn = Turn.objects.create(
-            session_state=self.state,
-            speaker=speaker,
-            text=text,
-            timestamp=timestamp,
-            source_type=source_type,
-        )
-        turn.save()
-        logger.info(f"TURN SAVED: {turn}")
-        return turn
-
-    def get_judgements_to_run(self, step, judgements):
-        # find all the judgements that should be run on every turn
-        potential_judgements_to_run = Judgement.objects.filter(
-            pk__in=(judgements.values_list("judgement", flat=True))
-        ).annotate(
-            notes_count=Count(
-                "notes",
-                filter=Q(notes__turn__session_state__session__cycle=self.cycle)
-                & ~Q(notes__data__value=None),
-            )
-        )
-
-        # exclude ones where we already have a note and we only want to run once
-        judgements_to_run = potential_judgements_to_run.exclude(
-            stepjudgements__once=True, notes_count__gt=0
-        )
-        # log which ones we skipped
-        for i in potential_judgements_to_run.filter(stepjudgements__once=True, notes_count__gt=0):
-            nts = Note.objects.filter(
-                judgement=i, turn__session_state__session__cycle=self.cycle
-            ).values("data")
-            logger.debug(f"SKIPPED JUDGEMENT: {i} - Existing Notes: {nts}")
-
-        return judgements_to_run
-
-    def build_client_data_dict(self, step):
-        """Make a dictionary of the MOST RECENT note for each judgement variable plus metadata"""
-        session_notes = Note.objects.filter(turn__session_state__session=self).filter(
-            data__isnull=False
-        )
-        client_data = defaultdict(lambda: None)
-        client_data.update(
-            dict(
-                session_notes.order_by("judgement__variable_name", "-timestamp").distinct(
-                    "judgement__variable_name"
-                )
-                # `data`` can contain multiple values, each defined by a different completion - see return_type_models.py
-                .values_list("judgement__variable_name", "data")
-            )
-        )
-
-        # add metadata to this dict to use as context in evaluating transition conditions
-        client_data.update(
-            {
-                "n_turns_step": self.turns.filter(session_state__step=step).count(),
-                "n_turns_session": self.turns.filter().count(),
-            }
-        )
-        logger.debug(f"DATA DETERMINING TRANSITION: {client_data}")
-        return client_data
-
-    def evaluate_transitions_and_update_step(self, turn, step, transitions, client_data):
-        # check each of the conditions for each transition, line by line
-        # all of the conditions must hold for the transition to be made
-        # conditions are evaluated in a clean context with no globals but
-        # do have access to the client_data default dictionary (default=None)
-
-        # TODO: helping users debug their conditions and providing sensible error
-        # messages will be important here and needs to be added.
-
-        # convert to a dotten namespace to allowed dotted access to vars in conditions users write
-        # from box import Box
-        # x=Box({'a': {'c':3}, 'b': 2}, default_box=True)
-        # eval("x.a.c", {}, x) == x.a.c
-        # eval("a.a.c", {}, x) == x.a.c
-
-        client_data = Box(client_data, default_box=True)
-        logger.debug(f"CLIENT DATA AS BOX: {client_data}")
-        transition_results = [
-            (
-                t,
-                [
-                    (c, eval(c, {}, client_data))
-                    for c in list(map(str.strip, filter(bool, t.conditions.split("\n"))))
-                ],
-            )
-            for t in transitions
-        ]
-
-        transition_results = [(i, all([r for c, r in l]), l) for i, l in transition_results]
-        logger.debug(f"TRANSITION RESULTS: {transition_results}")
-
-        # Find transitions that passed (if any)
-        next_step = None
-        valid_transitions = [t for t, passed, l in transition_results if passed]
-        if valid_transitions:
-            # for now, just pick the first transition that passed
-            next_step = transitions[0].to_step
-            newstate = TreatmentSessionState.objects.create(
-                session=self, previous_step=step, step=next_step
-            )
-            newstate.save()
-
-            # do any extra judgements needed
-            step_jgm_enter_exit = StepJudgement.objects.filter(
-                Q(
-                    pk__in=next_step.stepjudgements.filter(
-                        when=StepJudgementFrequencyChoices.ENTER
-                    ).values("pk")
-                )
-                | Q(
-                    pk__in=step.stepjudgements.filter(
-                        when=StepJudgementFrequencyChoices.EXIT
-                    ).values("pk")
-                )
-            )
-
-            judgements_to_run = self.get_judgements_to_run(step, step_jgm_enter_exit)
-            logger.debug(f"ENTRY/EXIT JUDGEMENTS TO RUN: {judgements_to_run}")
-
-            # then do the judgements we need
-            jvals_ = [j.make_judgement(turn) for j in judgements_to_run]
-
-            step = next_step  # Update the step to reflect the new state
-
-        return step
-
-    @observe(capture_input=False, capture_output=False)
-    def respond(self):
-        """Respond to the client's last utterance (and manage transitions)."""
-        logger.info("Starting response")
-
-        bot = CustomUser.objects.filter(role=RoleChoices.THERAPIST).first()
-        if not bot:
-            raise Exception("No therapist user found to respond to client.")
-
-        step = self.current_step()
-        transitions = step.transitions_from.all()
-        logger.info(f"Step: {step}, Transitions: {transitions}")
-
-        # for now, just get all the judgements that are run on every turn
-        turn_jgmnts = step.stepjudgements.filter(when=StepJudgementFrequencyChoices.TURN)
-        judgements_to_run = self.get_judgements_to_run(step, turn_jgmnts)
-        logger.info(f"TURN JUDGEMENTS TO RUN: {judgements_to_run}")
-
-        # generate a new turn for the bot
-        newturn = Turn.objects.create(
-            speaker=bot, session_state=self.state, source_type=TurnSourceTypes.AI
-        )
-        newturn.save()
-
-        logger.info(f"New turn created: {newturn}")
-
-        # do the judgements we need now
-        [j.make_judgement(newturn) for j in judgements_to_run]
-
-        client_data = self.build_client_data_dict(step)
-
-        step = self.evaluate_transitions_and_update_step(newturn, step, transitions, client_data)
-
-        completions = step.spoken_response(newturn)
-
-        utterance = completions.response
-        # save the generated response and other data to the new Turn
-        newturn.session_state = self.state  # update in case we changed step
-        newturn.text = utterance
-        newturn.metadata = dict(completions.items())
-        newturn.save()
-
-        thoughts = "TODO: ENSURE A SUMMARY OF MODEL THINKING IS MADE HERE?"
-
-        langfuse_context.update_current_observation(
-            name=f"Response: {self.state} ({self.cycle.intervention})",
-            session_id=self.uuid,
-            output=utterance,
-        )
-        langfuse_context.flush()
-
-        return {"utterance": utterance, "thoughts": thoughts}
-
-    def get_absolute_url(self):
-        return reverse("treatment_session_detail", args=[str(self.uuid)])
-
-    class Meta:
-        ordering = ["-started"]
-
-    def __str__(self):
-        return f"<{self.pk}> Session on {self.started} for {self.cycle.client.username} in Cycle {self.cycle.id}"
-
-
-class TreatmentSessionState(models.Model):
-    """Tracks the state of a treatment session, including the current and previous steps."""
-
-    session = models.ForeignKey(TreatmentSession, on_delete=models.CASCADE, related_name="progress")
-    timestamp = models.DateTimeField(default=timezone.now)
-    previous_step = models.ForeignKey(
-        Step,
-        on_delete=models.CASCADE,
-        related_name="progressions_from",
-        null=True,
-        blank=True,
-    )
-    step = models.ForeignKey(
-        Step,
-        on_delete=models.CASCADE,
-    )
-
-    class Meta:
-        ordering = ["timestamp"]
-
-    def __str__(self):
-        return f"{self.step.title}"
-
-
-class Turn(models.Model):
-    """An individual utterance during a session (either client or therapist)."""
-
-    uuid = models.CharField(unique=True, default=s_uuid, editable=False, null=False)
-    source_type = models.CharField(
-        choices=TurnSourceTypes.choices, max_length=25, default=TurnSourceTypes.HUMAN
-    )
-    session_state = models.ForeignKey(
-        TreatmentSessionState,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="turns",
-    )
-
-    timestamp = models.DateTimeField(default=timezone.now)
-    speaker = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=False, blank=False)
-    text = models.TextField(blank=True, null=True)
-
-    metadata = models.JSONField(
-        blank=True,
-        null=True,
-        help_text="Additional data like preparation, hidden tokens, LLM call chains etc.",
-    )
-
-    class Meta:
-        ordering = ["timestamp"]
-
-    def __str__(self):
-        return f"{self.speaker.get_full_name().upper()} ({self.timestamp}): {self.text}"
-
-
 class Note(models.Model):
-    """Stores clinical records or outputs from Judgements made during treatment sessions.
+    """
+    Stores clinical records or outputs from Judgements made during Conversations
 
-    Notes can be either plain text or contasin structured data, depending on the Judgement that created them.
+    Notes can be either plain text or contain structured data, depending on the
+    Judgement that created them.
     """
 
-    uuid = models.CharField(unique=True, default=s_uuid, editable=False, null=False)
-
-    # session_state = models.ForeignKey(
-    #     TreatmentSessionState,
-    #     on_delete=models.CASCADE,
-    #     null=True,
-    #     blank=True,
-    #     related_name="notes",
-    # )
+    uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False)
 
     turn = models.ForeignKey(
         "Turn",
@@ -805,66 +349,6 @@ class Note(models.Model):
         return (
             f"[{self.judgement.variable_name}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
         )
-
-
-class LLMLogTypes(models.TextChoices):
-    """Types of logs that can be stored in the LLMLog model."""
-
-    ERROR = auto()
-    USAGE = auto()
-
-
-class LLMLog(models.Model):
-    """Log LLM usage and errors."""
-
-    timestamp = models.DateTimeField(default=timezone.now)
-    # langfuse_context.get_current_trace_url()
-    # trace_url = models.URLField(blank=True, null=True)
-    variable_name = models.CharField(max_length=255, blank=True, null=True)
-    log_type = models.CharField(
-        choices=LLMLogTypes.choices, max_length=25, default=LLMLogTypes.USAGE
-    )
-    step = models.ForeignKey(Step, on_delete=models.CASCADE, null=True, blank=True)
-    judgement = models.ForeignKey(Judgement, on_delete=models.CASCADE, null=True, blank=True)
-    model = models.ForeignKey("LLM", on_delete=models.CASCADE, null=True, blank=True)
-
-    session = models.ForeignKey(TreatmentSession, on_delete=models.CASCADE, null=True, blank=True)
-    turn = models.ForeignKey(
-        Turn, on_delete=models.CASCADE, null=True, blank=True, related_name="llm_calls"
-    )
-
-    message = models.TextField(blank=True, null=True)
-    prompt_text = models.TextField(blank=True, null=True)
-    metadata = models.JSONField(default=dict, null=True, blank=True)
-
-    def __str__(self):
-        return f"<{self.pk}> {self.timestamp}: {self.message}"
-
-
-class SyntheticConversation(models.Model):
-    """A synthetic conversation between two TreatmentSessions"""
-
-    session_one = models.ForeignKey(
-        TreatmentSession, on_delete=models.CASCADE, related_name="conversation_one"
-    )
-    session_two = models.ForeignKey(
-        TreatmentSession, on_delete=models.CASCADE, related_name="conversation_two"
-    )
-    start_time = models.DateTimeField(default=timezone.now)
-
-    # because each TreatmentSession needs a full record of both speaker and listener (i.e. both sides of the conversation) we need to keep track of who spoke last manually for convenience
-    last_speaker_turn = models.ForeignKey("Turn", on_delete=models.CASCADE, null=True, blank=True)
-
-    additional_turns_scheduled = models.PositiveSmallIntegerField(
-        default=0,
-        help_text="Number of additional turns scheduled for this conversation (should be completed by a worker task — don't edit directly)",
-    )
-
-    def get_absolute_url(self):
-        return reverse("synthetic_conversation_detail", args=[str(self.pk)])
-
-    def __str__(self):
-        return f"Synthetic conversation between Session {self.session_one.id} and Session {self.session_two.id} starting at {self.start_time}"
 
 
 class LLM(models.Model):
@@ -900,19 +384,9 @@ class LLM(models.Model):
         # this is an Azure/OpenAI clent instance, but is used to query the litellm
         # proxy. It must provide chat.completions.create_with_completion and
         # client.chat.completions.create
-        # TODO: currently the langfuse version is not working properly so tracing
-        # won't work either
         return instructor.from_openai(
             OpenAI(api_key=config("LITELLM_API_KEY"), base_url=config("LITELLM_ENDPOINT"))
         )
-
-
-from pgvector.django import L2Distance
-from django.db.models import Window, F
-
-from django.template import Context, Template
-from django.db.models.functions import RowNumber
-from itertools import groupby
 
 
 ### QuerySet for MemoryChunk (Supports Chaining)
@@ -1085,13 +559,14 @@ class MemoryManager(models.Manager):
         return MemoryQuerySet(self.model, using=self._db)
 
 
-### Memory Model
 class Memory(LifecycleModel):
     text = models.TextField()
     intervention = models.ForeignKey(
         "Intervention", on_delete=models.CASCADE, related_name="memories"
     )
-    session = models.ForeignKey("TreatmentSession", blank=True, null=True, on_delete=models.CASCADE)
+
+    # TODO: decide, should this be on Conversation?
+    turn = models.ForeignKey("Turn", blank=True, null=True, on_delete=models.CASCADE)
 
     objects = MemoryManager()  # Use custom manager
 
@@ -1154,31 +629,7 @@ class Memory(LifecycleModel):
         return self.chunks.all()
 
 
-from treebeard.ns_tree import NS_Node
-
-
-def iter_conversation_path(node, direction="down"):
-    """
-    Iterates through a conversation tree in a given direction.
-
-    - If `direction="down"` (default), it follows the first path from root to tip.
-    - If `direction="up"`, it follows the path from a given node back to the root.
-
-    :param node: The starting node (root for down, tip for up).
-    :param direction: "down" (default) for depth-first, "up" for parent traversal.
-    :return: An iterator over nodes in the specified order.
-    """
-    if direction == "down":
-        while node:
-            yield node
-            children = node.get_children()
-            node = children.first() if children.exists() else None  # Take first child
-    elif direction == "up":
-        while node:
-            yield node
-            node = node.get_parent()  # Move to parent
-    else:
-        raise ValueError("Invalid direction. Use 'down' or 'up'.")
+from mindframe.tree import iter_conversation_path
 
 
 class Conversation(LifecycleModel):
@@ -1199,17 +650,6 @@ class Conversation(LifecycleModel):
             if node.speaker_id == speaker.id:
                 return node
         return None
-
-    def get_conversation(self, from_turn=None) -> Iterable:
-        """
-        Get the conversation as an iterable of turns, starting from the root node to the end point.
-
-        Because hypotheticals are ordered last within siblings, get_first_path
-        returns the 'true' conversation path.
-        """
-        if not from_turn:
-            from_turn = self.turns.filter(depth=1).first()
-        return iter_conversation_path(from_turn, direction="down")
 
     def speakers(self) -> QuerySet[CustomUser]:
         return CustomUser.objects.filter(
@@ -1237,19 +677,27 @@ class Conversation(LifecycleModel):
         if not respondent:
             raise ValueError("No speaker found to generate a response.")
 
+        # Find a speaker other than the last one
+        # we just pick the first one for the moment
+        # TODO: implement logic for choosing a speaker in group conversations
         respondent_last_turn = previous_turn_of_speaker(last_turn, respondent)
-
         step_to_use = respondent_last_turn
 
 
-class ConversationNode(NS_Node):
+class Turn(NS_Node):
     """
-    A 'turn' in the conversation.
+    Represents a 'turn' in the conversation.
 
-    At each point in the tree we can branch into alternative next turns to simulate different scenarios.
+    Conversations are trees rather than lists. At each node in the tree
+    we can branch into 'alternative' turns to simulate different scenarios
+    or different lines of conversations.
 
-    Nested sets chosen for read performance; writes not a concern because we're always appending at the tips and not moving stuff around.
+    Nested sets (NS_Node) is chosen for read performance. Writes are not a
+    concern because we're always appending at the branch tips and not moving
+    stuff around much.
     """
+
+    uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False)
 
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="turns")
     timestamp = models.DateTimeField(default=timezone.now)
@@ -1262,11 +710,16 @@ class ConversationNode(NS_Node):
     # Another use would be to collate different expert predictions for
     # what _should_ be said at a given point, and compare these to the
     # original conversation line.
-    counterfactual = models.BooleanField(
+    branch = models.BooleanField(
         default=False,
-        help_text="Is this a counterfactual turn? I.e. was it used to create a branch in the conversation tree or collate alternatives for a particular turn?",
+        help_text="Is this a an alternative version of something that was said in the main conversation? I.e. was it used to create a branch in the conversation tree - perhaps to collate alternatives for a particular turn?",
     )
-    author_of_counterfactual = models.ForeignKey(
+
+    branch_reason = models.CharField(
+        choices=BranchReasons.choices, max_length=25, default=BranchReasons.MAIN
+    )
+
+    branch_author = models.ForeignKey(
         CustomUser,
         on_delete=models.CASCADE,
         related_name="counterfactual_turns",
@@ -1284,13 +737,39 @@ class ConversationNode(NS_Node):
     )
 
     text = models.TextField(blank=True, null=True)
+    metadata = models.JSONField(default=dict, blank=True, null=True)
+    text_source = models.CharField(
+        choices=TurnTextSourceTypes.choices, max_length=25, default=TurnTextSourceTypes.HUMAN
+    )
+
     embedding = VectorField(dimensions=1024, null=True)
 
     # how sibling nodes are ordered within the same level
-    # we do counterfactuals first, then by timestamp to enable
+    # we do non-branches first, then by timestamp to enable
     # is to select the first sibling at each node as the 'real'
-    # conversation path.
-    node_order_by = ["counterfactual", "timestamp"]
+    # conversation path
+    node_order_by = ["branch", "timestamp"]
+
+    def listen(self, text, speaker):
+        return self.add_child(conversation=self.conversation, speaker=speaker, text=text)
+
+    def respond(self, as_speaker=None):
+        if not as_speaker:
+            # Find a speaker other than the last one
+            # we just pick the first one for the moment
+            # TODO: implement logic for choosing a speaker in group conversations
+            raise NotImplementedError("No speaker found to generate a response.")
+
+        spkr_history = [i.step for i in history(self) if i.speaker == as_speaker]
+        speakers_prev_step = spkr_history and list(reversed(spkr_history)).pop() or None
+        if not speakers_prev_step:
+            raise NotImplementedError("No Step/intervention found to use for response.")
+
+        newturn = self.add_child(
+            conversation=self.conversation, speaker=speaker, text="", step=speakers_prev_step
+        )
+        ctx = newturn.speaker_context()
+        newturn
 
     def __str__(self):
-        return f"{self.speaker_id or '-'}: {self.text[:40]}"
+        return f"{self.step}{self.step and ': '}{self.speaker or '-'}: {self.text[:40]}"

@@ -18,13 +18,9 @@ from mindframe.synthetic import add_turns_task
 import random
 from mindframe.models import (
     Intervention,
-    Cycle,
     CustomUser,
-    TreatmentSession,
     Memory,
-    SyntheticConversation,
     Turn,
-    LLMLog,
     Note,
     LLM,
 )
@@ -110,6 +106,7 @@ class RAGHyDEComparisonView(LoginRequiredMixin, FormView):
 
 
 def create_public_session(request, intervention_slug):
+    pass
     # Get the intervention based on the ID
     intervention = get_object_or_404(Intervention, slug=intervention_slug)
 
@@ -124,16 +121,17 @@ def create_public_session(request, intervention_slug):
     )
 
     # Generate a new cycle and session
-    cycle = Cycle.objects.create(intervention=intervention, client=client)
-    session = TreatmentSession.objects.create(cycle=cycle, started=timezone.now())
-
+    # cycle = Cycle.objects.create(intervention=intervention, client=client)
+    # session = TreatmentSession.objects.create(cycle=cycle, started=timezone.now())
+    # TODO FIXME
+    session = None
     # Redirect to the chat page with the session UUID
     chat_url = f"{settings.CHAT_URL}/?session_id={session.uuid}"
     return redirect(chat_url)
 
 
 class TreatmentSessionDetailView(LoginRequiredMixin, DetailView):
-    model = TreatmentSession
+    # model = TreatmentSession
     template_name = "treatment_session_detail.html"
     context_object_name = "session"
     slug_field = "uuid"
@@ -151,10 +149,6 @@ class TreatmentSessionDetailView(LoginRequiredMixin, DetailView):
         )
 
         context["states"] = session.progress.select_related("step", "previous_step")
-        context["logs"] = LLMLog.objects.filter(session=session).select_related(
-            "step", "judgement", "model"
-        )
-        from box import Box
 
         context["notes"] = Note.objects.filter(turn__session_state__session=session).select_related(
             "judgement"
@@ -165,66 +159,66 @@ class TreatmentSessionDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class SyntheticConversationForm(forms.Form):
-    therapist_first = forms.BooleanField(
-        required=False, initial=True, help_text="Therapist speaks first"
-    )
-    transcript = forms.CharField(
-        widget=forms.Textarea(attrs={"rows": 10, "cols": 80}),
-        initial="Hi, welcome to the session. Do you have any questions about Mindframe?",
-        help_text="Paste conversation transcript, one row per speaker. Splits on line breaks and assumes client/therapist alternate turns.",
-    )
-    add_turns = forms.IntegerField(
-        help_text="Number of new turns to generate and add to the conversation transcript.",
-        initial=0,
-        min_value=0,
-        max_value=100,
-    )
+# class SyntheticConversationForm(forms.Form):
+#     therapist_first = forms.BooleanField(
+#         required=False, initial=True, help_text="Therapist speaks first"
+#     )
+#     transcript = forms.CharField(
+#         widget=forms.Textarea(attrs={"rows": 10, "cols": 80}),
+#         initial="Hi, welcome to the session. Do you have any questions about Mindframe?",
+#         help_text="Paste conversation transcript, one row per speaker. Splits on line breaks and assumes client/therapist alternate turns.",
+#     )
+#     add_turns = forms.IntegerField(
+#         help_text="Number of new turns to generate and add to the conversation transcript.",
+#         initial=0,
+#         min_value=0,
+#         max_value=100,
+#     )
 
-    therapist = forms.ModelChoiceField(
-        required=False,
-        queryset=CustomUser.objects.none(),
-        help_text="Optionally select an existing therapist user",
-    )
+#     therapist = forms.ModelChoiceField(
+#         required=False,
+#         queryset=CustomUser.objects.none(),
+#         help_text="Optionally select an existing therapist user",
+#     )
 
-    client = forms.ModelChoiceField(
-        queryset=CustomUser.objects.none(),
-        required=False,
-        help_text="Optionally select an existing client user",
-    )
-    therapist_intervention = forms.ModelChoiceField(
-        required=True,
-        queryset=Intervention.objects.none(),
-        help_text="Select an intervention for the therapist",
-    )
-    client_intervention = forms.ModelChoiceField(
-        required=True,
-        queryset=Intervention.objects.none(),
-        help_text="Select an intervention for the client",
-    )
+#     client = forms.ModelChoiceField(
+#         queryset=CustomUser.objects.none(),
+#         required=False,
+#         help_text="Optionally select an existing client user",
+#     )
+#     therapist_intervention = forms.ModelChoiceField(
+#         required=True,
+#         queryset=Intervention.objects.none(),
+#         help_text="Select an intervention for the therapist",
+#     )
+#     client_intervention = forms.ModelChoiceField(
+#         required=True,
+#         queryset=Intervention.objects.none(),
+#         help_text="Select an intervention for the client",
+#     )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if Intervention.objects.exists():
-            self.fields["therapist"].queryset = CustomUser.objects.filter(role="therapist")
-            self.fields["therapist"].initial = CustomUser.objects.filter(role="therapist").first()
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         if Intervention.objects.exists():
+#             self.fields["therapist"].queryset = CustomUser.objects.filter(role="therapist")
+#             self.fields["therapist"].initial = CustomUser.objects.filter(role="therapist").first()
 
-            self.fields["therapist"].queryset = CustomUser.objects.filter(role="client")
+#             self.fields["therapist"].queryset = CustomUser.objects.filter(role="client")
 
-            self.fields["client_intervention"].queryset = Intervention.objects.all()
-            self.fields["client_intervention"].initial = Intervention.objects.filter(
-                slug__istartswith="fake-client"
-            ).first()
+#             self.fields["client_intervention"].queryset = Intervention.objects.all()
+#             self.fields["client_intervention"].initial = Intervention.objects.filter(
+#                 slug__istartswith="fake-client"
+#             ).first()
 
-            self.fields["therapist_intervention"].queryset = Intervention.objects.all()
-            self.fields["therapist_intervention"].initial = Intervention.objects.filter(
-                slug__istartswith="demo"
-            ).first()
+#             self.fields["therapist_intervention"].queryset = Intervention.objects.all()
+#             self.fields["therapist_intervention"].initial = Intervention.objects.filter(
+#                 slug__istartswith="demo"
+#             ).first()
 
 
 class SyntheticConversationCreateView(LoginRequiredMixin, FormView):
     template_name = "synthetic_conversation_form.html"
-    form_class = SyntheticConversationForm
+    # form_class = SyntheticConversationForm
     success_url = reverse_lazy("synthetic_conversation_detail")
 
     def form_valid(self, form):
@@ -301,7 +295,7 @@ class AdditionalTurnsForm(forms.Form):
 
 
 class SyntheticConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
-    model = SyntheticConversation
+    # model = SyntheticConversation
     template_name = "synthetic_conversation_detail.html"
     context_object_name = "conversation"
     form_class = AdditionalTurnsForm  # Use the custom form

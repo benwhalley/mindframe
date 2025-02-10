@@ -109,6 +109,7 @@ from llmtools.return_type_models import (
     selection_response_model,
     BooleanResponse,
     DefaultResponse,
+    IntegerResponse,
     PoeticalResponse,
     ExtractedResponse,
     ChunkedConversationResponse,
@@ -123,7 +124,6 @@ from decouple import config
 
 logger = logging.getLogger(__name__)
 
-
 # a lookup dict of return types for different actions specified in prompt templates
 ACTION_LOOKUP = defaultdict(lambda: DefaultResponse)
 ACTION_LOOKUP.update(
@@ -131,6 +131,8 @@ ACTION_LOOKUP.update(
         "speak": SpokenResponse,
         "extract": ExtractedResponse,
         "think": InternalThoughtsResponse,
+        "number": IntegerResponse,
+        "int": IntegerResponse,
         "pick": selection_response_model,
         "decide": BooleanResponse,
         "boolean": BooleanResponse,
@@ -288,8 +290,6 @@ def structured_chat(
     Make a tool call to an LLM, returning the `response` field, a completion object and the LLMLog.
     """
 
-    from mindframe.models import LLMLog, LLMLogTypes
-
     langfuse_context.update_current_observation(input=prompt)
 
     try:
@@ -299,25 +299,26 @@ def structured_chat(
             messages=[{"role": "user", "content": prompt}],
             max_retries=max_retries,
         )
-        msg, lt, meta = res.response, LLMLogTypes.USAGE, com.dict()
+        msg, lt, meta = res.response, None, com.dict()
 
     except Exception as e:
-        res, com, msg, lt, meta = None, None, str(e), LLMLogTypes.ERROR, str(log_context)
+        # res, com, msg, lt, meta = None, None, str(e), LLMLogTypes.ERROR, str(log_context)
         full_traceback = traceback.format_exc()
         logger.warning(f"Error calling LLM: {e}\n{full_traceback}")
 
-    llm_call_log = LLMLog.objects.create(
-        variable_name=log_context.get("variable_name", "?"),
-        log_type=lt,
-        session=log_context.get("session", None),
-        judgement=log_context.get("judgement", None),
-        turn=log_context.get("turn", None),
-        step=log_context.get("step", None),
-        model=llm,
-        message=msg,
-        prompt_text=prompt,
-        metadata=meta,
-    )
+    llm_call_log = None
+    # LLMLog.objects.create(
+    #     variable_name=log_context.get("variable_name", "?"),
+    #     log_type=lt,
+    #     session=log_context.get("session", None),
+    #     judgement=log_context.get("judgement", None),
+    #     turn=log_context.get("turn", None),
+    #     step=log_context.get("step", None),
+    #     model=llm,
+    #     message=msg,
+    #     prompt_text=prompt,
+    #     metadata=meta,
+    # )
 
     return res, com, llm_call_log
 
@@ -331,7 +332,7 @@ def simple_chat(prompt, llm, log_context={}):
 
     # we can't use chat_with_completion because it needs a response model
     # so we return the first string completion, plus the completion object
-    from mindframe.models import LLMLog, LLMLogTypes
+    # from mindframe.models import LLMLog, LLMLogTypes
 
     langfuse_context.update_current_observation(input=prompt)
 
@@ -351,21 +352,22 @@ def simple_chat(prompt, llm, log_context={}):
         )
 
     except Exception as e:
-        res, com, msg, lt, meta = None, None, str(e), LLMLogTypes.ERROR, str(log_context)
+        # res, com, msg, lt, meta = None, None, str(e), LLMLogTypes.ERROR, str(log_context)
         logger.error(f"Error calling LLM: {e}")
 
-    el = LLMLog.objects.create(
-        variable_name=log_context.get("variable_name", None),
-        log_type=lt,
-        session=log_context.get("session", None),
-        judgement=log_context.get("judgement", None),
-        turn=log_context.get("turn", None),
-        step=log_context.get("step", None),
-        model=llm,
-        message=msg,
-        prompt_text=prompt,
-        metadata=meta,
-    )
+    el = None
+    # LLMLog.objects.create(
+    #     variable_name=log_context.get("variable_name", None),
+    #     log_type=lt,
+    #     session=log_context.get("session", None),
+    #     judgement=log_context.get("judgement", None),
+    #     turn=log_context.get("turn", None),
+    #     step=log_context.get("step", None),
+    #     model=llm,
+    #     message=msg,
+    #     prompt_text=prompt,
+    #     metadata=meta,
+    # )
     logger.warning(f"MAKING llm log {el}")
     return res, com, el
 
@@ -391,59 +393,90 @@ class ChatterResult(OrderedDict):
 @observe(capture_input=False, capture_output=False)
 def chatter(multipart_prompt, model, context={}, log_context={}):
     """
-    Parse and execute a prompt template specifying multiple completions.
-
     Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next.
+
+    If the prompt contains a segment break (by default, any occurrence of "|||===..."
+    i.e. three or more "=" following "|||"), the prompt is split into segments.
+    Each segment is processed separately. For segments after the break, previous
+    completions are not automatically appended to the prompt text; however, any
+    desired value from a previous segment can be injected via the template's
+    double-curly syntax (e.g. {{VAR}}).
+
+    The completions from earlier segments are accumulated into a context dictionary,
+    making them available for explicit use in later segments.
     """
-    pprompt = parse_prompt(multipart_prompt)
-    results_dict = ChatterResult()
+    # Define a regex to split the prompt into segments.
+    # e.g. |||=== or ||| ===
+    SEGMENT_SPLIT_RE = re.compile(r"\|\|\|\s*={3,}\s*")
 
-    prompt_parts = []
-    llm_calls = []
+    final_results = ChatterResult()
+    # This dict will accumulate all completions across segments,
+    # so that later segments can reference earlier outputs using {{key}}.
+    accumulated_context = {}
 
-    for key, prompt_part in pprompt.items():
-        # prompt_part is namedtuple with key, return_type, options, text
-        prompt_parts.append(prompt_part.text)
-        prompt = "\n\n--\n\n".join(map(str, prompt_parts))
+    # Split the entire prompt by the segment break marker.
+    segments = SEGMENT_SPLIT_RE.split(multipart_prompt)
 
-        # deal with the case that the return type is a factory
-        # and accepts the options as a parameter
-        if isinstance(prompt_part.return_type, FunctionType):
-            rt = prompt_part.return_type(prompt_part.options)
-        else:
-            rt = prompt_part.return_type
+    # If no segment break is found, segments will be a list with one element.
+    for segment in segments:
+        # Process the current segment using the normal multipart parser.
+        pprompt = parse_prompt(segment)
+        # In a segmented prompt, we do not want to automatically include the
+        # results from previous segments into the prompt text. Instead, we let
+        # the author decide which earlier outputs to reference via template vars.
+        prompt_parts = []
 
-        # this suffix is not _required_ by helps guide the llm to return json
-        template = Template(
-            TEMPLATE_PREFIX + prompt + """\nAlways use the tools/JSON response.\n\n```json\n"""
-        )
-        pmt = template.render(Context(context))
+        for key, prompt_part in pprompt.items():
+            # Append the raw text for this prompt part.
+            prompt_parts.append(prompt_part.text)
+            # Build the prompt for this completion from the parts within this segment.
+            segment_prompt = "\n\n--\n\n".join(prompt_parts)
 
-        res, completion_obj, log = structured_chat(
-            pmt,
-            model,
-            return_type=rt,
-            log_context=log_context,
-        )
-        res = res and res.response or None
-        log_context["variable_name"] = key
+            # Merge the provided context with the accumulated completions
+            # so that any template variable like {{JOKE}} gets replaced.
+            merged_context = context.copy()
+            merged_context.update(accumulated_context)
 
-        if key in ["RESPONSE_", "response"]:
-            logger.info(f"""\033[32mCompletion: {key}\n{res}\n\033[0m""")
-        else:
-            logger.info(f"""Completion: {key}\n{res}\n""")
+            # Render the prompt template.
+            template = Template(
+                TEMPLATE_PREFIX
+                + segment_prompt
+                + "\nAlways use the tools/JSON response.\n\n```json\n"
+            )
+            rendered_prompt = template.render(Context(merged_context))
 
-        results_dict[key] = res
-        prompt_parts.append(res)
+            # Determine the appropriate return type.
+            if isinstance(prompt_part.return_type, FunctionType):
+                rt = prompt_part.return_type(prompt_part.options)
+            else:
+                rt = prompt_part.return_type
 
-    # duplicate the last item as the RESPONSE_ so we have a
-    # predictable key to access the final completion, but can still
-    # also access the last key by names used in the template
-    lastkey = next(reversed(results_dict))
-    if lastkey != "RESPONSE_":
-        results_dict["RESPONSE_"] = results_dict[lastkey]
+            # Call the LLM via structured_chat.
+            res, completion_obj, log = structured_chat(
+                rendered_prompt, model, return_type=rt, log_context=log_context
+            )
+            res = res and res.response or None
+            log_context["variable_name"] = key
 
-    return results_dict
+            if key in ["RESPONSE_", "response"]:
+                logging.info(f"\033[32mCompletion: {key}\n{res}\n\033[0m")
+            else:
+                logging.info(f"Completion: {key}\n{res}\n")
+
+            # Store the completion in both our final results and accumulated context.
+            final_results[key] = res
+            accumulated_context[key] = res
+
+            # For this segment, include the result in the prompt parts if desired.
+            # This preserves the original behaviour within a segment.
+            prompt_parts.append(res)
+
+        # If the segment didn't explicitly yield a key "RESPONSE_", set it to the last result.
+        last_key = next(reversed(final_results))
+        if last_key != "RESPONSE_":
+            final_results["RESPONSE_"] = final_results[last_key]
+
+    return final_results
 
 
 def get_embedding(texts, dimensions=1024) -> list:
@@ -496,3 +529,26 @@ if False:
     """,
         model=mini,
     )
+
+    # examples of segmenting a prompt
+
+    example_prompt = """
+    tell me a joke about apples
+    [[JOKE]]
+    tell me if the {{JOKE}} is funny
+    [[JOKE_EVALUATION]]
+    """
+
+    example_prompt2 = """
+    tell me a joke about apples
+    [[JOKE]]
+
+    |||===
+
+    tell me if the {{JOKE}} is funny
+    [[JOKE_EVALUATION]]
+    """
+
+    model = LLM.objects.get(model_name="gpt-4o-mini")
+    print(chatter(example_prompt, model))
+    print(chatter(example_prompt2, model))

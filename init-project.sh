@@ -17,7 +17,6 @@ docker-compose up --build web chat worker
 # replace mindframe-postgres-1 with running container name if different
 docker exec -it mindframe-postgres-1 create-database.sh mindframe_dbuser mindframe_db mfpassword
 
-
 docker-compose run web ./manage.py migrate
 docker-compose run web ./manage.py loaddata mindframe/fixtures/test.json
 
