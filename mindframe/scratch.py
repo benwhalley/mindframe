@@ -7,7 +7,16 @@ from django.utils import timezone
 # os.environ.setdefault("DJANGO_SETTINGS_MODULE", "your_project.settings")
 # django.setup()
 
-from mindframe.models import CustomUser, Conversation, Turn, Transition, Note, Judgement, LLM, Intervention
+from mindframe.models import (
+    CustomUser,
+    Conversation,
+    Turn,
+    Transition,
+    Note,
+    Judgement,
+    LLM,
+    Intervention,
+)
 from mindframe.tree import iter_conversation_path  # for traversing the conversation
 from mindframe.tree import conversation_history
 from mindframe.templatetags.turns import format_turns
@@ -42,11 +51,9 @@ cbtstep2, _ = Step.objects.get_or_create(
     prompt_template="Ask the client about their diary",
 )
 
-tr1, _ = Transition.objects.get_or_create(from_step=cbtwelcome, to_step=cbtstep2, 
-                                       conditions = "anxiety_level.value < 5")
-
-
-
+tr1, _ = Transition.objects.get_or_create(
+    from_step=cbtwelcome, to_step=cbtstep2, conditions="anxiety_level.value < 5"
+)
 
 
 # Create the root turn using Treebeard's add_root (sets proper tree fields)
@@ -74,12 +81,12 @@ turn2 = turn1.listen("Oh, that's sad", speaker=therapist)
 turn3 = turn2.listen("Yea, it's a real pita", speaker=client)
 
 
-
-j1, _  = Judgement.objects.get_or_create(
-        variable_name="anxiety_level", 
-        title="Anxiety Level", 
-        prompt_template="""{% turns 'all' %}\n How anxious does the client seem?\nGive a score on 1-5 scale. Return valid json.\n[[int:value]]""",
-        intervention=cbt)
+j1, _ = Judgement.objects.get_or_create(
+    variable_name="anxiety_level",
+    title="Anxiety Level",
+    prompt_template="""{% turns 'all' %}\n How anxious does the client seem?\nGive a score on 1-5 scale. Return valid json.\n[[int:value]]""",
+    intervention=cbt,
+)
 
 stpjd1, _ = StepJudgement.objects.get_or_create(step=cbtwelcome, judgement=j1)
 
@@ -98,14 +105,11 @@ Note.objects.filter(turn__conversation=cturn.conversation)
 print(format_turns(conversation_history(cturn)))
 
 
-
 turn = cturn
 # turn = new_turn
 # step = new_turn.step
 # judgement = j1
 # transition = tr1
-
-
 
 
 # need to refetch to get children to get accurate count
@@ -138,4 +142,3 @@ branch_turn2 = turn1.add_child(
 )
 
 print(transcript(conversation_history(branch_turn)))
-

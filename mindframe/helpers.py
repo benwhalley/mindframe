@@ -35,4 +35,3 @@ def make_data_variable(notes):
     for i in vars:
         dd.update(getv(notes, i))
     return Box(dd, default_box=True)
-

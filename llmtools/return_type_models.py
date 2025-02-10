@@ -95,7 +95,8 @@ class BooleanResponse(BaseModel):
         ...,
         description="Returns true or false only, based on the question/statement posed.",
     )
-    
+
+
 class IntegerResponse(BaseModel):
     """An integer response, based on the question posed."""
 

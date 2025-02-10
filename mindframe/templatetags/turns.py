@@ -32,7 +32,7 @@ def turns(context, filter_type="all", n=None):
         t = turns.filter(session_state__step=session.current_step())
 
     if n:
-        t = turns[:n-1]
+        t = turns[: n - 1]
         # query again because otherwise we return a list not a queryset
         t = Turn.objects.filter(id__in=[turn.id for turn in t])
 

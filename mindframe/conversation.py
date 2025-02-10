@@ -57,6 +57,7 @@ def evaluate_judgement(judgement, turn):
     nt = Note.objects.create(turn=turn, judgement=judgement, data=llmres)
     return nt
 
+
 def complete_the_turn(turn):
     # use context so far to complete a Step in a conversation; Return the completed Turn
 
@@ -72,7 +73,7 @@ def complete_the_turn(turn):
     turn.text = llmres.response
     turn.save()
     return turn
-    
+
 
 def possible_transitions(turn: Turn):
     history_list = list(iter_conversation_path(turn.get_root(), direction="down"))
@@ -133,13 +134,13 @@ def respond(turn: Turn, as_speaker: CustomUser = None):
     # run all the judgements and make notes
     judgments_to_make = new_turn.step.judgements.all()
     notes = [evaluate_judgement(j, new_turn) for j in judgments_to_make]
-    
-    # get the possible transitions, and if there is one possible, mutate the new_turn: 
+
+    # get the possible transitions, and if there is one possible, mutate the new_turn:
     # jump to that step and save before completing the turn
     transitions_possible = possible_transitions(new_turn)
     if transitions_possible.count() > 1:
         new_turn.step = transitions_possible.first().to_step
         new_turn.save()
-    
+
     new_turn_complete = complete_the_turn(new_turn)
     return new_turn_complete

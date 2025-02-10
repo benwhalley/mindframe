@@ -1,6 +1,7 @@
-
 from mindframe.helpers import get_ordered_queryset
+
 # TODO: add annotations
+
 
 def conversation_history(node):
     """
@@ -8,9 +9,9 @@ def conversation_history(node):
     the an end point
     """
     from mindframe.models import Turn
+
     turns = iter_conversation_path(node.get_root(), direction="down")
     return get_ordered_queryset(Turn, [i.pk for i in turns])
-    
 
 
 def iter_conversation_path(node, direction="down"):

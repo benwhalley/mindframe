@@ -221,7 +221,7 @@ class Transition(models.Model):
         blank=True,
         help_text="Python code to evaluate before the transition can be be made. Each line is evaluated indendently and all must be True for the transition to be made. Variables created by Judgements are passed in as a dictionary.",
     )
-    
+
     priority = models.PositiveSmallIntegerField(default=1)
 
     def clean(self):
