@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load pretty %}
+{% load turns %}
+
+{% load notes %}
+{% load guidance %}
+{% block content %}
+<div class="container mt-5">
+    <h1>Conversation Detail</h1>
+
+    <hr class="mt-3">
+    <div class="row mb-4">
+        <div class="col-6">
+            <p>
+                <a href="{% url 'admin:mindframe_conversation_change' object.pk %}">
+                    {{ object }}
+                </a>
+                [<code>{{object.uuid}}</code>]
+
+            </p>
+
+            <!-- <p>
+                FIXME
+                Current step:
+                <a href="{ url 'admin:mindframe_step_change' session.current_step.pk %}">{ session.current_step.title }}</a>
+            </p> -->
+
+        </div>
+
+        <div class="col-6">
+            <a class="btn btn-primary" href="{{leaf_node.gradio_url}}">
+                Continue conversation at turn {{leaf_node.uuid|slice:5}}</a>
+        </div>
+
+        <div class="col-12">
+
+
+            {% if leaves.count > 1 %}
+            Branches at:
+            {% for node in branches %}
+            <span class="badge bg-success rounded-pill">{{ node.uuid|slice:5 }}</span>
+            {% endfor %}
+
+            <p>
+            Conversation alternatives:
+            {% for l in leaves %}
+            {% if l.uuid != leaf_node.uuid %}
+            <a href="{% url 'conversation_detail' uuid=l.uuid %}">{{l.uuid|slice:4}}</a>,
+            {% else %}
+            {{l.uuid|slice:4}}
+            {% endif %}
+            {% endfor %}
+        </p>
+            {% endif %}
+
+        </div>
+
+    </div>
+    <hr>
+    <div class="row">
+
+        <div class="col-6"><h5>Conversation</h5></div>
+        <div class="col-6"><h5>Notes/LLM Calls</h5></div>
+
+        <style>
+            pre {
+                white-space: pre-wrap; /* Enable wrapping */
+                word-wrap: break-word; /* Break long words if necessary */
+                overflow-wrap: break-word; /* Compatibility for older browsers */
+            }
+        </style>
+    {% regroup turns by session_state as state_turns %}
+    {% for group, turns in state_turns %}
+
+    <div class="row">
+    <div class="col-12">
+       <h6>Step: {{group.step.title}}
+
+    </h6>
+    </div>
+    </div>
+
+    <style>
+        .speech { font-family: 'Courier New', Courier, monospace;
+    font-size:16pt;}
+
+    </style>
+    {% for turn in turns %}
+    <hr>
+    <div class="col-6">
+    <div class="row">
+        <div class="col-2">
+            <a class="mr-3" href="{% url 'admin:mindframe_turn_change' turn.id %}">
+                <span class="badge bg-primary rounded-pill mr-2">{{ turn.uuid|slice:5 }}</span>
+            </a>
+        </div>
+
+        <div class="col mb-5 speech">
+            <b>{{turn.speaker.username.upper}}: &nbsp;</b>
+
+            {{turn.text}}
+
+        </div>
+
+    </div>
+
+    </div>
+
+    <div class="col-3 small">
+        <code>{{turn.metadata}}    </code>
+    </div>
+    <div class="col-2 small">
+        <a  class='btn btn-sm btn-outline-success mb-4 float-end ' href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=gradio">Start new branch</a>
+    </div>
+
+
+    {% endfor %}
+    {% endfor %}
+</div>
+</div>
+{% endblock %}

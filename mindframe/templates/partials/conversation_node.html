@@ -1,0 +1,11 @@
+<!-- node_snippet.html -->
+{% for node in nodes %}
+  <li class="list-group-item">
+    <span class="badge bg-{% if node.pk in visible_turn_ids %}success{%else%}secondary{% endif %} rounded-pill">{{ node.pk }}</span>
+    {% if node.get_children_count %}
+      <ul class="list-group list-group-flush ms-3 mt-2">
+        {% include "partials/conversation_node.html" with nodes=node.get_children %}
+      </ul>
+    {% endif %}
+  </li>
+{% endfor %}

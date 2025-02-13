@@ -15,7 +15,8 @@ package_data = \
                'static/mindframe/js/*',
                'templates/*',
                'templates/admin/*',
-               'templates/admin/mindframe/intervention/*']}
+               'templates/admin/mindframe/intervention/*',
+               'templates/partials/*']}
 
 install_requires = \
 ['Django>=5.0.6,<6.0.0',
@@ -55,7 +56,9 @@ install_requires = \
  'python-box>=7.2.0,<8.0.0',
  'python-decouple>=3.8,<4.0',
  'python-magic>=0.4.27,<0.5.0',
+ 'python-telegram-bot>=21.10,<22.0',
  'redis>=5.2,<6.0',
+ 'requests>=2.32.3,<3.0.0',
  'ruamel-yaml>=0.18.6,<0.19.0',
  'rules>=3.4,<4.0',
  'setuptools',

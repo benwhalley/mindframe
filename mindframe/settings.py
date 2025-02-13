@@ -32,6 +32,7 @@ class TurnTextSourceTypes(models.TextChoices):
 
     HUMAN = "human", "Human"
     AI = "AI", "AI"
+    OPENING = "opening", "Opening"
 
 
 class RoleChoices(models.TextChoices):
@@ -50,6 +51,7 @@ class StepJudgementFrequencyChoices(models.TextChoices):
     TURN = "turn", "Each turn"
     ENTER = "enter", "When entering the step"
     EXIT = "exit", "When exiting the step"
+    OFFLINE_STEP = "offline", "After each turn asyncronously, probably available for the next turn"
 
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")

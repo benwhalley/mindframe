@@ -13,17 +13,20 @@ from django.views.generic.edit import FormView
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from itertools import cycle
-from mindframe.synthetic import add_turns_task
+from mindframe.conversation import add_turns_task
+from django.db.models import F
 
 import random
 from mindframe.models import (
     Intervention,
     CustomUser,
+    Conversation,
     Memory,
     Turn,
     Note,
     LLM,
 )
+from mindframe.tree import conversation_history
 
 import logging
 
@@ -130,31 +133,35 @@ def create_public_session(request, intervention_slug):
     return redirect(chat_url)
 
 
-class TreatmentSessionDetailView(LoginRequiredMixin, DetailView):
-    # model = TreatmentSession
-    template_name = "treatment_session_detail.html"
+class ConversationDetailView(LoginRequiredMixin, DetailView):
+    model = Turn
+    template_name = "conversation_detail.html"
     context_object_name = "session"
     slug_field = "uuid"
     slug_url_kwarg = "uuid"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        session = self.object
 
-        # Prefetch related data for performance
-        context["turns"] = (
-            Turn.objects.filter(session_state__session__uuid=session.uuid)
-            .prefetch_related("speaker", "session_state__step", "notes", "llm_calls")
-            .order_by("timestamp")
+        context["object"] = self.object.conversation
+
+        tip_ = self.object.get_descendants().last()
+        leaf_turn = tip_ or self.object
+        turns = conversation_history(leaf_turn)
+
+        context["turns"] = turns.prefetch_related(
+            "speaker",
+            "notes",
         )
+        context["leaf_node"] = leaf_turn
 
-        context["states"] = session.progress.select_related("step", "previous_step")
-
-        context["notes"] = Note.objects.filter(turn__session_state__session=session).select_related(
-            "judgement"
+        context["visible_turn_ids"] = turns.values_list("id", flat=True)
+        context["branches"] = set(
+            [i.get_parent() for i in self.object.conversation.turns.filter(branch=True)]
         )
+        context["leaves"] = self.object.conversation.turns.filter(lft=F("rgt") - 1)
 
-        context["data"] = session.state.step.make_data_variable(session)
+        context["root"] = self.object.conversation.turns.all().first().get_root()
 
         return context
 

@@ -6,6 +6,10 @@ from collections.abc import Iterable
 from treebeard.ns_tree import NS_Node
 from pgvector.django import L2Distance
 from django.db.models import Window, F
+from box import Box
+
+
+from django.db.models import QuerySet, Q
 
 from django.db.models.functions import RowNumber
 from itertools import groupby
@@ -22,13 +26,12 @@ from langfuse.decorators import langfuse_context, observe
 
 
 from django.forms.models import model_to_dict
-from django.conf import settings
-from django.utils.safestring import mark_safe
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.urls import reverse
-from django.db.models import Count, Q, QuerySet, Subquery
+from django.db.models import Q, QuerySet, Subquery
+from django.conf import settings
 
 from django.utils import timezone
 from django.utils.text import slugify
@@ -36,6 +39,7 @@ from django.utils.text import slugify
 from pgvector.django import VectorField, HnswIndex
 from django_lifecycle import LifecycleModel, hook, AFTER_UPDATE, AFTER_CREATE
 
+from mindframe.tree import iter_conversation_path
 from mindframe.chunking import CHUNKER_TEMPLATE
 from llmtools.llm_calling import chatter, get_embedding, simple_chat
 from mindframe.settings import (
@@ -52,7 +56,6 @@ langfuse_context.configure(debug=False)
 import shortuuid
 
 shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
-# len(shortuuid.uuid())
 
 
 class CustomUser(AbstractUser):
@@ -67,7 +70,11 @@ class CustomUser(AbstractUser):
 
 
 class Intervention(LifecycleModel):
-    """A treatment/intervention, including steps, transitions, and related metadata."""
+    """
+    A treatment/intervention,
+
+    Interventions connect Steps, Judgements, Transitions, and related metadata.
+    """
 
     def natural_key(self):
         return slugify(self.title)
@@ -79,11 +86,12 @@ class Intervention(LifecycleModel):
             "interventions": [
                 "title",
             ],
-            "steps": ["title", "prompt_template"],
+            "steps": ["prompt_template"],
             "transitions": ["conditions"],  # "from_step__title", "to_step__title",
             "judgements": [
-                "title",
-            ],  # "variable_name", "prompt_template"],
+                "variable_name",
+                "prompt_template",
+            ],
             "memories": ["text"],
         }
 
@@ -119,6 +127,16 @@ class Intervention(LifecycleModel):
     slug = AutoSlugField(populate_from="title", unique=True)
     version = models.CharField(max_length=64, null=True, editable=False)
     sem_ver = models.CharField(max_length=64, null=True, editable=True)
+
+    is_default_intervention = models.BooleanField(default=False)
+
+    default_fake_client = models.ForeignKey(
+        "Intervention",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Default intervention to choose as a partner when creating a new Synthetic conversation",
+    )
 
     # TODO - make this non nullable
     default_conversation_model = models.ForeignKey(
@@ -160,7 +178,9 @@ class Intervention(LifecycleModel):
 
 
 class StepJudgement(models.Model):
-    """Relationships between steps and judgements, and when a Judgement should be made."""
+    """
+    M2M through model for Steps and Judgements, says _when_ a Judgement should be made
+    """
 
     judgement = models.ForeignKey(
         "Judgement", related_name="stepjudgements", on_delete=models.CASCADE
@@ -187,7 +207,13 @@ class StepJudgement(models.Model):
 
 
 class Step(models.Model):
-    """Represents a step in an intervention, including a prompt template and Judgements."""
+    """
+    Step in an intervention, instructions for how to respond
+
+    `prompt_template` is an LLM instruction, specifying what to say.
+    `judgements` are other prompts which need to be run before responding, to inform the response.
+
+    """
 
     def natural_key(self):
         return slugify(f"{self.intervention.title}__{self.title}")
@@ -199,6 +225,12 @@ class Step(models.Model):
     slug = AutoSlugField(populate_from="title")
     prompt_template = models.TextField()
     judgements = models.ManyToManyField("Judgement", through="StepJudgement")
+
+    opening_line = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Opening statements if no conversation history exists. E.g. 'How are you today?'",
+    )
 
     def get_absolute_url(self):
         return reverse("admin:mindframe_step_change", args=[str(self.id)])
@@ -247,7 +279,6 @@ class Judgement(models.Model):
 
     intervention = models.ForeignKey("mindframe.Intervention", on_delete=models.CASCADE)
     prompt_template = models.TextField()
-    title = models.CharField(max_length=255)
     variable_name = AutoSlugField(
         editable=True,
         unique_with="intervention",
@@ -298,11 +329,11 @@ class Judgement(models.Model):
         return newnote
 
     def __str__(self) -> str:
-        return f"<{self.variable_name}> {self.title} ({self.intervention.title} {self.intervention.sem_ver})"
+        return f"<{self.variable_name}> ({self.intervention.title} {self.intervention.sem_ver})"
 
     class Meta:
         unique_together = [
-            ("intervention", "title"),
+            ("intervention", "variable_name"),
         ]
 
 
@@ -333,7 +364,6 @@ class Note(models.Model):
     judgement = models.ForeignKey(Judgement, on_delete=models.CASCADE, related_name="notes")
     timestamp = models.DateTimeField(default=timezone.now)
 
-    inputs = models.JSONField(default=dict, null=True, blank=True)
     # for clinical Note type records, save a 'text' key
     # for other return types, save multiple string keys
     # type of this values is Dict[str, str | int]
@@ -341,9 +371,7 @@ class Note(models.Model):
     data = models.JSONField(default=dict, null=True, blank=True)
 
     def val(self):
-        return (
-            self.data.get("text", None) or {"task_summary": self.judgement.task_summary} | self.data
-        )
+        return Box(self.data, default_box=True)
 
     def __str__(self):
         return (
@@ -629,9 +657,6 @@ class Memory(LifecycleModel):
         return self.chunks.all()
 
 
-from mindframe.tree import iter_conversation_path
-
-
 class Conversation(LifecycleModel):
     """
     Store conversations as a Tree
@@ -645,6 +670,22 @@ class Conversation(LifecycleModel):
     This setup would also allow for group conversations, even though we're not doing this right now.
     """
 
+    uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, editable=False)
+    is_synthetic = models.BooleanField(default=False)
+    archived = models.BooleanField(default=False)
+    telegram_conversation_id = models.CharField(max_length=255, blank=True, null=True)
+
+    def get_absolute_url(self):
+        return settings.WEB_URL + reverse(
+            "conversation_detail",
+            args=[
+                self.turns.all().order_by("depth").last().uuid,
+            ],
+        )
+
+    def __str__(self):
+        return f"Conversation between: {', '.join(self.speakers().values_list('username', flat=True))} ()"
+
     def previous_turn_of_speaker(self, start_node, speaker):
         for node in iter_conversation_path(start_node, direction="up"):
             if node.speaker_id == speaker.id:
@@ -656,32 +697,8 @@ class Conversation(LifecycleModel):
             id__in=Subquery(self.turns.values_list("speaker", flat=True).distinct())
         )
 
-    def generate_response(self):
-        """
-        Generate a response to the last turn in the conversation, using a therapist user.
-        TODO: check the logic for selecting the next speaker.
-        """
-
-        # Find the tip of the conversation
-        transcript = list(self.get_conversation())
-        last_turn = transcript[-1] if transcript else None
-
-        if not last_turn:
-            raise NotImplementedError("No conversation found to generate a response for.")
-
-        # Find a speaker other than the last one
-        # we just pick the first one for the moment
-        # TODO: implement logic for choosing a speaker in group conversations
-        respondent = self.speakers().exclude(id=last_turn.speaker_id).first()
-
-        if not respondent:
-            raise ValueError("No speaker found to generate a response.")
-
-        # Find a speaker other than the last one
-        # we just pick the first one for the moment
-        # TODO: implement logic for choosing a speaker in group conversations
-        respondent_last_turn = previous_turn_of_speaker(last_turn, respondent)
-        step_to_use = respondent_last_turn
+    def interventions(self):
+        self.turns.all().values_list("step__intervention", flat=True).distinct()
 
 
 class Turn(NS_Node):
@@ -719,6 +736,9 @@ class Turn(NS_Node):
         choices=BranchReasons.choices, max_length=25, default=BranchReasons.MAIN
     )
 
+    def gradio_url(self):
+        return settings.CHAT_URL + f"?turn_id={self.uuid}"
+
     branch_author = models.ForeignKey(
         CustomUser,
         on_delete=models.CASCADE,
@@ -750,26 +770,13 @@ class Turn(NS_Node):
     # conversation path
     node_order_by = ["branch", "timestamp"]
 
-    def listen(self, text, speaker):
-        return self.add_child(conversation=self.conversation, speaker=speaker, text=text)
-
-    def respond(self, as_speaker=None):
-        if not as_speaker:
-            # Find a speaker other than the last one
-            # we just pick the first one for the moment
-            # TODO: implement logic for choosing a speaker in group conversations
-            raise NotImplementedError("No speaker found to generate a response.")
-
-        spkr_history = [i.step for i in history(self) if i.speaker == as_speaker]
-        speakers_prev_step = spkr_history and list(reversed(spkr_history)).pop() or None
-        if not speakers_prev_step:
-            raise NotImplementedError("No Step/intervention found to use for response.")
-
-        newturn = self.add_child(
-            conversation=self.conversation, speaker=speaker, text="", step=speakers_prev_step
+    def notes_data(self):
+        # Assumes Note has a ForeignKey to Turn with related_name="notes"
+        return "\n".join(
+            f"<{note.judgement.variable_name}>: {note.data}" for note in self.notes.all()
         )
-        ctx = newturn.speaker_context()
-        newturn
+
+    notes_data.short_description = "Notes Data"
 
     def __str__(self):
-        return f"{self.step}{self.step and ': '}{self.speaker or '-'}: {self.text[:40]}"
+        return f"{self.uuid}"

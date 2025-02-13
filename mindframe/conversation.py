@@ -1,27 +1,40 @@
-from mindframe.models import Turn, CustomUser, Transition, LLM, Note
+from collections import OrderedDict
+import pprint
+from mindframe.models import Turn, CustomUser, Transition, LLM, Note, Conversation
 import traceback
 import logging
 from itertools import islice
-from mindframe.settings import mfuuid
+from mindframe.settings import mfuuid, StepJudgementFrequencyChoices
 from mindframe.helpers import make_data_variable, get_ordered_queryset
 from llmtools.llm_calling import chatter
 from mindframe.tree import conversation_history, iter_conversation_path
+from mindframe.settings import TurnTextSourceTypes
+from langfuse.decorators import langfuse_context, observe
 
+from celery import shared_task
 
 logger = logging.getLogger(__name__)
 
 
 def pick_speaker_for_next_response(turn: Turn):
+    """Decide who should respond next in the conversation.
+
+    In simple cases this should be really straightforward: the bot alternates
+    with the client. However, in (future) group conversations between humans
+    and multiple bots we might want additional logic here.
+    """
+
+    # return the previous-but-one speaker
     try:
         hist = iter_conversation_path(turn, direction="up")
-        _, previous = next(hist), next(hist)
-        return previous.speaker
+        speakers = [i.speaker for i in hist]
+        unique_speakers = list(OrderedDict.fromkeys(speakers))
+        second_speaker = unique_speakers[1] if len(unique_speakers) > 1 else None
+        return second_speaker
     except Exception as e:
-        logger.error("No previous speaker found in conversation history.")
+        logger.error("No speaker found to respond with.")
         logger.error(str(e))
         logger.error(str(traceback.format_exc()))
-        # TODO: don't raise?
-        raise
     # TODO:
     # - implement logic for choosing a speaker in group conversations
     # - pick a therapist?
@@ -30,21 +43,25 @@ def pick_speaker_for_next_response(turn: Turn):
 def transition_permitted(transition, turn) -> bool:
     # Test whether the conditions for a Transition are met at this Turn
 
-    # we can only use the speaker context
-    # (we don't know what the client thought, just what they said)
     ctx_data = speaker_context(turn).get("data")
+    clean_conditions = [cond.strip() for cond in transition.conditions.splitlines() if cond.strip()]
 
-    # clean up the conditions (defined as strings) and evaluate them
-    clean_conditions = list(map(str.strip, filter(bool, transition.conditions.split("\n"))))
-    try:
-        condition_evals = [(c, eval(c, {}, ctx_data)) for c in clean_conditions]
-        logger.info(f"Transition condition evaluations for {transition}:\n {condition_evals}")
-        return all([i[1] for i in condition_evals])
-    except Exception as e:
-        logger.error(str(e))
-        return False
+    condition_evals = []
+    for cond in clean_conditions:
+        logger.info(f"Evaluating condition '{cond}'")
+        logger.info(pprint.pformat(ctx_data, width=1))
+        try:
+            result = eval(cond, {}, ctx_data)
+            logger.info(f"{cond} is {result}")
+            condition_evals.append((cond, result))
+        except Exception as e:
+            logger.error(f"Error evaluating condition '{cond}': {e}")
+            condition_evals.append((cond, False))
+
+    return all(result for _, result in condition_evals)
 
 
+@observe(capture_input=False, capture_output=False)
 def evaluate_judgement(judgement, turn):
     ctx = speaker_context(turn)
     # TODO: fix this model pick
@@ -58,6 +75,7 @@ def evaluate_judgement(judgement, turn):
     return nt
 
 
+@observe(capture_input=False, capture_output=False)
 def complete_the_turn(turn):
     # use context so far to complete a Step in a conversation; Return the completed Turn
 
@@ -81,11 +99,15 @@ def possible_transitions(turn: Turn):
     possibles = turn.step.transitions_from.all()
     for i in possibles:
         i.permitted = transition_permitted(i, turn)
-    return Transition.objects.filter(pk__in=[i.pk for i in possibles if i.permitted == True])
+
+    pos_trans_qs = Transition.objects.filter(
+        pk__in=[i.pk for i in possibles if i.permitted == True]
+    )
+    logger.info(f"Possible transitions: {pos_trans_qs}")
+    return pos_trans_qs
 
 
 def speaker_context(turn):
-
     # a Turn is created with a history of previous turns, and for a specific speaker
     # this means we can navigate up the tree to identify context which this speaker
     # would have access to when making their contribution
@@ -96,16 +118,31 @@ def speaker_context(turn):
     speaker_turns = history.filter(speaker=turn.speaker)
     speaker_notes = Note.objects.filter(turn__pk__in=[i.pk for i in speaker_turns])
 
+    # find the first turn with the same step, then count how many descendents it has in the history to count N turns from the start of this Step; +1 to include the first in the count
+    n_turns_step = (
+        history.filter(depth__gt=history.filter(step=turn.step).first().depth).count() + 1
+    )
+
     context = {
         "current_turn": turn,
         "turns": history,
+        "n_turns_step": n_turns_step,
+        "n_turns": history.count(),
         "speaker_turns": speaker_turns,
         "data": make_data_variable(speaker_notes),
     }
+    logger.info(f"Prompt context:\n{pprint.pformat(context, width=1)}")
     return context
 
 
-def respond(turn: Turn, as_speaker: CustomUser = None):
+def listen(turn, text, speaker) -> Turn:
+    """Accept user input in response to a Turn, return a new Turn which saves it."""
+
+    return turn.add_child(conversation=turn.conversation, speaker=speaker, text=text)
+
+
+@observe(capture_input=False, capture_output=False)
+def respond(turn: Turn, as_speaker: CustomUser = None) -> Turn:
     """
     Respond to a particular turn in the conversation. Returns the new completed Turn object.
 
@@ -130,17 +167,114 @@ def respond(turn: Turn, as_speaker: CustomUser = None):
         text="... thinking ...",
         step=speakers_prev_step,
     )
-    # turn = new_turn
-    # run all the judgements and make notes
-    judgments_to_make = new_turn.step.judgements.all()
-    notes = [evaluate_judgement(j, new_turn) for j in judgments_to_make]
+    new_turn.save()
 
-    # get the possible transitions, and if there is one possible, mutate the new_turn:
-    # jump to that step and save before completing the turn
+    # run all the judgements to be made every Turn and ignore the Notes they produce
+    judgements_to_make = [
+        i.judgement
+        for i in new_turn.step.stepjudgements.filter(when=StepJudgementFrequencyChoices.TURN)
+    ]
+    [evaluate_judgement(j, new_turn) for j in judgements_to_make]
+
+    # get the possible transitions, and if there is one possible
     transitions_possible = possible_transitions(new_turn)
-    if transitions_possible.count() > 1:
-        new_turn.step = transitions_possible.first().to_step
-        new_turn.save()
+    new_turn = apply_step_transition_and_judgements(new_turn, transitions_possible)
 
+    # do the final completion, using all the new context available from Judgements
     new_turn_complete = complete_the_turn(new_turn)
+
+    run_offline_judgements(new_turn_complete.pk)
+
+    # ensure all the langfuse traces are identifiable by the Turn uuid
+    langfuse_context.update_current_observation(
+        name=f"Response in turn: {turn}", session_id=turn.uuid, output=new_turn_complete.text
+    )
+    langfuse_context.flush()
+
     return new_turn_complete
+
+
+def apply_step_transition_and_judgements(turn, transitions_possible):
+    """
+    Take a step, and a list of transitions. Change Step, running appropriate Judgements.
+    """
+
+    if transitions_possible.count() == 0:
+        logger.info("No possible transitions found for this step.")
+    else:
+        # run the Turn-exit judgements
+        judgements_to_make = [
+            i.judgement
+            for i in turn.step.stepjudgements.filter(when=StepJudgementFrequencyChoices.EXIT)
+        ]
+        [evaluate_judgement(j, turn) for j in judgements_to_make]
+        transition_selected = transitions_possible.first()
+        turn.step = transition_selected.to_step
+        turn.save()
+        logger.warning(
+            f"Moved to new step: {transition_selected.to_step} from {transition_selected.from_step} "
+        )
+
+        # run the Turn-enter judgements
+        judgements_to_make = [
+            i.judgement
+            for i in turn.step.stepjudgements.filter(when=StepJudgementFrequencyChoices.ENTER)
+        ]
+        [evaluate_judgement(j, turn) for j in judgements_to_make]
+    return turn
+
+
+@shared_task
+@observe(capture_input=False, capture_output=False)
+def run_offline_judgements(turn_pk):
+    turn = Turn.objects.get(pk=turn_pk)
+    logger.info(f"Running offline judgements for {turn}")
+    judgements_to_make = turn.step.stepjudgements.filter(
+        when=StepJudgementFrequencyChoices.OFFLINE_STEP
+    ).values("judgement")
+    notes = [evaluate_judgement(j, turn) for j in judgements_to_make]
+    logger.info(notes)
+    langfuse_context.update_current_observation(session_id=turn.uuid)
+    langfuse_context.flush()
+
+
+def add_turns(turn, n_turns: int):
+
+    if not turn.conversation.is_synthetic:
+        raise ValueError(
+            "Can't add turns to a conversation that is not Synthetic. Use `respond` to respond to humans in conversation"
+        )
+    for i in range(n_turns):
+        turn = respond(turn)
+        # refetch the object to ensure all the tree information
+        # is refreshed and doesn't case a problem when trying to
+        # add subsequent children
+        turn = Turn.objects.get(pk=turn.pk)
+        logger.info(f"Added turn: {turn.pk}, dpt:{turn.depth}, step: {turn.step}")
+
+    return turn
+
+
+@shared_task
+def add_turns_task(conversation_pk: int, n_turns: int):
+    """
+    Celery task to add N additional turns to a synthetic conversation.
+    """
+    conversation = get_object_or_404(SyntheticConversation, pk=conversation_pk)
+    add_turns(conversation, n_turns)
+
+
+def start_conversation(intervention, therapist, client=None, client_intervention=None) -> Turn:
+
+    synth = bool(client_intervention)
+    conversation = Conversation.objects.create(is_synthetic=synth)
+
+    turn = Turn.add_root(
+        conversation=conversation,
+        speaker=therapist,
+        text=intervention.opening_line,
+        text_source=TurnTextSourceTypes.OPENING,
+        step=intervention.steps.all().first(),
+    )
+
+    return turn

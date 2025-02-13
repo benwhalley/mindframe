@@ -1,28 +1,18 @@
-import io
-from django.db import transaction
 import logging
 import pprint
 from django.forms.models import model_to_dict
 from django.contrib import admin
 from django.db import models
-from django.db.models import Count, Prefetch
-
 from django.shortcuts import redirect
 from django.urls import path
 from django.utils.html import format_html
-from django.utils import timezone
 from django.conf import settings
 from django.forms import Textarea
 from django.utils.html import format_html, format_html_join
 from django.urls import reverse
-from django.db.models import Q
-from django.contrib import admin, messages
-from django.utils import timezone
-from django.http import HttpResponse
-import json
-from django import forms
+from django.contrib import admin
 from django.shortcuts import render, redirect
-from django.contrib import messages
+from django.shortcuts import get_object_or_404
 
 import shortuuid
 from django.contrib import admin
@@ -38,11 +28,13 @@ from .models import (
     LLM,
     Memory,
     MemoryChunk,
+    Conversation,
 )
 
 
-from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET
+from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, TurnTextSourceTypes
 from mindframe.graphing import mermaid_diagram
+from mindframe.tree import create_branch
 
 from ruamel.yaml import YAML
 
@@ -86,6 +78,143 @@ logger = logging.getLogger(__name__)
 # @admin.register(MemoryChunk)
 # class MemoryChunkAdmin(admin.ModelAdmin):
 #     pass
+
+
+class IsSyntheticFilter(admin.SimpleListFilter):
+    title = "is synthetic"
+    parameter_name = "is_synthetic"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("True", "Yes"),
+            ("False", "No"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "True":
+            return queryset.filter(is_synthetic=True)
+        if self.value() == "False":
+            return queryset.filter(is_synthetic=False)
+        return queryset
+
+
+class TurnInline(admin.TabularInline):
+    model = Turn
+    fields = [
+        "timestamp",
+        "depth",
+        "branch",
+        "step",
+        "speaker",
+        "text",
+        "metadata",
+        "notes_data",
+        "branch_button",
+    ]
+    readonly_fields = [
+        "timestamp",
+        "depth",
+        "branch",
+        "step",
+        "speaker",
+        "text",
+        "metadata",
+        "notes_data",
+        "branch_button",
+    ]
+    extra = 0
+    ordering = ["depth", "timestamp"]
+
+    def branch_button(self, obj):
+        if not obj.pk:
+            # Inline is in "add" mode and hasn't been saved yet
+            return ""
+        url = reverse("admin:conversation_branch_turn", args=[obj.pk])
+        return format_html('<a class="button" href="{}">Branch here</a>', url)
+
+    branch_button.short_description = "Branch"
+
+
+class NoteInline(admin.TabularInline):
+    model = Note
+    fields = [
+        "timestamp",
+        "judgement",
+        "data",
+    ]
+    readonly_fields = [
+        "timestamp",
+        "judgement",
+        "data",
+    ]
+    extra = 0
+    ordering = ["timestamp"]
+
+
+@admin.register(Conversation)
+class ConversationAdmin(admin.ModelAdmin):
+    save_on_top = True
+    list_filter = (IsSyntheticFilter, "archived")
+    inlines = [TurnInline]
+    list_display = ["__str__", "summary", "speakers", "active", "intervention"]
+
+    def speakers(self, obj):
+        return ",".join(
+            set(
+                filter(bool, obj.turns.all().values_list("speaker__username", flat=True).distinct())
+            )
+        )
+
+    def intervention(self, obj):
+        return ",".join(
+            set(
+                filter(
+                    bool,
+                    obj.turns.all().values_list("step__intervention__title", flat=True).distinct(),
+                )
+            )
+        )
+
+    def active(self, obj):
+        return not obj.archived
+
+    active.boolean = True
+
+    def summary(self, obj):
+        fn = (
+            Note.objects.filter(turn__conversation=obj)
+            .filter(judgement__variable_name__istartswith="summary")
+            .last()
+        )
+        return fn and fn.val().RESPONSE_ or ""
+
+    def branch_turn(self, request, turn_id, *args, **kwargs):
+        """
+        Admin view to handle 'Branch here' clicks from the TurnInline or anywhere.
+        Supports an optional 'next' GET param for custom redirection.
+        """
+        turn = get_object_or_404(Turn, pk=turn_id)
+        new_turn = create_branch(turn, reason="Admin UI branch")
+
+        # If the user included ?next=some_url, redirect there; otherwise, go to conversation admin.
+        next_loc = request.GET.get("next")
+        if next_loc == "gradio":
+            return redirect(new_turn.gradio_url())
+        else:
+            return redirect(
+                reverse("admin:mindframe_conversation_change", args=[turn.conversation.pk])
+            )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "branch-turn/<int:turn_id>/",
+                self.admin_site.admin_view(self.branch_turn),
+                name="conversation_branch_turn",
+            ),
+        ]
+        return custom_urls + urls
 
 
 @admin.register(LLM)
@@ -164,7 +293,12 @@ class StepJudgementInline(admin.TabularInline):
 
 @admin.register(Step)
 class StepAdmin(admin.ModelAdmin):
-    list_display = ("title", "slug", "intervention")
+    list_display = (
+        "title",
+        "intervention",
+        "order",
+        "slug",
+    )
     # autocomplete_fields = ("intervention",)
     search_fields = ("title", "intervention__title")
     list_filter = ("intervention",)
@@ -195,7 +329,8 @@ class TransitionAdmin(admin.ModelAdmin):
 @admin.register(Turn)
 class TurnAdmin(admin.ModelAdmin):
     list_display = (
-        "conversation",
+        "uuid",
+        "conversation__uuid",
         "speaker",
         "text",
         "timestamp",
@@ -204,131 +339,52 @@ class TurnAdmin(admin.ModelAdmin):
         "speaker",
         "timestamp",
     )
-    # search_fields = (
-    #     "session_state__session__cycle__client__username",
-    #     "session_state__session__uuid",
-    # )
+    inlines = [NoteInline]
+    search_fields = (
+        "uuid",
+        "speaker__username",
+        "speaker__last_name",
+        "conversation__uuid",
+    )
 
 
-#     # def get_urls(self):
-#     #     urls = super().get_urls()
-#     #     custom_urls = [
-#     #         path(
-#     #             "start_again/<int:turn_id>/",
-#     #             self.admin_site.admin_view(self.start_again_from_turn),
-#     #             name="start_again_from_turn",
-#     #         ),
-#     #     ]
-#     #     return custom_urls + urls
+@admin.register(Note)
+class NoteAdmin(admin.ModelAdmin):
+    list_display = ("turn__uuid", "judgement", "val", "timestamp")
 
-#     # def start_again_from_turn(self, request, turn_id):
-#     #     try:
-#     #         # Get the specified turn
-#     #         original_turn = Turn.objects.get(id=turn_id)
-#     #         original_session = original_turn.session_state.session
-#     #         turn_timestamp = original_turn.timestamp
+    list_filter = ("timestamp", "judgement")
+    exclude = ["data"]
+    readonly_fields = ["turn", "judgement", "timestamp", "pprint_data"]
+    search_fields = ("turn__speaker__username",)
+    autocomplete_fields = [
+        "turn",
+    ]
 
-#     #         # 1. Duplicate the Cycle
-#     #         original_cycle = original_session.cycle
-#     #         new_cycle = Cycle.objects.create(
-#     #             client=original_cycle.client,
-#     #             intervention=original_cycle.intervention,
-#     #             start_date=timezone.now(),
-#     #         )
+    def pprint_data(self, obj):
+        return format_html("<pre>{}</pre>", pprint.pformat(obj.data, compact=True))
 
-#     #         # 2. Duplicate the TreatmentSession
-#     #         new_session = TreatmentSession.objects.create(cycle=new_cycle, started=timezone.now())
-
-#     #         # 3. Duplicate relevant TreatmentSessionStates
-#     #         tss_to_dupe = TreatmentSessionState.objects.filter(
-#     #             session=original_session, timestamp__lte=turn_timestamp
-#     #         ).order_by("timestamp")
-#     #         for state in tss_to_dupe:
-#     #             state.pk = None
-#     #             state.session = new_session
-#     #             state.save()
-
-#     #         # 4. Duplicate Turns and Notes before the turn timestamp
-#     #         turns_to_duplicate = Turn.objects.filter(
-#     #             session_state__session=original_session,
-#     #             timestamp__lte=turn_timestamp,
-#     #         )
-#     #         for turn in turns_to_duplicate:
-#     #             logs_ids = turn.llm_calls.all().values("id")  # get the ids of the LLM logs
-#     #             turn.pk = None  # reset primary key to create new object
-#     #             turn.uuid = shortuuid.uuid()
-#     #             turn.session_state = new_session.state  # Attach to new session
-#     #             turn.save()
-#     #             # we don't duplicate LLM Log objects, but do reference them in the new turn
-#     #             turn.llm_calls.add(*LLMLog.objects.filter(id__in=logs_ids))
-
-#     #         notes_to_duplicate = Note.objects.filter(
-#     #             turn__session_state__session=original_session,
-#     #             timestamp__lte=turn_timestamp,
-#     #         )
-#     #         for note in notes_to_duplicate:
-#     #             note.pk = None
-#     #             note.uuid = shortuuid.uuid()
-#     #             note.turn = turn
-#     #             note.save()
-
-#     #         # Redirect to chatbot interface for the new session
-#     #         return redirect(f"{settings.CHAT_URL}/?session_id={new_session.uuid}")
-
-#     #     except Exception as e:
-#     #         logger.error(f"An error occurred while starting again: {e}")
-#     #         self.message_user(
-#     #             request, f"An error occurred while starting again: {e}", level=messages.ERROR
-#     #         )
-#     #         return redirect("admin:mindframe_turn_change", turn_id)
-
-
-# @admin.register(Note)
-# class NoteAdmin(admin.ModelAdmin):
-#     list_display = ("turn__id", "judgement", "val", "timestamp")
-#     list_filter = ("timestamp", "judgement")
-#     readonly_fields = ["turn", "judgement", "timestamp", "pprint_inputs", "pprint_data"]
-#     search_fields = ("turn__session_state__session__cycle__client__username",)
-#     autocomplete_fields = [
-#         "turn",
-#     ]
-
-#     def pprint_inputs(self, obj):
-#         return format_html("<pre>{}</pre>", pprint.pformat(obj.inputs, compact=True))
-
-#     def pprint_data(self, obj):
-#         return format_html("<pre>{}</pre>", pprint.pformat(obj.data, compact=True))
-
-#     pprint_inputs.short_description = "Inputs"
-#     pprint_data.short_description = "Data"
+    pprint_data.short_description = "Data"
 
 
 @admin.register(Judgement)
 class JudgementAdmin(admin.ModelAdmin):
     list_display = (
         "variable_name",
-        "title",
         "prompt_template",
         "intervention",
     )
     # autocomplete_fields = [
     #     "intervention",
     # ]
-    search_fields = ["title", "variable_name", "intervention__title"]
+    search_fields = ["variable_name", "intervention__title"]
     list_editable = [
-        "title",
         "prompt_template",
     ]
 
 
 @admin.register(Intervention)
 class InterventionAdmin(admin.ModelAdmin):
-    list_display = (
-        "title_version",
-        "ver",
-        "slug",
-        "title",
-    )  # "start_session_button")
+    list_display = ("title_version", "ver", "slug", "title", "start_session_button")
     search_fields = ("title",)
 
     readonly_fields = ["slug", "version"]
@@ -341,44 +397,44 @@ class InterventionAdmin(admin.ModelAdmin):
     def title_version(self, obj):
         return f"{obj.title} ({obj.sem_ver})"
 
-    #     def ver(self, obj):
-    #         return obj.ver()
+    def ver(self, obj):
+        return obj.ver()
 
-    #     # def start_session_button(self, obj):
-    #     #     url = reverse("admin:start_session", args=[obj.id])
-    #     #     anon_url = reverse("public_start_session", args=[obj.slug])
-    #     #     return format_html(
-    #     #         f'<a class="button" href="{url}">New Session</a> &nbsp;  <a class="button" href="{anon_url}">New Anonymous Session</a> '
-    #     #     )
+    def start_session_button(self, obj):
+        url = reverse("admin:start_session", args=[obj.id])
+        anon_url = reverse("public_start_session", args=[obj.slug])
+        return format_html(
+            f'<a class="button" href="{url}">New Session</a> &nbsp;  <a class="button" href="{anon_url}">New Anonymous Session</a> '
+        )
 
-    #     # start_session_button.short_description = "Start Session"
-    #     # start_session_button.allow_tags = True
+    start_session_button.short_description = "Start Session"
+    start_session_button.allow_tags = True
 
-    #     def mermaid_diagram(self, obj):
+    def mermaid_diagram(self, obj):
 
-    #         return mermaid_diagram(obj)
+        return mermaid_diagram(obj)
 
-    #     mermaid_diagram.short_description = "Intervention Flowchart"
+    mermaid_diagram.short_description = "Intervention Flowchart"
 
-    #     def render_mermaid_view(self, request, object_id):
-    #         """
-    #         Displays the Mermaid diagram on a separate page.
-    #         """
-    #         intervention = self.get_object(request, object_id)
-    #         return render(
-    #             request,
-    #             "admin/intervention_mermaid.html",
-    #             {"intervention": intervention, "mermaid_code": self.mermaid_diagram(intervention)},
-    #         )
+    def render_mermaid_view(self, request, object_id):
+        """
+        Displays the Mermaid diagram on a separate page.
+        """
+        intervention = self.get_object(request, object_id)
+        return render(
+            request,
+            "admin/intervention_mermaid.html",
+            {"intervention": intervention, "mermaid_code": self.mermaid_diagram(intervention)},
+        )
 
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            #             # path(
-            #             #     "<int:intervention_id>/new-session/",
-            #             #     self.admin_site.admin_view(self.start_session),
-            #             #     name="start_session",
-            #             # ),
+            path(
+                "<int:intervention_id>/new-session/",
+                self.admin_site.admin_view(self.start_session),
+                name="start_session",
+            ),
             #             path(
             #                 "<int:object_id>/export/",
             #                 self.admin_site.admin_view(self.export_intervention),
@@ -389,11 +445,11 @@ class InterventionAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.import_intervention),
                 name="import_intervention",
             ),
-            #             path(
-            #                 "<int:object_id>/mermaid/",
-            #                 self.admin_site.admin_view(self.render_mermaid_view),
-            #                 name="mermaid_diagram",
-            #             ),
+            path(
+                "<int:object_id>/mermaid/",
+                self.admin_site.admin_view(self.render_mermaid_view),
+                name="mermaid_diagram",
+            ),
         ]
         return custom_urls + urls
 
@@ -439,121 +495,135 @@ class InterventionAdmin(admin.ModelAdmin):
     def import_intervention(self, request):
         pass
 
+    #         if request.method == "POST":
+    #             form = InterventionImportForm(request.POST, request.FILES)
+    #             if form.is_valid():
+    #                 with transaction.atomic():
+    #                     file = form.cleaned_data["file"]
+    #                     try:
+    #                         data = yaml.load(file)
+    #                         intervention_data = data.pop("intervention")
 
-#         if request.method == "POST":
-#             form = InterventionImportForm(request.POST, request.FILES)
-#             if form.is_valid():
-#                 with transaction.atomic():
-#                     file = form.cleaned_data["file"]
-#                     try:
-#                         data = yaml.load(file)
-#                         intervention_data = data.pop("intervention")
+    #                         # Generate a new semantic version (you can customize this logic)
+    #                         new_sem_ver = f"{intervention_data.get('sem_ver', '1.0.1')}-imported"
 
-#                         # Generate a new semantic version (you can customize this logic)
-#                         new_sem_ver = f"{intervention_data.get('sem_ver', '1.0.1')}-imported"
+    #                         # Create a new intervention with a different version
+    #                         intervention = Intervention.objects.create(
+    #                             title=f"{intervention_data['title']} (Imported)",
+    #                             short_title=intervention_data["short_title"],
+    #                             slug=None,  # Let AutoSlugField generate a new slug
+    #                             sem_ver=new_sem_ver,
+    #                         )
 
-#                         # Create a new intervention with a different version
-#                         intervention = Intervention.objects.create(
-#                             title=f"{intervention_data['title']} (Imported)",
-#                             short_title=intervention_data["short_title"],
-#                             slug=None,  # Let AutoSlugField generate a new slug
-#                             sem_ver=new_sem_ver,
-#                         )
+    #                         # Keep a mapping of old IDs to new instances for steps and judgements
+    #                         step_mapping = {}
+    #                         judgement_mapping = {}
 
-#                         # Keep a mapping of old IDs to new instances for steps and judgements
-#                         step_mapping = {}
-#                         judgement_mapping = {}
+    #                         # Create the mapping during step import
+    #                         step_mapping = {}
+    #                         for step_data in data["steps"]:
+    #                             step_data.pop("id", None)  # Remove the original ID
+    #                             step_data["intervention_id"] = intervention.id
+    #                             new_step = Step.objects.create(**step_data)
+    #                             step_mapping[new_step.slug] = new_step
 
-#                         # Create the mapping during step import
-#                         step_mapping = {}
-#                         for step_data in data["steps"]:
-#                             step_data.pop("id", None)  # Remove the original ID
-#                             step_data["intervention_id"] = intervention.id
-#                             new_step = Step.objects.create(**step_data)
-#                             step_mapping[new_step.slug] = new_step
+    #                         # Import Judgements
+    #                         for judgement_data in data["judgements"]:
+    #                             judgement_data.pop("id", None)  # Remove the original ID
+    #                             judgement_data["intervention_id"] = intervention.id
+    #                             new_judgement = Judgement.objects.create(**judgement_data)
+    #                             judgement_mapping[judgement_data["variable_name"]] = new_judgement
 
-#                         # Import Judgements
-#                         for judgement_data in data["judgements"]:
-#                             judgement_data.pop("id", None)  # Remove the original ID
-#                             judgement_data["intervention_id"] = intervention.id
-#                             new_judgement = Judgement.objects.create(**judgement_data)
-#                             judgement_mapping[judgement_data["variable_name"]] = new_judgement
+    #                         # Import Examples
+    #                         for example_data in data["examples"]:
+    #                             example_data.pop("id", None)  # Remove the original ID
+    #                             example_data["intervention_id"] = intervention.id
+    #                             Example.objects.create(**example_data)
 
-#                         # Import Examples
-#                         for example_data in data["examples"]:
-#                             example_data.pop("id", None)  # Remove the original ID
-#                             example_data["intervention_id"] = intervention.id
-#                             Example.objects.create(**example_data)
+    #                         # Import Transitions
+    #                         # note we lookup by slug among the NEWLY CREATED ste[]
+    #                         for transition_data in data["transitions"]:
 
-#                         # Import Transitions
-#                         # note we lookup by slug among the NEWLY CREATED ste[]
-#                         for transition_data in data["transitions"]:
+    #                             transition_data["from_step"] = step_mapping[
+    #                                 transition_data.pop("from_step__slug")
+    #                             ]
+    #                             transition_data["to_step"] = step_mapping[
+    #                                 transition_data.pop("to_step__slug")
+    #                             ]
+    #                             # Create the new Transition object
+    #                             Transition.objects.create(**transition_data)
 
-#                             transition_data["from_step"] = step_mapping[
-#                                 transition_data.pop("from_step__slug")
-#                             ]
-#                             transition_data["to_step"] = step_mapping[
-#                                 transition_data.pop("to_step__slug")
-#                             ]
-#                             # Create the new Transition object
-#                             Transition.objects.create(**transition_data)
+    #                         messages.success(
+    #                             request,
+    #                             f"Imported Intervention '{intervention.title}' with version '{new_sem_ver} ({intervention.ver()})'.",
+    #                         )
+    #                         return redirect("admin:mindframe_intervention_changelist")
+    #                     except Exception as e:
+    #                         messages.error(request, f"Error importing intervention: {e}")
+    #         else:
+    #             form = InterventionImportForm()
 
-#                         messages.success(
-#                             request,
-#                             f"Imported Intervention '{intervention.title}' with version '{new_sem_ver} ({intervention.ver()})'.",
-#                         )
-#                         return redirect("admin:mindframe_intervention_changelist")
-#                     except Exception as e:
-#                         messages.error(request, f"Error importing intervention: {e}")
-#         else:
-#             form = InterventionImportForm()
+    #         context = {
+    #             "form": form,
+    #             "title": "Import Intervention",
+    #         }
+    #         return render(request, "admin/intervention_import.html", context)
 
-#         context = {
-#             "form": form,
-#             "title": "Import Intervention",
-#         }
-#         return render(request, "admin/intervention_import.html", context)
+    def start_session(self, request, intervention_id):
+        intervention = Intervention.objects.get(pk=intervention_id)
+        step = intervention.steps.all().first()
+        therapist, _ = CustomUser.objects.get_or_create(
+            username="therapist",
+            defaults={"role": "therapist", "email": "linda@example.com"},
+        )
+        conversation = Conversation.objects.create()
+        human_starter = Turn.add_root(
+            conversation=conversation,
+            speaker=request.user,
+            text="/start",
+            text_source=TurnTextSourceTypes.OPENING,
+        )
 
-#     # def start_session(self, request, intervention_id):
-#     #     intervention = Intervention.objects.get(pk=intervention_id)
-#     #     client = request.user
-#     #     cycle = Cycle.objects.create(intervention=intervention, client=client)
-#     #     session = TreatmentSession.objects.create(
-#     #         cycle=cycle,
-#     #         started=timezone.now(),
-#     #     )
-#     #     return redirect(f"{settings.CHAT_URL}/?session_id={session.uuid}")
+        bot_turn = human_starter.add_child(
+            conversation=conversation,
+            speaker=therapist,
+            text=step.opening_line,
+            text_source=TurnTextSourceTypes.OPENING,
+            step=step,
+        )
 
-#     def change_view(self, request, object_id, form_url="", extra_context=None):
+        return redirect(f"{settings.CHAT_URL}/?conversation_id={conversation.uuid}")
 
-#         extra_context = extra_context or {}
-#         obj = self.get_object(request, object_id)
-#         extra_context.update(
-#             {
-#                 "new_session": reverse(
-#                     "admin:start_session",
-#                     args=[
-#                         object_id,
-#                     ],
-#                 ),
-#                 "diagram": reverse(
-#                     "admin:mermaid_diagram",
-#                     args=[
-#                         object_id,
-#                     ],
-#                 ),
-#                 "mermaid": self.mermaid_diagram(obj),
-#                 "start_new_chat_link": settings.WEB_URL
-#                 + reverse("public_start_session", args=[obj.slug]),
-#             }
-#         )
+    def change_view(self, request, object_id, form_url="", extra_context=None):
 
-#         return super().change_view(request, object_id, form_url, extra_context=extra_context)
+        extra_context = extra_context or {}
+        obj = self.get_object(request, object_id)
+        extra_context.update(
+            {
+                "new_session": reverse(
+                    "admin:start_session",
+                    args=[
+                        object_id,
+                    ],
+                ),
+                "diagram": reverse(
+                    "admin:mermaid_diagram",
+                    args=[
+                        object_id,
+                    ],
+                ),
+                "mermaid": self.mermaid_diagram(obj),
+                "start_new_chat_link": settings.WEB_URL
+                + reverse("public_start_session", args=[obj.slug]),
+            }
+        )
 
-#     class Media:
-#         js = [
-#             "https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js",  # Include Mermaid.js
-#         ]
-#         css = {
-#             "all": ("mindframe/css/admin-extra.css",),  # Optional custom admin styles
-#         }
+        return super().change_view(request, object_id, form_url, extra_context=extra_context)
+
+    class Media:
+        js = [
+            "https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js",  # Include Mermaid.js
+        ]
+        css = {
+            "all": ("mindframe/css/admin-extra.css",),  # Optional custom admin styles
+        }

@@ -16,7 +16,6 @@ def guidance(session, filter_type=None):
     latest_notes = all_notes.filter(
         # uncomment to restrict to judgements made in the step
         # judgement__stepjudgements__step=self,
-        judgement__stepjudgements__use_as_guidance=True,
         judgement__variable_name=OuterRef("judgement__variable_name"),
     ).order_by("-timestamp")
 
