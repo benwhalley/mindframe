@@ -4,7 +4,6 @@
   "pk": 23,
   "fields": {
     "title": "Motivational Interviewing Demo",
-    "short_title": "MI Demo",
     "slug": "demo",
     "version": "0b5acec9633f84cc54cf3b990c1f6f0d673126d8c9543075a47518d134e3f47e",
     "sem_ver": "1",
@@ -18,7 +17,6 @@
   "pk": 28,
   "fields": {
     "title": "Fake Client - Eating",
-    "short_title": "fake-client-eating",
     "slug": "fake-client-eating",
     "version": "1b9d60a0df3be24ea2031d84fd61e74ad423622d9f33d675f0bca6d35ebc32d3",
     "sem_ver": "1",
@@ -100,8 +98,7 @@
     "judgement": 132,
     "step": 60,
     "when": "turn",
-    "once": false,
-    "use_as_guidance": false
+    "once": false
   }
 },
 {
@@ -111,8 +108,7 @@
     "judgement": 133,
     "step": 57,
     "when": "turn",
-    "once": false,
-    "use_as_guidance": false
+    "once": false
   }
 },
 {
@@ -122,8 +118,7 @@
     "judgement": 133,
     "step": 60,
     "when": "turn",
-    "once": false,
-    "use_as_guidance": false
+    "once": false
   }
 },
 {
@@ -167,10 +162,7 @@
   "pk": 113,
   "fields": {
     "intervention": 23,
-    "title": "Move on?",
-    "slug": "move-on",
     "variable_name": "move",
-    "task_summary": "",
     "prompt_template": "Conversation so far:\r\n\r\n{% turns \"step\" %}\r\n\r\nHas the client asked for the weather forecast?\r\n\r\n[[decide:weather_requested]]\r\n\r\nHas the client/user said they want to move to the next step?\r\n\r\n[[decide:on]]"
   }
 },
@@ -179,10 +171,7 @@
   "pk": 114,
   "fields": {
     "intervention": 23,
-    "title": "Extract user info from conversation",
-    "slug": "are-they-a-rabbit",
     "variable_name": "userinfo",
-    "task_summary": "",
     "prompt_template": "# CONTEXT\r\n\r\n\r\nYou are an expert assistant\r\n\r\nThis is a dialogue with a user so far.\r\nWe need to make a judgement about it and extract information from the conversation\r\n\r\n# CONVERSATION SO FAR\r\n\r\n{{session|turns:\"all\"}}\r\n\r\n\r\n# YOUR TASK\r\n\r\nHas the user said they are feeling joyful? \r\nThey need to have stated it explicitly in the conversation above.\r\nRespond with a true or false type. \r\n\r\n[[decide:joy]]"
   }
 },
@@ -191,10 +180,7 @@
   "pk": 117,
   "fields": {
     "intervention": 23,
-    "title": "Tell about the rain",
-    "slug": "tell-about-the-rain",
     "variable_name": "rain",
-    "task_summary": "",
     "prompt_template": "You are an AI having a conversation game with someone.\r\n\r\n# CONVERSATION SO FAR\r\n\r\nThis is what you have discussed so far\r\n\r\n{% turns \"step\" %}\r\n\r\n\r\n\r\nYOUR TASK\r\n\r\nhas the person told you about the last time they got caught in the rain? \r\n\r\n[[bool:told_you]]\r\n\r\n\r\nIf the answer is False, briefly explain what the user still needs to do. If True, just reply \"Nothing\"\r\n[[think:what_still_to_say]]"
   }
 },
@@ -203,10 +189,7 @@
   "pk": 118,
   "fields": {
     "intervention": 23,
-    "title": "Tell about family",
-    "slug": "tell-about-family",
     "variable_name": "family",
-    "task_summary": "",
     "prompt_template": "You are an AI having a conversation game with someone.\r\n\r\n# CONVERSATION SO FAR\r\n\r\nThis is what you have discussed so far\r\n\r\n{% turns \"step\" %}\r\n\r\n\r\n\r\nYOUR TASK\r\n\r\nhas the person told you about 2 people in their family ?\r\nfor each person, you need to know age, gender and their relation to the person \r\n\r\nthink about this. If the answer is False, briefly explain what the user still needs to do. If True, just reply \"Nothing\"\r\n[[think:feedback]]\r\n\r\nNow respond True/false to say if the client has completed the task\r\n\r\n[[bool:told]]"
   }
 },
@@ -215,10 +198,7 @@
   "pk": 119,
   "fields": {
     "intervention": 23,
-    "title": "Check riddle answers",
-    "slug": "check-riddle-answers",
     "variable_name": "riddle",
-    "task_summary": "",
     "prompt_template": "Read this conversation:\r\n\r\n{% turns 'step' %}\r\n\r\nHas the person got the right answer to the riddle that was posed?\r\n\r\nThink for a moment, and explain your answer [[think:feedback]]\r\nNow answer True/False. Have they solved the riddle?\r\n[[boolean:solved]]"
   }
 },
@@ -227,10 +207,7 @@
   "pk": 132,
   "fields": {
     "intervention": 23,
-    "title": "Move to Focussing?",
-    "slug": "move-to-focussing",
     "variable_name": "move_focussing",
-    "task_summary": "",
     "prompt_template": "<state>\r\nYou are an AI bot working as a practitioner to help clients with eating nutrition and physical activity.\r\n</state>\r\n\r\n\r\n# Context\r\n\r\n<theory>\r\nYour approach is Motivational Interviewing.\r\nThis intervention has four steps which are:\r\n\r\n- Engaging\r\n- Focusing\r\n- Evoking\r\n- Planning\r\n</theory\r\n\r\n\r\n# Your task\r\n\r\nWe need to decide whether the therapist should move onto the next step in the process.\r\n\r\n<state>\r\nWe are currently in the Engaging Step and \r\ndeciding whether to move to the Focusing Step\r\n</state>\r\n\r\n\r\n<theory>\r\n\r\n### The Engaging Step\r\n\r\nIn Engaging, the AI’s goal is to build trust, connection, and understanding before narrowing the conversation. \r\n\r\nAt this stage, the client may:\r\n\r\n- Express general concerns about health, fitness, or nutrition.\r\n- Discuss their daily habits without a clear goal.\r\n- Share their feelings about their current situation.\r\n- Be unsure about whether they want to change.\r\n\r\nThis is not yet the time to ask about specific changes. \r\nInstead, the AI should focus on listening, validating, and exploring their experiences.\r\n\r\n### How Do We Know a Client is Ready to Move to Focusing?\r\n\r\nThe Focusing step begins when there is a clear topic for change—something the client wants to work on.\r\nSignals that a client is ready to move into Focusing include:\r\n\r\nExpressing a specific concern or goal\r\n<example>\r\n- \"I know I should eat better, but I don’t know where to start.\"\r\n- \"I used to be more active, but I’ve stopped, and I don’t like it.\"\r\n- Indicating dissatisfaction with their current state\r\n- \"I feel sluggish all the time, and I think my diet plays a role.\"\r\n- \"I don’t feel good about my body, and I wonder if I should exercise more.\"\r\n</example>\r\n\r\nAsking about change\r\n<example>\r\n\"What do most people do when they want to eat healthier?\"\r\n\"Is it hard to get into a workout routine?\"\r\n</example>\r\n\r\nRepeatedly mentioning the same issue\r\nIf a client brings up the same topic multiple times (e.g., struggling with snacking, feeling unmotivated to exercise), they may be naturally gravitating toward a focus area.\r\n\r\nAmbivalence emerging\r\n<example>\r\n\"I kind of want to change, but I also feel like I don’t have the energy.\"\r\n\"Part of me thinks I should work out, but I don’t know if it’s worth it.\"\r\n</example>\r\n\r\n### What to Do When a Client Shows These Signals?\r\n\r\nWhen any of the above signals appear, the AI should gently test the waters for moving into Focusing by:\r\n\r\nReflecting the concern back to ensure understanding. <example>It sounds like you’ve been thinking about getting more active again, but you’re not sure where to start. Is that right?</example>\r\n\r\nChecking for readiness to explore the issue further using permission-based questions. <example> \"Would it be okay if we explored that a little more together?\" or \"It sounds like your eating habits are on your mind lately. Would you like to talk more about that?\"\r\n</example>\r\n\r\nIf the client agrees or continues exploring, Focusing can begin. If they hesitate or change the subject, the AI should stay in Engaging and continue building trust and understanding.\r\n\r\n### How to Make the Transition Smoothly\r\n\r\nRather than abruptly moving into Focusing, a skilled MI practitioner will:\r\n\r\nSummarize what has been discussed so far, affirming the client’s experiences.\r\n\r\n“You’ve shared a bit about your lifestyle and the things that are important to you. It sounds like you have some thoughts about changes you might want to make.”\r\n\r\nAsk permission to shift focus\r\n\r\n“Would it be okay if we explore that a little further and see what feels most important to you?”\r\n\r\nThis maintains engagement while gently guiding the client towards selecting a focus.\r\n\r\n</theory>\r\n\r\n\r\n<state>\r\n# Data on the client\r\n\r\n<clinical-notes>\r\n{{data}}\r\n</clinical-notes>\r\n\r\n<transcript> \r\n{% turns 'all' %}\r\n</transcript>\r\n\r\n</state>\r\n\r\n\r\n\r\n# Your task now\r\n\r\nUse the data on THIS client\r\nThink carefully about where they are in the process\r\nHow much evidence do we have they are ready to begin the focussing step?\r\nWhat should the therapist do next?\r\n\r\nTake a moment to check the conversation and think carefully.\r\nRefer to the principles of MI and the guidance provided to make your decision.\r\n\r\n[[think:plan]]\r\n\r\nCollate evidence for a decision to move to the Focussing step.\r\nFocus on HOW MANY examples there are of the right sort of client talk to support our decision.\r\n\r\nGive extra weight to more recent things the client said. If they shift, allow us to move on.\r\n\r\n[[speak:evidence]]\r\n\r\nDecide if the therapist should move on to the Focussing step.\r\nWe can go back to engaging later if needed, there is no great harm in moving forward if the client is ready. Respond with True or False.\r\n\r\n[[boolean:decision]]\r\n\r\nExplain your answer. If the answer was False, Give guidance to the therapist on what they might do next to check readiness and help the client get ready.\r\n\r\n[[think:guidance]]"
   }
 },
@@ -239,10 +216,7 @@
   "pk": 133,
   "fields": {
     "intervention": 23,
-    "title": "Check style",
-    "slug": "check-style",
     "variable_name": "style",
-    "task_summary": "",
     "prompt_template": "# Context\r\n\r\nYou are an expert motivational interviewing practitioner, supervising a colleague on their current case.\r\n\r\nWe want to check their style is appropriate and give them feedback.\r\n\r\n\r\n# Data\r\n\r\nThis is the most recent few turns in their conversation\r\n\r\n{% turns 'all' n=4 %}\r\n\r\n\r\n# Task\r\n\r\nIs the tone of what the therapist says appropriate?\r\n\r\n- UK Conversational Style\r\n- Avoids overly upbeat or cliched encouragement (e.g., \"Great job!\")\r\n- Prefers natural affirmations (e.g., \"That’s a solid insight,\" \"That makes a lot of sense\").\r\n- Ensure language remains collaborative, not instructive\r\n- Avoids offering advice\r\n\r\nALSO IMPORTANT\r\n\r\n- Therapists should avoid repeating phrases. If possible, they should use different constructions/phrases/explanations/reflections to keep the conversation varied.\r\n\r\n\r\n\r\nThe style, tone and phrasing is OK: [[decide:ok]]\r\n\r\nGive some feedback to your colleague. Very briefly, concisely: In 1-2 sentences, let them know if their speech OK, and if there is anything that they should change as the conversation develops?\r\n\r\n[[think:feedback]]"
   }
 },

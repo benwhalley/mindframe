@@ -295,7 +295,7 @@ class Judgement(models.Model):
         self.make_judgement(s)
         """
 
-        get_step_context
+        logger.info(f"Making judgement {self} for {turn}")
         try:
             result = self.process_inputs(
                 turn, inputs=session.current_step().get_step_context(session)
@@ -314,7 +314,7 @@ class Judgement(models.Model):
 
     def process_inputs(self, turn, inputs: dict):
 
-        newnote = Note.objects.create(judgement=self, turn=turn, inputs=None)
+        newnote = Note.objects.create(judgement=self, turn=turn)
         session = turn.session_state.session
 
         llm_result = chatter(

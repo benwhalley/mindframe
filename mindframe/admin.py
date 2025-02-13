@@ -225,48 +225,6 @@ class LLMAdmin(admin.ModelAdmin):
     ]
 
 
-# @admin.register(LLMLog)
-# class LLMLogAdmin(admin.ModelAdmin):
-#     list_display = [
-#         "timestamp",
-#         "log_type",
-#         "turn_id",
-#         "inference_for",
-#         "message",
-#     ]
-#     readonly_fields = [
-#         "prompt_text",
-#         "log_type",
-#         "session",
-#         "step",
-#         "model",
-#         "turn",
-#         "judgement",
-#         "timestamp",
-#         "message",
-#         "metadata",
-#         "metadata_neat",
-#     ]
-
-#     def turn_id(self, obj):
-#         return obj.turn and obj.turn.uuid[:5] + "…"
-
-#     def inference_for(self, obj):
-#         return obj.step and "Step" or obj.judgement and "Judgement" or "Unknown"
-
-#     exclude = [
-#         "metadata",
-#     ]
-#     search_fields = ["model__model_name", "step__title", "judgement__title", "session__uuid"]
-#     list_filter = ["log_type", "model", "judgement", "step"]
-#     date_hierarchy = "timestamp"
-
-#     def metadata_neat(self, obj):
-#         import pprint
-
-#         return format_html("<pre>{}</pre>", pprint.pformat(obj.metadata))
-
-
 class TransitionInline(admin.TabularInline):
     model = Transition
     fk_name = "from_step"
@@ -301,6 +259,7 @@ class StepAdmin(admin.ModelAdmin):
     )
     # autocomplete_fields = ("intervention",)
     search_fields = ("title", "intervention__title")
+    list_editable = ["order"]
     list_filter = ("intervention",)
     inlines = [
         StepJudgementInline,
@@ -384,9 +343,16 @@ class JudgementAdmin(admin.ModelAdmin):
 
 @admin.register(Intervention)
 class InterventionAdmin(admin.ModelAdmin):
-    list_display = ("title_version", "ver", "slug", "title", "start_session_button")
+    list_display = (
+        "title_version",
+        "ver",
+        "is_default_intervention",
+        "slug",
+        "title",
+        "start_session_button",
+    )
     search_fields = ("title",)
-
+    list_editable = ["is_default_intervention"]
     readonly_fields = ["slug", "version"]
     autocomplete_fields = [
         "default_conversation_model",
@@ -580,7 +546,7 @@ class InterventionAdmin(admin.ModelAdmin):
         human_starter = Turn.add_root(
             conversation=conversation,
             speaker=request.user,
-            text="/start",
+            text="",
             text_source=TurnTextSourceTypes.OPENING,
         )
 
@@ -592,7 +558,7 @@ class InterventionAdmin(admin.ModelAdmin):
             step=step,
         )
 
-        return redirect(f"{settings.CHAT_URL}/?conversation_id={conversation.uuid}")
+        return redirect(f"{settings.CHAT_URL}/?turn_id={bot_turn.uuid}")
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
 

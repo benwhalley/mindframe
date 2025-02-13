@@ -12,8 +12,8 @@ smart = LLM.objects.get(model_name="gpt-4o")
 mini = LLM.objects.get(model_name="gpt-4o-mini")
 
 
+chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]", mini)['JOKE']
 
-chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]", mini)[0]['JOKE']
 
 
 convo = """ """
@@ -281,15 +281,9 @@ def parse_prompt(prompt_text) -> OrderedDict:
 
 
 @observe(capture_input=False, capture_output=False)
-def structured_chat(
-    prompt,
-    llm,
-    return_type,
-    max_retries=3,
-    log_context={},
-):
+def structured_chat(prompt, llm, return_type, max_retries=3):
     """
-    Make a tool call to an LLM, returning the `response` field, a completion object and the LLMLog.
+    Make a tool call to an LLM, returning the `response` field, and a completion object
     """
 
     langfuse_context.update_current_observation(input=prompt)
@@ -304,37 +298,18 @@ def structured_chat(
         msg, lt, meta = res.response, None, com.dict()
 
     except Exception as e:
-        # res, com, msg, lt, meta = None, None, str(e), LLMLogTypes.ERROR, str(log_context)
         full_traceback = traceback.format_exc()
         logger.warning(f"Error calling LLM: {e}\n{full_traceback}")
 
-    llm_call_log = None
-    # LLMLog.objects.create(
-    #     variable_name=log_context.get("variable_name", "?"),
-    #     log_type=lt,
-    #     session=log_context.get("session", None),
-    #     judgement=log_context.get("judgement", None),
-    #     turn=log_context.get("turn", None),
-    #     step=log_context.get("step", None),
-    #     model=llm,
-    #     message=msg,
-    #     prompt_text=prompt,
-    #     metadata=meta,
-    # )
-
-    return res, com, llm_call_log
+    return res, com
 
 
 @observe(capture_input=False, capture_output=False)
-def simple_chat(prompt, llm, log_context={}):
-    """For a text prompt and LLM model, return a string completion.
-
-    Accepts log_context dictionary to pass to LLMLog creation on error.
-    """
+def simple_chat(prompt, llm):
+    """For a text prompt and LLM model, return a string completion."""
 
     # we can't use chat_with_completion because it needs a response model
     # so we return the first string completion, plus the completion object
-    # from mindframe.models import LLMLog, LLMLogTypes
 
     langfuse_context.update_current_observation(input=prompt)
 
@@ -345,33 +320,15 @@ def simple_chat(prompt, llm, log_context={}):
             messages=[{"role": "user", "content": prompt}],
         )
         res_text = res.choices[0].message.content
-        res, com, msg, lt, meta = (
+        res, com = (
             res_text,
             res,
-            res_text[:30] + "...",
-            LLMLogTypes.USAGE,
-            res.dict(),
         )
 
     except Exception as e:
-        # res, com, msg, lt, meta = None, None, str(e), LLMLogTypes.ERROR, str(log_context)
         logger.error(f"Error calling LLM: {e}")
 
-    el = None
-    # LLMLog.objects.create(
-    #     variable_name=log_context.get("variable_name", None),
-    #     log_type=lt,
-    #     session=log_context.get("session", None),
-    #     judgement=log_context.get("judgement", None),
-    #     turn=log_context.get("turn", None),
-    #     step=log_context.get("step", None),
-    #     model=llm,
-    #     message=msg,
-    #     prompt_text=prompt,
-    #     metadata=meta,
-    # )
-    logger.warning(f"MAKING llm log {el}")
-    return res, com, el
+    return res, com
 
 
 # prefix attached to all prompt text/templates to ensure templating syntax works
@@ -392,7 +349,7 @@ class ChatterResult(OrderedDict):
 
 
 @observe(capture_input=False, capture_output=False)
-def chatter(multipart_prompt, model, context={}, log_context={}):
+def chatter(multipart_prompt, model, context={}):
     """
     Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next.
 
@@ -410,6 +367,9 @@ def chatter(multipart_prompt, model, context={}, log_context={}):
     # e.g. |||=== or ||| ===
     SEGMENT_SPLIT_RE = re.compile(r"\|\|\|\s*={3,}\s*")
 
+    logger.warning("ENTIRE PROMPT\n\n")
+    logger.warning(multipart_prompt + "\n\n\n")
+
     final_results = ChatterResult()
     # This dict will accumulate all completions across segments,
     # so that later segments can reference earlier outputs using {{key}}.
@@ -417,6 +377,7 @@ def chatter(multipart_prompt, model, context={}, log_context={}):
 
     # Split the entire prompt by the segment break marker.
     segments = SEGMENT_SPLIT_RE.split(multipart_prompt)
+    logger.info(segments)
 
     # If no segment break is found, segments will be a list with one element.
     for segment in segments:
@@ -427,11 +388,18 @@ def chatter(multipart_prompt, model, context={}, log_context={}):
         # the author decide which earlier outputs to reference via template vars.
         prompt_parts = []
 
+        logger.info("PPROMPT", pprompt)
+
         for key, prompt_part in pprompt.items():
             # Append the raw text for this prompt part.
             prompt_parts.append(prompt_part.text)
             # Build the prompt for this completion from the parts within this segment.
-            segment_prompt = "\n\n--\n\n".join(prompt_parts)
+            try:
+                segment_prompt = "\n\n--\n\n".join(filter(bool, prompt_parts))
+            except Exception:
+                import pdb
+
+                pdb.set_trace()
 
             # Merge the provided context with the accumulated completions
             # so that any template variable like {{JOKE}} gets replaced.
@@ -453,11 +421,8 @@ def chatter(multipart_prompt, model, context={}, log_context={}):
                 rt = prompt_part.return_type
 
             # Call the LLM via structured_chat.
-            res, completion_obj, log = structured_chat(
-                rendered_prompt, model, return_type=rt, log_context=log_context
-            )
+            res, completion_obj = structured_chat(rendered_prompt, model, return_type=rt)
             res = res and res.response or None
-            log_context["variable_name"] = key
 
             if key in ["RESPONSE_", "response"]:
                 logging.info(f"\033[32mCompletion: {key}\n{res}\n\033[0m")

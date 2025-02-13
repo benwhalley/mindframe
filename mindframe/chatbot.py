@@ -36,10 +36,11 @@ def main():
 
         for turn in turns:
             role = "assistant" if turn.speaker.role == RoleChoices.THERAPIST else "user"
-            if role == "user":
-                history.append((turn.text, ""))
-            else:
-                history.append(("", turn.text))
+            if turn.text and len(turn.text.strip()) > 0:
+                if role == "user":
+                    history.append((turn.text, ""))
+                else:
+                    history.append(("", turn.text))
 
         if turns.count() == 0:
             history.append(("", "Error: No turns found in conversation"))

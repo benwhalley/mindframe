@@ -92,6 +92,7 @@
         <div class="col-2">
             <a class="mr-3" href="{% url 'admin:mindframe_turn_change' turn.id %}">
                 <span class="badge bg-primary rounded-pill mr-2">{{ turn.uuid|slice:5 }}</span>
+                {{turn.step.title}}
             </a>
         </div>
 
@@ -107,7 +108,19 @@
     </div>
 
     <div class="col-3 small">
-        <code>{{turn.metadata}}    </code>
+
+        {% for n in turn.notes.all %}
+        <code>{{n.judgement.variable_name}}</code><pre>{{n.data}}</pre>
+        {% if not forloop.last %}<hr>{% endif %}
+        {% endfor %}
+
+        {% for k, v in turn.metadata.items %}
+            {% if k != "response" and  k != "RESPONSE_" %}
+            <code>{{k}}</code>
+            <pre>{{v}}</pre>
+            {% endif %}
+        {% endfor %}
+
     </div>
     <div class="col-2 small">
         <a  class='btn btn-sm btn-outline-success mb-4 float-end ' href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=gradio">Start new branch</a>
