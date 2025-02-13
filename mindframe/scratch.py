@@ -3,10 +3,6 @@ import django
 from datetime import timedelta
 from django.utils import timezone
 
-# If running outside of the Django shell, uncomment these lines:
-# os.environ.setdefault("DJANGO_SETTINGS_MODULE", "your_project.settings")
-# django.setup()
-
 from mindframe.models import (
     CustomUser,
     Conversation,
@@ -16,27 +12,28 @@ from mindframe.models import (
     Judgement,
     LLM,
     Intervention,
+    StepJudgement,
 )
-from mindframe.tree import iter_conversation_path  # for traversing the conversation
-from mindframe.tree import conversation_history
+from mindframe.tree import iter_conversation_path, conversation_history
 from mindframe.templatetags.turns import format_turns
-
+from mindframe.settings import TurnTextSourceTypes
 from mindframe.conversation import *
+
+
+# setup intervention
+
+Intervention.objects.all().delete()
+Conversation.objects.all().delete()
+Note.objects.all().delete()
 
 model, _ = LLM.objects.get_or_create(model_name="gpt-4o-mini")
 
-Intervention.objects.all().delete()
-
-# Create (or fetch) our users
 client, _ = CustomUser.objects.get_or_create(
     username="client", defaults={"role": "client", "email": "client@example.com"}
 )
 therapist, _ = CustomUser.objects.get_or_create(
     username="therapist", defaults={"role": "therapist", "email": "therapist@example.com"}
 )
-
-# Create a new conversation instance (saved in DB)
-conversation = Conversation.objects.create()
 
 cbt = Intervention.objects.create(title="CBT")
 cbtwelcome, _ = Step.objects.get_or_create(
@@ -55,6 +52,52 @@ tr1, _ = Transition.objects.get_or_create(
     from_step=cbtwelcome, to_step=cbtstep2, conditions="anxiety_level.value < 5"
 )
 
+fakeclient, _ = Intervention.objects.get_or_create(title="Fake Client")
+fakeclientstep1, _ = Step.objects.get_or_create(
+    intervention=fakeclient,
+    title="Fake Client Step 1",
+    prompt_template="Conversation so far: {% turns 'all' %}\n\nYou are the client in a conversation between a depressed person and a CBT therapist. Role play the client. Always continue the conversation above.\n[[speak:response]]",
+)
+
+
+judge_anxiety, _ = Judgement.objects.get_or_create(
+    variable_name="anxiety_level",
+    prompt_template="""{% turns 'all' %}\n How anxious does the client seem?\nGive a score on 1-5 scale. Return valid json.\n[[int:value]]""",
+    intervention=cbt,
+)
+
+
+stepjudgementexample, _ = StepJudgement.objects.get_or_create(
+    step=cbtwelcome, judgement=judge_anxiety
+)
+
+
+judge_summaryofconvo, _ = Judgement.objects.get_or_create(
+    variable_name="summary",
+    prompt_template="""{% turns 'all' %}\n Summarise the contents of this conversation. Imagine you are the therapist, looking at a list of conversations. Write it for yourself, making it as easy as possible to recall and distinguish the conversation. Don't label, title or prefix the summary: just 3-4 sentences of prose, starting with 'Discussed' or 'Spoke about' or similar \n[[summary]]""",
+    intervention=cbt,
+)
+stepjudgementexample2, _ = StepJudgement.objects.get_or_create(
+    step=cbtwelcome, judgement=judge_summaryofconvo
+)
+stepjudgementexample3, _ = StepJudgement.objects.get_or_create(
+    step=cbtstep2, judgement=judge_summaryofconvo
+)
+
+
+judge_progress, _ = Judgement.objects.get_or_create(
+    variable_name="progress",
+    prompt_template="""{% turns 'all' %}\n How complete is this CBT treatment session. Return valid json.\n[[pick|just_started,half_done,nearly_done,complete]]""",
+    intervention=cbt,
+)
+
+
+stepjudgeentryexample, _ = StepJudgement.objects.get_or_create(
+    step=cbtstep2, judgement=judge_progress, when=StepJudgementFrequencyChoices.ENTER
+)
+
+
+conversation = Conversation.objects.create(is_synthetic=True)
 
 # Create the root turn using Treebeard's add_root (sets proper tree fields)
 turn0 = Turn.add_root(
@@ -63,82 +106,25 @@ turn0 = Turn.add_root(
     text="Welcome to the session. How are you feeling today?",
     timestamp=timezone.now(),
     branch=False,
-    text_source="HUMAN",
+    text_source=TurnTextSourceTypes.OPENING,
     step=cbtwelcome,
 )
 
 turn1 = turn0.add_child(
-    conversation=conversation,
-    speaker=client,
-    text="Hi, I'm feeling anxious.",
-    timestamp=timezone.now(),
-    branch=False,
-    text_source="HUMAN",
+    conversation=conversation, speaker=client, text="Hi, I'm feeling anxious.", step=fakeclientstep1
 )
 
-
-turn2 = turn1.listen("Oh, that's sad", speaker=therapist)
-turn3 = turn2.listen("Yea, it's a real pita", speaker=client)
+new_tip = add_turns(turn1, 4)
 
 
-j1, _ = Judgement.objects.get_or_create(
-    variable_name="anxiety_level",
-    title="Anxiety Level",
-    prompt_template="""{% turns 'all' %}\n How anxious does the client seem?\nGive a score on 1-5 scale. Return valid json.\n[[int:value]]""",
-    intervention=cbt,
-)
+hist = conversation_history(new_tip)
 
-stpjd1, _ = StepJudgement.objects.get_or_create(step=cbtwelcome, judgement=j1)
+hist.first().step
+hist.last().step
 
 
-cturn = respond(turn3)
-cturn = cturn.listen("Yea, it's a real pita", speaker=client)
-cturn = respond(cturn)
-cturn = cturn.listen("what can you do for me?", speaker=client)
-cturn = respond(cturn)
+# we should have made 2 notes, because we have 2 therapist-completed turns
+Note.objects.filter(turn__in=hist)
+Note.objects.filter(turn__in=hist).count()
 
-
-# get notes
-Note.objects.filter(turn__conversation=cturn.conversation)
-
-
-print(format_turns(conversation_history(cturn)))
-
-
-turn = cturn
-# turn = new_turn
-# step = new_turn.step
-# judgement = j1
-# transition = tr1
-
-
-# need to refetch to get children to get accurate count
-Turn.objects.get(pk=cturn.pk).get_children().count()
-Turn.objects.get(pk=cturn.pk).get_children()[0].get_siblings().count()
-
-# the whole conversation branch
-list(iter_conversation_path(turn3.get_root()))
-
-
-# Create an alternative branch turn as another therapist response,
-# attached to the same parent as turn2. Note: branch=True.
-branch_turn = turn1.add_child(
-    conversation=conversation,
-    speaker=therapist,
-    text="Have you considered trying some relaxation techniques?",
-    timestamp=timezone.now() + timedelta(minutes=1, seconds=30),
-    branch=True,
-    text_source="HUMAN",
-)
-
-
-branch_turn2 = turn1.add_child(
-    conversation=conversation,
-    speaker=therapist,
-    text="Have a nice hot bath?",
-    timestamp=timezone.now() + timedelta(minutes=1, seconds=30),
-    branch=True,
-    text_source="HUMAN",
-)
-
-print(transcript(conversation_history(branch_turn)))
+print(format_turns(conversation_history(new_tip)))
