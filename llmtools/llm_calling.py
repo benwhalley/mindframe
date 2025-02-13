@@ -213,9 +213,11 @@ def extract_keys_and_options(key):
     else:
         ro = [i.strip() for i in kn_ops_split[1].strip().split(",")]
 
-    return namedtuple("KeyParts", ["name", "return_type", "return_options"])(
+    valops = namedtuple("KeyParts", ["name", "return_type", "return_options"])(
         kn, ACTION_LOOKUP[rn], ro
     )
+    logger.info(f"Extracted options: {valops}")
+    return valops
 
 
 def parse_prompt(prompt_text) -> OrderedDict:
@@ -372,13 +374,12 @@ def simple_chat(prompt, llm, log_context={}):
     return res, com, el
 
 
-# prefix attached to all prompts to ensure templating syntax works
+# prefix attached to all prompt text/templates to ensure templating syntax works
 TEMPLATE_PREFIX = """
 {% load pretty %}
 {% load guidance %}
 {% load rag %}
 {% load turns %}
-{% load examples %}
 {% load notes %}
 """
 
