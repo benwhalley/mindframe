@@ -71,9 +71,9 @@ docker-compose run web \
 	mindframe.Transition \
 	mindframe.Judgement \
 	mindframe.LLM \
-	--indent 2 > ~/dev/mindframe/mindframe/fixtures/test.json
+	--indent 2 > ~/dev/mindframe/mindframe/fixtures/demo.json
 
-head ~/dev/mindframe/mindframe/fixtures/test.json
+head ~/dev/mindframe/mindframe/fixtures/demo.json
 ```
 
 

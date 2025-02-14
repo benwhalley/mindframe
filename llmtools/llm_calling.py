@@ -1,96 +1,3 @@
-"""
-# Define your desired output structure
-
-from pydantic import BaseModel, Field
-from llmtools.llm_calling import structured_chat
-from typing import Optional, List
-
-from llmtools.llm_calling import *
-
-
-smart = LLM.objects.get(model_name="gpt-4o")
-mini = LLM.objects.get(model_name="gpt-4o-mini")
-
-
-chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]", mini)['JOKE']
-
-
-
-convo = """ """
-chunktmpl = """ """
-
-chnks = chatter(chunktmpl.format(source=convo), model=smart)
-chnks.response
-
-
-for i in chnks.response:
-    i.text= convo.split('\n')[i.start-1:i.end-1]["]
-chnks
-
-
-
-simple_chat
-
-# this raises an exception
-split_multipart_prompt("one[[]]two[[RESP]]dddd")
-
-# tests
-len(split_multipart_prompt("one[[x]]two[[RESP]]dddd").items())==3
-split_multipart_prompt("one[[talk:y]]two[[RESP]]dddd")['talk:y'] == 'one'
-
-
-rr = chatter("Pick an ancient civilisation: [[thoughts]] Now pick one of art, science or magic. Just one of those three words [[pick:topic]] Now tell me a SINGLE interesting fact[[speak:]]", mini)
-rr.response
-rr[1]
-
-chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]", mini)[0]['JOKE']
-
-chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[poem:JOKE]]", mini)[0]['JOKE']
-
-simple_chat("tell a joke", mini)[0]
-simple_chat("tell a joke", local)[0]
-
-
-zz = chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke[[JOKE]]", mini)
-zz[0]
-
-chatter("Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke[[JOKE]]", local)[0]
-
-
-
-class UserInfo(BaseModel):
-    name: str
-    age: Optional[int] = Field(description="The age in years of the user.", default=None)
-
-class UserList(BaseModel):
-    peeps: List[UserInfo]
-
-
-structured_chat("Create a list of 3 fake users. Use consistent field names for each item. Use the tools",
-                llm=mini,
-                return_type=UserList)
-
-structured_chat("Create a fake user, Use the tools",
-                llm=local,
-                return_type=UserInfo)
-
-
-
-# note - not as reliable but still works OK
-structured_chat("Create a list of 3 fake users. Use consistent field names for each item. Use the tools",
-                llm=local,
-                return_type=UserList)
-
-# do some accounting on tokens on one chatter call from above
-import pandas as pd
-df = pd.DataFrame(
-list(rr[1].values('metadata__usage__total_tokens', 'metadata__usage__prompt_tokens'))
-)
-df['out'] = df['metadata__usage__total_tokens'] - df['metadata__usage__prompt_tokens']
-df[['out', 'metadata__usage__prompt_tokens']].sum()
-
-"""
-
 import traceback
 import logging
 import re
@@ -287,7 +194,6 @@ def structured_chat(prompt, llm, return_type, max_retries=3):
     """
 
     langfuse_context.update_current_observation(input=prompt)
-
     try:
         res, com = llm.client.chat.completions.create_with_completion(
             model=llm.model_name,
@@ -295,7 +201,7 @@ def structured_chat(prompt, llm, return_type, max_retries=3):
             messages=[{"role": "user", "content": prompt}],
             max_retries=max_retries,
         )
-        msg, lt, meta = res.response, None, com.dict()
+        msg, lt, meta = res, None, com.dict()
 
     except Exception as e:
         full_traceback = traceback.format_exc()

@@ -26,7 +26,7 @@ services:
     volumes:
       - ~/dev/mindframe/mindframe:/app/mindframe:rw,rslave
       - ~/dev/mindframe/llmtools:/app/llmtools:rw,rslave
-
+      - ~/dev/mindframe/config:/app/config:rw,rslave
   chat:
     depends_on:
       - redis
@@ -46,8 +46,8 @@ services:
     volumes:
       - ~/dev/mindframe/mindframe:/app/mindframe:rw,rslave
       - ~/dev/mindframe/llmtools:/app/llmtools:rw,rslave
+      - ~/dev/mindframe/config:/app/config:rw,rslave
       - ~/dev/mindframe/mindframe/chatbot.py:/app/chatbot.py:rw,rslave
-
   worker:
     image: mindframe-base:latest
     command:
@@ -61,3 +61,5 @@ services:
       - APP_MODE=worker
     volumes:
       - ~/dev/mindframe/mindframe:/app/mindframe:rw,rslave
+      - ~/dev/mindframe/llmtools:/app/llmtools:rw,rslave
+      - ~/dev/mindframe/config:/app/config:rw,rslave
