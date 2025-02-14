@@ -309,11 +309,11 @@ def add_turns_task(turn_pk: int, n_turns: int):
 
 def start_conversation(intervention, therapist, client=None, client_intervention=None) -> Turn:
     """Create a new conversation between a therapist and a (real or synthetic) client."""
-    
+
     # it's a synthetic conversation if we use an intervention for the client
     synth = bool(client_intervention)
     conversation = Conversation.objects.create(is_synthetic=synth)
-    
+
     turn = Turn.add_root(
         conversation=conversation,
         speaker=therapist,

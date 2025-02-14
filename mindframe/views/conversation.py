@@ -98,7 +98,7 @@ class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
         context["turn"] = self.object
         context["object"] = self.object.conversation
         # deepest leaf node on this branch
-        leaf_node = self.object.get_descendants().order_by('-depth', '-rgt').first() or self.object
+        leaf_node = self.object.get_descendants().order_by("-depth", "-rgt").first() or self.object
         turns = conversation_history(self.object)
 
         context["turns"] = turns.prefetch_related(

@@ -7,11 +7,11 @@
 {% block content %}
 <div class="container mt-5">
     <h1 class="mb-5 mt-4">Conversation at node: {{turn.uuid|slice:5}}</h1>
-    
+
     {% if turn.pk != leaf_node.pk %}
     <div class="alert alert-warning" role="alert">
     <p>This is a partial view of a conversation branch.</p>
-    
+
     <a href="{% url 'conversation_detail' leaf_node.uuid %}">See the entire branch</a>
     or <a href="{% url 'conversation_mermaid' uuid=object.uuid %}">view the tree diagram</a>.
     </div>
@@ -53,7 +53,7 @@
                 </div>
                 <div class="card-body">
 
-                  
+
 
     {% if leaves.count > 1 %}
     <p>
@@ -164,13 +164,13 @@
 
         <div class="col-4 small">
 
-        
+
             <span class="badge border border-primary text-primary rounded-pill mr-2">
                 <a class="mr-3" href="{% url 'admin:mindframe_turn_change' turn.id %}"></a>
                 {{ turn.uuid|slice:5 }}
                 </a>
             </span>
-            
+
             <span class="badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source}}</span>
 
             {% if turn.step %}
