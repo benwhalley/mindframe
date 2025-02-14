@@ -13,7 +13,10 @@ from itertools import cycle
 
 from mindframe.conversation import listen, continue_conversation_task
 from mindframe.models import Turn, Intervention, CustomUser, Conversation
-from mindframe.tree import conversation_history
+from mindframe.tree import conversation_history, generate_mermaid_tree
+from django.shortcuts import get_object_or_404
+
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,10 +73,10 @@ class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
 
             self.object.conversation.synthetic_turns_scheduled += n_turns
             self.object.conversation.save()
-            leaf_turn = self.object.get_descendants().last() or self.object
+            # leaf_turn = self.object.get_descendants().last() or self.object
 
             continue_conversation_task.delay(
-                from_turn_id=leaf_turn.pk,
+                from_turn_id=self.object.pk,
                 speaker_interventions=speaker_interventions,
                 n_turns=n_turns,
             )
@@ -92,9 +95,10 @@ class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
         context = super().get_context_data(**kwargs)
         context["form"] = self.get_form()
 
+        context["turn"] = self.object
         context["object"] = self.object.conversation
         leaf_turn = self.object.get_descendants().last() or self.object
-        turns = conversation_history(leaf_turn)
+        turns = conversation_history(self.object)
 
         context["turns"] = turns.prefetch_related(
             "speaker",
@@ -177,3 +181,18 @@ class ImportConversationView(LoginRequiredMixin, FormView):
             turn = listen(turn, line, spkr)
 
         return redirect(reverse_lazy("conversation_detail", kwargs={"uuid": turn.uuid}))
+
+
+class ConversationMermaidView(DetailView):
+    model = Conversation
+    template_name = "conversation_mermaid.html"
+    context_object_name = "conversation"
+    slug_field = "uuid"
+    slug_url_kwarg = "uuid"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        conversation = self.object  # Retrieved Conversation instance
+        root_turn = conversation.turns.get(depth=1)  # Assuming root turn has depth=1
+        context["mermaid_code"] = generate_mermaid_tree(root_turn)
+        return context

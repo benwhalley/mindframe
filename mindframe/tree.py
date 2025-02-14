@@ -1,5 +1,6 @@
 import logging
-
+from django.urls import reverse
+from django.utils.html import escape
 from mindframe.helpers import get_ordered_queryset
 from mindframe.settings import BranchReasons
 
@@ -83,3 +84,41 @@ def create_branch(turn, reason=BranchReasons.PLAY):
         f"Created a new branch Turn {new_turn.uuid} as sibling of {turn.uuid} from parent {parent.uuid}."
     )
     return new_turn
+
+
+def generate_mermaid_tree(root):
+    """
+    Recursively generates a Mermaid.js graph definition from a Treebeard tree.
+
+    :param root: Root node of the Treebeard tree.
+    :return: Mermaid graph definition as a string.
+    """
+    edges = []
+    nodes = {}
+
+    def traverse(node):
+        """Recursively process the tree"""
+        node_id = f"node_{node.pk}"
+        safe_label = escape(f"{node.uuid[:5]}: {node.text}")  # Escape to prevent any HTML issues
+        node_link = reverse("conversation_detail", args=[node.uuid])
+
+        # Define the node with a clickable link
+        nodes[node_id] = f'{node_id}["<a href="{node_link}">{safe_label}</a>"]'
+
+        for child in node.get_children():
+            child_id = f"node_{child.pk}"
+            edges.append(f"{node_id} --> {child_id}")
+            traverse(child)
+
+    traverse(root)
+
+    # Construct Mermaid definition
+    mermaid_code = "graph TD;\n" + "\n".join(nodes.values()) + "\n" + "\n".join(edges)
+    return mermaid_code
+
+
+if False:
+    from mindframe.models import Turn
+    from mindframe.tree import generate_mermaid_tree
+
+    print(generate_mermaid_tree(Turn.objects.get(uuid="7nsthysqh8a8wcxpeh3qr6rdx1").get_root()))

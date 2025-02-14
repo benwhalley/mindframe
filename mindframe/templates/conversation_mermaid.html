@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h2>Conversation Mermaid Graph</h2>
+
+    <p>
+        <a href="{% url 'conversation_detail' conversation.turns.last.uuid %}">Conversation details</a>
+    </p>
+
+
+    <div class="mermaid">
+
+        {{ mermaid_code|safe }}
+    </div>
+
+
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.esm.min.mjs";
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+{% endblock %}

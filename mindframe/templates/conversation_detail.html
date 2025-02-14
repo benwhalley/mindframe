@@ -6,10 +6,22 @@
 {% load guidance %}
 {% block content %}
 <div class="container mt-5">
-    <h1>Conversation at node: {{leaf_node.uuid|slice:5}}</h1>
+    <h1 class="mb-5 mt-4">Conversation at node: {{turn.uuid|slice:5}}</h1>
+
+
+    {% if turn.pk != leaf_turn.pk %}
+    <div class="alert alert-warning" role="alert">
+    This is a partial view of a branch of a conversation.
+    <a href="{% url 'conversation_detail' leaf_node.uuid %}">See the entire conversation branch</a>
+    or <a href="{% url 'conversation_mermaid' uuid=object.uuid %}">view the tree diagram</a>.
+    </div>
+    {% endif %}
+
+
 
     <div class="row mb-4">
-        <div class="col-4 pr-5">
+        <div class="col-1 order-last"></div>
+        <div class="col-3 pr-5 order-last">
 
             <div class="card">
                 <div class="card-header">
@@ -22,9 +34,10 @@
                     <p>ID:<code>{{object.uuid}}</code></p>
 
                 <p>
-                    <a class="btn btn-primary" href="{{leaf_node.gradio_url}}">
+                    <a class="btn btn-sm btn-primary" href="{{leaf_node.gradio_url}}">
                     Continue conversation at turn {{leaf_node.uuid|slice:5}}</a>
                 </p>
+
                 </div>
             </div>
 
@@ -34,6 +47,12 @@
                     Branches
                 </div>
                 <div class="card-body">
+
+                    <p>
+                        <a class="btn btn-sm btn-primary" href="{% url 'conversation_mermaid' uuid=object.uuid %}">
+                        View Tree</a>
+                    </p>
+
 
     {% if leaves.count > 1 %}
     Branches at:
@@ -65,7 +84,11 @@
 
                     <h5>Add synthetic turns</h5>
 
-                    <p>Appending to {{leaf_node.uuid|slice:4}}</p>
+                    {% if turn.pk != leaf_node.pk %}
+                    <p>Branching from {{turn.uuid|slice:4}}</p>
+                    {% else %}
+                    <p>Appending to {{turn.uuid|slice:4}}</p>
+                    {% endif %}
                 <form method="post" >
                 <h6>Add additional turns to the conversation</h6>
                 <a name="addmore"></a>
@@ -74,39 +97,15 @@
                         <button type="submit" class="btn btn-primary float-end">Add Turns</button>
                 </form>
 
-
-                {% if object.synthetic_turns_scheduled > 0 %}
-                <div class="alert alert-warning" role="alert">
-                    Note: {{object.synthetic_turns_scheduled}} additional turns are scheduled to be generated for this conversation.
-                </div>
-                <!-- meta refresh every 3 seconds - go to #addmore tag -->
-                <meta http-equiv="refresh" content="3;url=#conversationend">
-
-            {% endif %}
-
-
                 </div>
             </div>
-
-
-
-
-            <hr>
-
-
-
 
 
 
     </div>
 
     <div class="col-8 pl-5">
-
-
     <div class="row">
-
-        <div class="col-6"><h5>Conversation</h5></div>
-        <div class="col-6"><h5>Notes/LLM Calls</h5></div>
 
         <style>
             pre {
@@ -120,54 +119,58 @@
 
     <div class="row">
     <div class="col-12">
-       <h6>Step: {{group.step.title}}
+
 
     </h6>
     </div>
     </div>
 
     <style>
-        .speech { font-family: 'Courier New', Courier, monospace;
-    font-size:16pt;}
+        .speech {
+            font-family: 'Courier New', Courier, monospace;
+            font-size:14pt;
+
+        }
 
     </style>
     {% for turn in turns %}
-    <hr>
-    <div class="col-6">
-    <div class="row">
-        <div class="col-2">
-            <a class="mr-3" href="{% url 'admin:mindframe_turn_change' turn.id %}">
-                <span class="badge border border-primary text-primary rounded-pill mr-2">
-                    {{ turn.uuid|slice:5 }}
-                </span>
-                </a>
+    {% if forloop.last%}
+    <a name="conversationend"></a>
+    {% endif %}
 
-                <span class="badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source}}</span>
-
-                {% if turn.step %}
-                <a href="{% url 'admin:mindframe_step_change' turn.step.id %}">
-                <code class="small">{{turn.step.title}}</code>
-                </a>
-                {% endif %}
+    <div class="col">
+    <div class="row mb-5">
 
 
-            </a>
-        </div>
-
-        <div class="col mb-5 speech">
-            <b>{{turn.speaker.username.upper}}: &nbsp;</b>
+        <div class="col-8 mb-5 speech pr-5">
+            <b>{{turn.speaker.username.upper}}: </b>
 
             {{turn.text}}
 
         </div>
 
-    </div>
 
-    </div>
+        <div class="col-4 small">
 
-    <div class="col-3 small">
+        <a class="mr-3" href="{% url 'admin:mindframe_turn_change' turn.id %}">
+            <span class="badge border border-primary text-primary rounded-pill mr-2">
+                {{ turn.uuid|slice:5 }}
+            </span>
+            </a>
+            <span class="badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source}}</span>
 
-{% for n in turn.notes.all %}
+            {% if turn.step %}
+            <p><a href="{% url 'admin:mindframe_step_change' turn.step.id %}">
+                <code class="small">{{turn.step.title}}</code>
+                </a></p>
+            {% endif %}
+
+
+            </a>
+
+
+
+        {% for n in turn.notes.all %}
         <code>{{n.judgement.variable_name}}</code><pre>{{n.data}}</pre>
         {% if not forloop.last %}<hr>{% endif %}
         {% endfor %}
@@ -179,18 +182,26 @@
             {% endif %}
         {% endfor %}
 
-    </div>
-    <div class="col-2 small">
-        <a  class='btn btn-sm btn-outline-success mb-4 float-end ' href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch">Start new branch</a>
-    </div>
+        <br><a  class='btn btn-xs btn-outline-success mb-4 mt-1' href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch">Start new branch</a>
 
+        </div>
+    <hr>
 
     {% endfor %}
+</div>
 
 
 {% endfor %}
 
-<a name="conversationend"></a>
+{% if object.synthetic_turns_scheduled > 0 %}
+                <div class="alert alert-warning" role="alert">
+                    Note: {{object.synthetic_turns_scheduled}} additional turns are scheduled to be generated for this conversation.
+                </div>
+                <!-- meta refresh every 3 seconds - go to #addmore tag -->
+                <meta http-equiv="refresh" content="3;url=#conversationend">
+
+            {% endif %}
+
 
 
 </div>

@@ -9,6 +9,7 @@ from mindframe.views.hyde import (
 from mindframe.views.conversation import (
     ConversationDetailView,
     ImportConversationView,
+    ConversationMermaidView,
 )
 
 from mindframe.telegram import telegram_webhook
@@ -35,6 +36,11 @@ urlpatterns = [
         "conversations/<str:uuid>/",
         ConversationDetailView.as_view(),
         name="conversation_detail",
+    ),
+    path(
+        "conversation/mermaid/<str:uuid>/",
+        ConversationMermaidView.as_view(),
+        name="conversation_mermaid",
     ),
     path("rag-test/", RAGHyDEComparisonView.as_view(), name="rag_test"),
     path("", IndexView.as_view(), name="index"),  # Index page
