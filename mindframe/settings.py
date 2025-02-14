@@ -6,6 +6,12 @@ from types import SimpleNamespace
 import os
 from django.db import models
 import shortuuid
+from decouple import config
+
+
+DEFAULT_CONVERSATION_MODEL_NAME = config("DEFAULT_CONVERSATION_MODEL_NAME", "gpt-4o-mini")
+DEFAULT_JUDGEMENT_MODEL_NAME = config("DEFAULT_JUDGEMENT_MODEL_NAME", "gpt-4o-mini")
+DEFAULT_CHUNKING_MODEL_NAME = config("DEFAULT_CHUNKING_MODEL_NAME", "gpt-4o")
 
 
 # 24 chars in alphapbet and 22 long = 24^22 so still very large for guessing but easier to read for humans

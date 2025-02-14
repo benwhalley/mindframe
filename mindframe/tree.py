@@ -65,7 +65,7 @@ def create_branch(turn, reason=BranchReasons.PLAY):
 
     if parent is None:
         logger.warning("Can't branch at the root Turn.")
-        return None
+        return turn
 
     # Create the new child Turn, copying fields from 'self'
     new_turn = parent.add_child(

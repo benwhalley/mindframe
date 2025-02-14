@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import pprint
+from django.db.models import QuerySet
 from mindframe.models import Turn, CustomUser, Transition, LLM, Note, Conversation, Intervention
 import traceback
 import logging
@@ -9,7 +10,11 @@ from mindframe.settings import mfuuid, StepJudgementFrequencyChoices
 from mindframe.helpers import make_data_variable, get_ordered_queryset
 from llmtools.llm_calling import chatter
 from mindframe.tree import conversation_history, iter_conversation_path
-from mindframe.settings import TurnTextSourceTypes
+from mindframe.settings import (
+    TurnTextSourceTypes,
+    DEFAULT_CONVERSATION_MODEL_NAME,
+    DEFAULT_JUDGEMENT_MODEL_NAME,
+)
 from langfuse.decorators import langfuse_context, observe
 
 from celery import shared_task
@@ -62,11 +67,27 @@ def transition_permitted(transition, turn) -> bool:
     return all(result for _, result in condition_evals)
 
 
+def get_model_for_turn(turn, type_="conversation") -> LLM:
+
+    interv = turn.step and turn.step.intervention or None
+    if type_.startswith("con"):
+        return LLM.objects.filter(
+            model_name=step and interv.default_conversation_model or DEFAULT_CONVERSATION_MODEL_NAME
+        ).first()
+    elif type_.startswith("jud"):
+        return LLM.objects.filter(
+            model_name=step and interv.default_judgement_model or DEFAULT_JUDGEMENT_MODEL_NAME
+        ).first()
+    else:
+        raise NotImplementedError("Model type not recognised.")
+
+
 @observe(capture_input=False, capture_output=False)
 def evaluate_judgement(judgement, turn):
     ctx = speaker_context(turn)
     # TODO: fix this model pick
-    model = LLM.objects.filter(model_name="gpt-4o-mini").first()
+
+    model = get_model_for_turn(turn, "judgement")
     llmres = chatter(
         judgement.prompt_template,
         model=model,
@@ -77,12 +98,15 @@ def evaluate_judgement(judgement, turn):
 
 
 @observe(capture_input=False, capture_output=False)
-def complete_the_turn(turn):
-    # use context so far to complete a Step in a conversation; Return the completed Turn
+def complete_the_turn(turn) -> Turn:
+    """
+    Make an AI-generated completion.
+
+    Use context so far to complete a Step in a conversation. Return the completed Turn.
+    """
 
     ctx = speaker_context(turn)
-    # TODO: fix this model pick
-    model = LLM.objects.filter(model_name="gpt-4o-mini").first()
+    model = get_model_for_turn(turn, "conversation")
     llmres = chatter(
         turn.step.prompt_template,
         model=model,
@@ -94,7 +118,7 @@ def complete_the_turn(turn):
     return turn
 
 
-def possible_transitions(turn: Turn):
+def possible_transitions(turn: Turn) -> QuerySet[Transition]:
     history_list = list(iter_conversation_path(turn.get_root(), direction="down"))
     history = get_ordered_queryset(Turn, [i.pk for i in history_list])
     possibles = turn.step.transitions_from.all()
@@ -108,7 +132,7 @@ def possible_transitions(turn: Turn):
     return pos_trans_qs
 
 
-def speaker_context(turn):
+def speaker_context(turn) -> dict:
     # a Turn is created with a history of previous turns, and for a specific speaker
     # this means we can navigate up the tree to identify context which this speaker
     # would have access to when making their contribution
@@ -207,9 +231,11 @@ def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=No
     return new_turn_complete
 
 
-def apply_step_transition_and_judgements(turn, transitions_possible):
+def apply_step_transition_and_judgements(turn, transitions_possible) -> Turn:
     """
-    Take a step, and a list of transitions. Change Step, running appropriate Judgements.
+    Update progress in the conversation.
+    Take a Turn and a list of transitions. Mutate the Turn to change the Step for the
+    Turn if needed, running the appropriate Judgements first.
     """
 
     if transitions_possible.count() == 0:
@@ -282,10 +308,12 @@ def add_turns_task(turn_pk: int, n_turns: int):
 
 
 def start_conversation(intervention, therapist, client=None, client_intervention=None) -> Turn:
-
+    """Create a new conversation between a therapist and a (real or synthetic) client."""
+    
+    # it's a synthetic conversation if we use an intervention for the client
     synth = bool(client_intervention)
     conversation = Conversation.objects.create(is_synthetic=synth)
-
+    
     turn = Turn.add_root(
         conversation=conversation,
         speaker=therapist,
@@ -297,14 +325,15 @@ def start_conversation(intervention, therapist, client=None, client_intervention
     return turn
 
 
-def continue_conversation(from_turn, speaker_interventions, n_turns):
+def continue_conversation(from_turn, speaker_interventions, n_turns) -> Turn:
     """
     Generates additional turns using the selected interventions for each speaker.
     speaker_interventions is a dictionary of {speaker_username: intervention}
     """
 
-    logger.info(f"Task: Continuing conversation from turn {from_turn.pk}/{from_turn.uuid[:5]}")
+    logger.info(f"Continuing conversation from turn {from_turn.pk}/{from_turn.uuid[:5]}")
 
+    # TODO: maybe update pick_speaker_for_next_response to use this logic instead
     all_speakers = [CustomUser.objects.get(username=k) for k in speaker_interventions.keys()]
     all_speakers = [s for s in all_speakers if s != from_turn.speaker] + [from_turn.speaker]
     speakers = cycle(all_speakers)
@@ -333,3 +362,4 @@ def continue_conversation_task(from_turn_id, speaker_interventions, n_turns):
     newleaf = continue_conversation(from_turn, speaker_interventions, n_turns)
     newleaf.conversation.synthetic_turns_scheduled = 0
     newleaf.conversation.save()
+    return True

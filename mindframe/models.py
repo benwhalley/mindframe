@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Iterable
-
+import traceback
 from treebeard.ns_tree import NS_Node
 from pgvector.django import L2Distance
 from django.db.models import Window, F
@@ -14,7 +14,6 @@ from django.db.models import QuerySet, Q
 from django.db.models.functions import RowNumber
 from itertools import groupby
 
-from enum import auto
 from mindframe.shortuuidfield import MFShortUUIDField as ShortUUIDField
 import instructor
 from autoslug import AutoSlugField
@@ -36,6 +35,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.utils.text import slugify
 
+import shortuuid
 from pgvector.django import VectorField, HnswIndex
 from django_lifecycle import LifecycleModel, hook, AFTER_UPDATE, AFTER_CREATE
 
@@ -49,38 +49,34 @@ from mindframe.settings import (
     TurnTextSourceTypes,
     RoleChoices,
     StepJudgementFrequencyChoices,
+    DEFAULT_CONVERSATION_MODEL_NAME,
+    DEFAULT_CHUNKING_MODEL_NAME,
+    DEFAULT_JUDGEMENT_MODEL_NAME,
 )
 
 logger = logging.getLogger(__name__)
 langfuse_context.configure(debug=False)
-
-import shortuuid
-
 shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
 
 
-class CustomUser(AbstractUser):
-    """Custom user model with additional role field for defining user roles."""
-
-    role = models.CharField(
-        max_length=30, choices=RoleChoices.choices, default=RoleChoices.CLIENT.value
-    )
-
-    def __str__(self):
-        return self.username
+# ################################################ #
+#
+#
+# Model instances which configure the system
+# (not necessarily at runtime, for those see below)
 
 
 class Intervention(LifecycleModel):
     """
-    A treatment/intervention,
+    An intervention or treatment: a definition of the conversation content and structure.
 
     Interventions connect Steps, Judgements, Transitions, and related metadata.
     """
 
-    def natural_key(self):
+    def natural_key(self) -> str:
         return slugify(self.title)
 
-    def compute_version(self):
+    def compute_version(self) -> str:
         """Compute a version hash based on all linked objects."""
 
         hashed_fields = {
@@ -159,7 +155,7 @@ class Intervention(LifecycleModel):
         related_name="default_for_chunking",
     )
 
-    def transitions(self):
+    def transitions(self) -> QuerySet["Transition"]:
         return Transition.objects.filter(
             Q(from_step__intervention=self) | Q(to_step__intervention=self)
         )
@@ -283,48 +279,6 @@ class Judgement(models.Model):
         max_length=255,
     )
 
-    @observe(capture_input=False, capture_output=False)
-    def make_judgement(self, turn):
-        """
-        cn = Turn.objects.last()
-        c = cn.conversation
-        self = Judgement.objects.first()
-        self.make_judgement(s)
-        """
-
-        logger.info(f"Making judgement {self} for {turn}")
-        try:
-            result = self.process_inputs(
-                turn, inputs=session.current_step().get_step_context(session)
-            )
-            langfuse_context.update_current_observation(
-                name=f"Judgement: {self}",
-                session_id=turn.session_state.session.uuid,
-                # output = result.data
-            )
-            return result
-        except Exception as e:
-            logger.error(f"ERROR MAKING JUDGEMENT {e}")
-            logger.error(traceback.print_exc())
-            # TODO: find some way of making this error more obvious to users
-            return None
-
-    def process_inputs(self, turn, inputs: dict):
-
-        newnote = Note.objects.create(judgement=self, turn=turn)
-        session = turn.session_state.session
-
-        llm_result = chatter(
-            self.prompt_template,
-            model=self.get_model(session),
-            context=inputs,
-            log_context={"judgement": self, "session": session, "inputs": inputs, "turn": turn},
-        )
-
-        newnote.data = llm_result
-        newnote.save()
-        return newnote
-
     def __str__(self) -> str:
         return f"<{self.variable_name}> ({self.intervention.title} {self.intervention.sem_ver})"
 
@@ -332,48 +286,6 @@ class Judgement(models.Model):
         unique_together = [
             ("intervention", "variable_name"),
         ]
-
-
-# ######################### #
-#
-#
-# Records made at runtime
-
-
-class Note(models.Model):
-    """
-    Stores clinical records or outputs from Judgements made during Conversations
-
-    Notes can be either plain text or contain structured data, depending on the
-    Judgement that created them.
-    """
-
-    uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False)
-
-    turn = models.ForeignKey(
-        "Turn",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="notes",
-    )
-
-    judgement = models.ForeignKey(Judgement, on_delete=models.CASCADE, related_name="notes")
-    timestamp = models.DateTimeField(default=timezone.now)
-
-    # for clinical Note type records, save a 'text' key
-    # for other return types, save multiple string keys
-    # type of this values is Dict[str, str | int]
-    # todo? add some validatio?
-    data = models.JSONField(default=dict, null=True, blank=True)
-
-    def val(self):
-        return Box(self.data, default_box=True)
-
-    def __str__(self):
-        return (
-            f"[{self.judgement.variable_name}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
-        )
 
 
 class LLM(models.Model):
@@ -411,6 +323,59 @@ class LLM(models.Model):
         # client.chat.completions.create
         return instructor.from_openai(
             OpenAI(api_key=config("LITELLM_API_KEY"), base_url=config("LITELLM_ENDPOINT"))
+        )
+
+
+# ################################################ #
+#
+#
+# Model instances created in runtime operation
+
+
+class CustomUser(AbstractUser):
+    """Custom user model with additional role field for defining user roles."""
+
+    role = models.CharField(
+        max_length=30, choices=RoleChoices.choices, default=RoleChoices.CLIENT.value
+    )
+
+    def __str__(self):
+        return self.username
+
+
+class Note(models.Model):
+    """
+    Stores clinical records or outputs from Judgements made during Conversations
+
+    Notes can be either plain text or contain structured data, depending on the
+    Judgement that created them.
+    """
+
+    uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False)
+
+    turn = models.ForeignKey(
+        "Turn",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notes",
+    )
+
+    judgement = models.ForeignKey(Judgement, on_delete=models.CASCADE, related_name="notes")
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    # for clinical Note type records, save a 'text' key
+    # for other return types, save multiple string keys
+    # type of this values is Dict[str, str | int]
+    # todo? add some validatio?
+    data = models.JSONField(default=dict, null=True, blank=True)
+
+    def val(self):
+        return Box(self.data, default_box=True)
+
+    def __str__(self):
+        return (
+            f"[{self.judgement.variable_name}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
         )
 
 
@@ -698,7 +663,7 @@ class Conversation(LifecycleModel):
                 return node
         return None
 
-    def speakers(self) -> QuerySet[CustomUser]:
+    def speakers(self) -> QuerySet["CustomUser"]:
         return CustomUser.objects.filter(
             id__in=Subquery(self.turns.values_list("speaker", flat=True).distinct())
         )
