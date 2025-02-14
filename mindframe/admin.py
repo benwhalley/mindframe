@@ -50,34 +50,31 @@ shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
 logger = logging.getLogger(__name__)
 
 
-# class InterventionImportForm(forms.Form):
-#     file = forms.FileField(label="Select JSON file to import")
+@admin.register(CustomUser)
+class CustomUserAdmin(admin.ModelAdmin):
+    list_display = ("username", "email", "role", "is_staff", "is_active")
+    list_filter = ("role", "is_staff", "is_active")
+    search_fields = ("username", "email")
 
 
-# @admin.register(CustomUser)
-# class CustomUserAdmin(admin.ModelAdmin):
-#     list_display = ("username", "email", "role", "is_staff", "is_active")
-#     list_filter = ("role", "is_staff", "is_active")
-#     search_fields = ("username", "email")
+class MemoryChunkInline(admin.TabularInline):
+    model = MemoryChunk
+    extra = 0
+    max_num = 0
+    readonly_fields = [
+        "memory",
+    ]
 
 
-# class MemoryChunkInline(admin.TabularInline):
-#     model = MemoryChunk
-#     extra = 0
-#     max_num = 0
-#     readonly_fields = [
-#         "memory",
-#     ]
+@admin.register(Memory)
+class MemoryAdmin(admin.ModelAdmin):
+    inlines = [MemoryChunkInline]
+    autocomplete_fields = ["intervention", "turn"]
 
 
-# @admin.register(Memory)
-# class MemoryAdmin(admin.ModelAdmin):
-#     inlines = [MemoryChunkInline]
-
-
-# @admin.register(MemoryChunk)
-# class MemoryChunkAdmin(admin.ModelAdmin):
-#     pass
+@admin.register(MemoryChunk)
+class MemoryChunkAdmin(admin.ModelAdmin):
+    pass
 
 
 class IsSyntheticFilter(admin.SimpleListFilter):
@@ -200,6 +197,8 @@ class ConversationAdmin(admin.ModelAdmin):
         next_loc = request.GET.get("next")
         if next_loc == "gradio":
             return redirect(new_turn.gradio_url())
+        if next_loc == "branch":
+            return redirect(reverse("conversation_detail", args=[new_turn.uuid]))
         else:
             return redirect(
                 reverse("admin:mindframe_conversation_change", args=[turn.conversation.pk])
@@ -401,15 +400,20 @@ class InterventionAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.start_session),
                 name="start_session",
             ),
-            #             path(
-            #                 "<int:object_id>/export/",
-            #                 self.admin_site.admin_view(self.export_intervention),
-            #                 name="mindframe_export",
-            #             ),
+            path(
+                "<int:object_id>/export/",
+                self.admin_site.admin_view(self.export_intervention),
+                name="mindframe_export",
+            ),
             path(
                 "import/",
                 self.admin_site.admin_view(self.import_intervention),
                 name="import_intervention",
+            ),
+            path(
+                "export/",
+                self.admin_site.admin_view(self.export_intervention),
+                name="export_intervention",
             ),
             path(
                 "<int:object_id>/mermaid/",
@@ -419,7 +423,9 @@ class InterventionAdmin(admin.ModelAdmin):
         ]
         return custom_urls + urls
 
-    #     def export_intervention(self, request, object_id):
+    def export_intervention(self, request, object_id):
+        raise NotImplementedError("Exporting interventions is not yet implemented.")
+
     #         intervention = Intervention.objects.filter(pk=object_id).first()
 
     #         # all fields except id
@@ -459,7 +465,7 @@ class InterventionAdmin(admin.ModelAdmin):
     #         return response
 
     def import_intervention(self, request):
-        pass
+        raise NotImplementedError("Importing interventions is not yet implemented.")
 
     #         if request.method == "POST":
     #             form = InterventionImportForm(request.POST, request.FILES)

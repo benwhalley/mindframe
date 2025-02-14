@@ -42,8 +42,9 @@
 <body class="bg-light">
     <div class="container mt-4">
 
+
         <!-- bootstrap warning banner -->
-        {% if conversation.additional_turns_scheduled > 0 %}
+        {% if object.additional_turns_scheduled > 0 %}
             <div class="alert alert-warning" role="alert">
                 Note: {{conversation.additional_turns_scheduled}} additional turns are scheduled to be generated for this conversation.
             </div>

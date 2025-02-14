@@ -21,6 +21,11 @@ def mfuuid():
     return shortuuid.uuid()
 
 
+class InterventionTypes(models.TextChoices):
+    THERAPY = "therapy", "A therapeutic intervention"
+    CLIENT = "client", "A simulated client"
+
+
 class BranchReasons(models.TextChoices):
     MAIN = "main", "Not a branch - part of the main trunk of the conversation"
     EXPERT = "expert", "Expert completion/imagined alternative"
@@ -31,7 +36,7 @@ class TurnTextSourceTypes(models.TextChoices):
     """Types of sources for a Turn object."""
 
     HUMAN = "human", "Human"
-    AI = "AI", "AI"
+    GENERATED = "generated", "AI generated"
     OPENING = "opening", "Opening"
 
 

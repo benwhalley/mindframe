@@ -1,9 +1,10 @@
 from collections import OrderedDict
 import pprint
-from mindframe.models import Turn, CustomUser, Transition, LLM, Note, Conversation
+from mindframe.models import Turn, CustomUser, Transition, LLM, Note, Conversation, Intervention
 import traceback
 import logging
-from itertools import islice
+from itertools import cycle
+from django.shortcuts import get_object_or_404
 from mindframe.settings import mfuuid, StepJudgementFrequencyChoices
 from mindframe.helpers import make_data_variable, get_ordered_queryset
 from llmtools.llm_calling import chatter
@@ -119,9 +120,12 @@ def speaker_context(turn):
     speaker_notes = Note.objects.filter(turn__pk__in=[i.pk for i in speaker_turns])
 
     # find the first turn with the same step, then count how many descendents it has in the history to count N turns from the start of this Step; +1 to include the first in the count
-    n_turns_step = (
-        history.filter(depth__gt=history.filter(step=turn.step).first().depth).count() + 1
-    )
+    try:
+        n_turns_step = (
+            history.filter(depth__gt=history.filter(step=turn.step).first().depth).count() + 1
+        )
+    except:
+        n_turns_step = None
 
     context = {
         "current_turn": turn,
@@ -142,7 +146,7 @@ def listen(turn, text, speaker) -> Turn:
 
 
 @observe(capture_input=False, capture_output=False)
-def respond(turn: Turn, as_speaker: CustomUser = None) -> Turn:
+def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=None) -> Turn:
     """
     Respond to a particular turn in the conversation. Returns the new completed Turn object.
 
@@ -153,11 +157,19 @@ def respond(turn: Turn, as_speaker: CustomUser = None) -> Turn:
     if not as_speaker:
         as_speaker = pick_speaker_for_next_response(turn)
 
-    # get turns made by this speaker and the step they are on
-    spkr_history = conversation_history(turn).filter(speaker=as_speaker)
-    speakers_prev_step = spkr_history and list(reversed(list(spkr_history))).pop().step or None
-    if not speakers_prev_step:
-        raise NotImplementedError("No Step/intervention found to use for response.")
+    if not with_intervention_step:
+        # get turns made by this speaker and the step they are on
+        spkr_history = conversation_history(turn).filter(speaker=as_speaker)
+        speakers_prev_step = spkr_history and list(reversed(list(spkr_history))).pop().step or None
+        if not speakers_prev_step:
+            if turn.conversation.synthetic_client:
+                speakers_prev_step = turn.conversation.synthetic_client.steps.all().first()
+                logger.info(
+                    f"Using synthetic client intervention's first step: {speakers_prev_step}"
+                )
+            else:
+                raise NotImplementedError("No Step/intervention found to use for response.")
+        with_intervention_step = speakers_prev_step
 
     # prepare an 'empty' turn ready for completion
     new_turn = turn.add_child(
@@ -165,7 +177,8 @@ def respond(turn: Turn, as_speaker: CustomUser = None) -> Turn:
         conversation=turn.conversation,
         speaker=as_speaker,
         text="... thinking ...",
-        step=speakers_prev_step,
+        step=with_intervention_step,
+        text_source=TurnTextSourceTypes.GENERATED,
     )
     new_turn.save()
 
@@ -238,12 +251,12 @@ def run_offline_judgements(turn_pk):
     langfuse_context.flush()
 
 
-def add_turns(turn, n_turns: int):
-
+def add_turns(turn, n_turns: int) -> Turn:
     if not turn.conversation.is_synthetic:
-        raise ValueError(
-            "Can't add turns to a conversation that is not Synthetic. Use `respond` to respond to humans in conversation"
-        )
+        logger.warning("Adding turns to a non-synthetic conversation.")
+        turn.conversation.is_synthetic = True
+        turn.conversation.save()
+
     for i in range(n_turns):
         turn = respond(turn)
         # refetch the object to ensure all the tree information
@@ -256,12 +269,16 @@ def add_turns(turn, n_turns: int):
 
 
 @shared_task
-def add_turns_task(conversation_pk: int, n_turns: int):
+def add_turns_task(turn_pk: int, n_turns: int):
     """
     Celery task to add N additional turns to a synthetic conversation.
     """
-    conversation = get_object_or_404(SyntheticConversation, pk=conversation_pk)
-    add_turns(conversation, n_turns)
+    turn = get_object_or_404(Turn, pk=turn_pk)
+    add_turns(turn, n_turns)
+    turn.conversation.synthetic_turns_scheduled = (
+        turn.conversation.synthetic_turns_scheduled - n_turns
+    )
+    turn.conversation.save()
 
 
 def start_conversation(intervention, therapist, client=None, client_intervention=None) -> Turn:
@@ -278,3 +295,41 @@ def start_conversation(intervention, therapist, client=None, client_intervention
     )
 
     return turn
+
+
+def continue_conversation(from_turn, speaker_interventions, n_turns):
+    """
+    Generates additional turns using the selected interventions for each speaker.
+    speaker_interventions is a dictionary of {speaker_username: intervention}
+    """
+
+    logger.info(f"Task: Continuing conversation from turn {from_turn.pk}/{from_turn.uuid[:5]}")
+
+    all_speakers = [CustomUser.objects.get(username=k) for k in speaker_interventions.keys()]
+    all_speakers = [s for s in all_speakers if s != from_turn.speaker] + [from_turn.speaker]
+    speakers = cycle(all_speakers)
+    interventions = cycle(speaker_interventions.values())
+
+    for i, speak, inter in zip(range(n_turns), speakers, interventions):
+        from_turn = respond(
+            from_turn, as_speaker=speak, with_intervention_step=inter.steps.all().first()
+        )
+
+    return from_turn
+
+
+@shared_task
+def continue_conversation_task(from_turn_id, speaker_interventions, n_turns):
+    """
+    Task to call continue_conversation
+    speaker_interventions is a dictionary of {speaker_username: intervention_pk}
+    """
+
+    from_turn = Turn.objects.get(pk=from_turn_id)
+    speaker_interventions = {
+        k: Intervention.objects.get(pk=v) for k, v in speaker_interventions.items()
+    }
+
+    newleaf = continue_conversation(from_turn, speaker_interventions, n_turns)
+    newleaf.conversation.synthetic_turns_scheduled = 0
+    newleaf.conversation.save()

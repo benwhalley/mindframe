@@ -44,6 +44,7 @@ from mindframe.chunking import CHUNKER_TEMPLATE
 from llmtools.llm_calling import chatter, get_embedding, simple_chat
 from mindframe.settings import (
     MINDFRAME_SHORTUUID_ALPHABET,
+    InterventionTypes,
     BranchReasons,
     TurnTextSourceTypes,
     RoleChoices,
@@ -128,15 +129,11 @@ class Intervention(LifecycleModel):
     version = models.CharField(max_length=64, null=True, editable=False)
     sem_ver = models.CharField(max_length=64, null=True, editable=True)
 
-    is_default_intervention = models.BooleanField(default=False)
-
-    default_fake_client = models.ForeignKey(
-        "Intervention",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        help_text="Default intervention to choose as a partner when creating a new Synthetic conversation",
+    intervention_type = models.CharField(
+        choices=InterventionTypes.choices, default=InterventionTypes.THERAPY, max_length=30
     )
+
+    is_default_intervention = models.BooleanField(default=False)
 
     # TODO - make this non nullable
     default_conversation_model = models.ForeignKey(
@@ -674,6 +671,15 @@ class Conversation(LifecycleModel):
     is_synthetic = models.BooleanField(default=False)
     archived = models.BooleanField(default=False)
     telegram_conversation_id = models.CharField(max_length=255, blank=True, null=True)
+
+    synthetic_client = models.ForeignKey(
+        "Intervention",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Default intervention to choose as a partner when creating a new Synthetic conversation turns",
+    )
+    synthetic_turns_scheduled = models.PositiveSmallIntegerField(default=0)
 
     def get_absolute_url(self):
         return settings.WEB_URL + reverse(

@@ -1,10 +1,12 @@
 """
 
-# delete any existing webhooks
+# delete
 curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/deleteWebhook"
 
-# setup the new webhook
-curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook?url=https://mindframe-dev-ben.llemma.net/telegram-webhook/"
+# detup
+curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+     -d "url=$TELEGRAM_WEBHOOK_URL" \
+     -d "secret_token=$TELEGRAM_WEBHOOK_VALIDATION_TOKEN"
 
 # get webhook status
 curl -X GET "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo"
@@ -24,10 +26,31 @@ from mindframe.settings import TurnTextSourceTypes
 from mindframe.conversation import listen, respond
 import requests
 from django.shortcuts import get_object_or_404
+import ipaddress
+from decouple import config, Csv
 
-User = get_user_model()
 logger = logging.getLogger(__name__)
-# from telegram.request import HTTPXRequest
+User = get_user_model()
+
+TELEGRAM_WEBHOOK_VALIDATION_TOKEN = config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN")
+TELEGRAM_IP_RANGES = [ipaddress.ip_network(ip) for ip in ["149.154.160.0/20", "91.108.4.0/22"]]
+
+
+def is_valid_telegram_request(request):
+    """Check if the request originates from a valid Telegram IP."""
+
+    client_ip = request.META.get("HTTP_X_FORWARDED_FOR")
+    ip = ipaddress.ip_address(client_ip)
+    valid_ip = any(ip in net for net in TELEGRAM_IP_RANGES)
+    valid_ip = True
+
+    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != TELEGRAM_WEBHOOK_VALIDATION_TOKEN:
+        valid_header = False
+    else:
+        valid_header = True
+    logger.info(f"Valid IP: {valid_ip}, valid header: {valid_header}")
+    return valid_ip and valid_header
+
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 
@@ -39,7 +62,7 @@ bot = Bot(token=TELEGRAM_BOT_TOKEN)  # , request=trequest)
 def send_telegram_message(chat_id, text):
     """Send a Telegram message synchronously using requests."""
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {"chat_id": chat_id, "text": text}
+    data = {"chat_id": chat_id, "text": text, "parse_mode": "MarkdownV2"}
 
     try:
         response = requests.post(
@@ -53,6 +76,10 @@ def send_telegram_message(chat_id, text):
 @csrf_exempt
 def telegram_webhook(request):
     """Handles incoming Telegram messages."""
+
+    if not is_valid_telegram_request(request):
+        logger.warning(f"Rejected request from {request.META.get('REMOTE_ADDR')}")
+
     if request.method != "POST":
         return JsonResponse({"error": "Invalid method"}, status=405)
     try:
@@ -61,7 +88,7 @@ def telegram_webhook(request):
             return process_message(update.message)
     except Exception as e:
         logger.error(f"Telegram webhook error: {e}")
-        return JsonResponse({"error": str(e)}, status=500)
+        raise e
 
     return JsonResponse({"status": "ok"})
 
@@ -158,7 +185,7 @@ def process_message(message):
                     conversation=conversation,
                     speaker=therapist,
                     text=interv.steps.all().first().opening_line,
-                    text_source=TurnTextSourceTypes.AI,
+                    text_source=TurnTextSourceTypes.GENERATED,
                     step=interv.steps.all().first(),
                 )
 

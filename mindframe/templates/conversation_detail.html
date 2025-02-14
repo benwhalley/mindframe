@@ -1,62 +1,108 @@
 {% extends "base.html" %}
 {% load pretty %}
 {% load turns %}
-
+{% load crispy_forms_tags %}
 {% load notes %}
 {% load guidance %}
 {% block content %}
 <div class="container mt-5">
-    <h1>Conversation Detail</h1>
+    <h1>Conversation at node: {{leaf_node.uuid|slice:5}}</h1>
 
-    <hr class="mt-3">
     <div class="row mb-4">
-        <div class="col-6">
-            <p>
-                <a href="{% url 'admin:mindframe_conversation_change' object.pk %}">
-                    {{ object }}
-                </a>
-                [<code>{{object.uuid}}</code>]
+        <div class="col-4 pr-5">
 
-            </p>
+            <div class="card">
+                <div class="card-header">
+                    Conversation details
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'admin:mindframe_conversation_change' object.pk %}">
+                        {{ object }}
+                    </a>
+                    <p>ID:<code>{{object.uuid}}</code></p>
 
-            <!-- <p>
-                FIXME
-                Current step:
-                <a href="{ url 'admin:mindframe_step_change' session.current_step.pk %}">{ session.current_step.title }}</a>
-            </p> -->
-
-        </div>
-
-        <div class="col-6">
-            <a class="btn btn-primary" href="{{leaf_node.gradio_url}}">
-                Continue conversation at turn {{leaf_node.uuid|slice:5}}</a>
-        </div>
-
-        <div class="col-12">
+                <p>
+                    <a class="btn btn-primary" href="{{leaf_node.gradio_url}}">
+                    Continue conversation at turn {{leaf_node.uuid|slice:5}}</a>
+                </p>
+                </div>
+            </div>
 
 
-            {% if leaves.count > 1 %}
-            Branches at:
-            {% for node in branches %}
-            <span class="badge bg-success rounded-pill">{{ node.uuid|slice:5 }}</span>
-            {% endfor %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    Branches
+                </div>
+                <div class="card-body">
 
-            <p>
-            Conversation alternatives:
-            {% for l in leaves %}
-            {% if l.uuid != leaf_node.uuid %}
-            <a href="{% url 'conversation_detail' uuid=l.uuid %}">{{l.uuid|slice:4}}</a>,
-            {% else %}
-            {{l.uuid|slice:4}}
+    {% if leaves.count > 1 %}
+    Branches at:
+    {% for node in branches %}
+    <span class="badge bg-success rounded-pill">{{ node.uuid|slice:5 }}</span>
+    {% endfor %}
+
+    <p>
+    Conversation alternatives:
+    {% for l in leaves %}
+    {% if l.uuid != leaf_node.uuid %}
+    <a href="{% url 'conversation_detail' uuid=l.uuid %}">{{l.uuid|slice:4}}</a>,
+    {% else %}
+    {{l.uuid|slice:4}}
+    {% endif %}
+    {% endfor %}
+</p>
+    {% endif %}
+
+                </div>
+            </div>
+
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    Adding turns
+                </div>
+                <div class="card-body">
+
+                    <h5>Add synthetic turns</h5>
+
+                    <p>Appending to {{leaf_node.uuid|slice:4}}</p>
+                <form method="post" >
+                <h6>Add additional turns to the conversation</h6>
+                <a name="addmore"></a>
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        <button type="submit" class="btn btn-primary float-end">Add Turns</button>
+                </form>
+
+
+                {% if object.synthetic_turns_scheduled > 0 %}
+                <div class="alert alert-warning" role="alert">
+                    Note: {{object.synthetic_turns_scheduled}} additional turns are scheduled to be generated for this conversation.
+                </div>
+                <!-- meta refresh every 3 seconds - go to #addmore tag -->
+                <meta http-equiv="refresh" content="3;url=#conversationend">
+
             {% endif %}
-            {% endfor %}
-        </p>
-            {% endif %}
 
-        </div>
+
+                </div>
+            </div>
+
+
+
+
+            <hr>
+
+
+
+
+
 
     </div>
-    <hr>
+
+    <div class="col-8 pl-5">
+
+
     <div class="row">
 
         <div class="col-6"><h5>Conversation</h5></div>
@@ -91,8 +137,20 @@
     <div class="row">
         <div class="col-2">
             <a class="mr-3" href="{% url 'admin:mindframe_turn_change' turn.id %}">
-                <span class="badge bg-primary rounded-pill mr-2">{{ turn.uuid|slice:5 }}</span>
-                {{turn.step.title}}
+                <span class="badge border border-primary text-primary rounded-pill mr-2">
+                    {{ turn.uuid|slice:5 }}
+                </span>
+                </a>
+
+                <span class="badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source}}</span>
+
+                {% if turn.step %}
+                <a href="{% url 'admin:mindframe_step_change' turn.step.id %}">
+                <code class="small">{{turn.step.title}}</code>
+                </a>
+                {% endif %}
+
+
             </a>
         </div>
 
@@ -109,7 +167,7 @@
 
     <div class="col-3 small">
 
-        {% for n in turn.notes.all %}
+{% for n in turn.notes.all %}
         <code>{{n.judgement.variable_name}}</code><pre>{{n.data}}</pre>
         {% if not forloop.last %}<hr>{% endif %}
         {% endfor %}
@@ -123,12 +181,18 @@
 
     </div>
     <div class="col-2 small">
-        <a  class='btn btn-sm btn-outline-success mb-4 float-end ' href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=gradio">Start new branch</a>
+        <a  class='btn btn-sm btn-outline-success mb-4 float-end ' href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch">Start new branch</a>
     </div>
 
 
     {% endfor %}
-    {% endfor %}
+
+
+{% endfor %}
+
+<a name="conversationend"></a>
+
+
 </div>
 </div>
 {% endblock %}

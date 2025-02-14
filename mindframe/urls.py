@@ -1,12 +1,16 @@
 from django.urls import path
-from mindframe.views import (
-    create_public_session,
-    SyntheticConversationDetailView,
-    ConversationDetailView,
+
+
+from mindframe.views.general import create_public_session, IndexView
+
+from mindframe.views.hyde import (
     RAGHyDEComparisonView,
-    SyntheticConversationCreateView,
-    IndexView,
 )
+from mindframe.views.conversation import (
+    ConversationDetailView,
+    ImportConversationView,
+)
+
 from mindframe.telegram import telegram_webhook
 
 urlpatterns = [
@@ -19,8 +23,8 @@ urlpatterns = [
     ),
     path(
         "import/fake/",
-        SyntheticConversationCreateView.as_view(),
-        name="synthetic_conversation_create",
+        ImportConversationView.as_view(),
+        name="import_conversation",
     ),
     # path(
     #     "fake/conversation/<int:pk>/",
