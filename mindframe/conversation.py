@@ -72,11 +72,13 @@ def get_model_for_turn(turn, type_="conversation") -> LLM:
     interv = turn.step and turn.step.intervention or None
     if type_.startswith("con"):
         return LLM.objects.filter(
-            model_name=step and interv.default_conversation_model or DEFAULT_CONVERSATION_MODEL_NAME
+            model_name=turn.step
+            and interv.default_conversation_model
+            or DEFAULT_CONVERSATION_MODEL_NAME
         ).first()
     elif type_.startswith("jud"):
         return LLM.objects.filter(
-            model_name=step and interv.default_judgement_model or DEFAULT_JUDGEMENT_MODEL_NAME
+            model_name=turn.step and interv.default_judgement_model or DEFAULT_JUDGEMENT_MODEL_NAME
         ).first()
     else:
         raise NotImplementedError("Model type not recognised.")
