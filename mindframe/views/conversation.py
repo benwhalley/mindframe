@@ -14,6 +14,7 @@ from itertools import cycle
 from mindframe.conversation import listen, continue_conversation_task
 from mindframe.models import Turn, Intervention, CustomUser, Conversation
 from mindframe.tree import conversation_history, generate_mermaid_tree
+from mindframe.silly import silly_user
 from django.shortcuts import get_object_or_404
 
 
@@ -47,6 +48,13 @@ class AdditionalTurnsForm(forms.Form):
                     help_text=f"Select an intervention for {speaker.username}",
                     initial=default_intervention,
                 )
+            if speakers.count() == 1:
+                self.fields["intervention__additional_speaker"] = forms.ModelChoiceField(
+                    required=True,
+                    queryset=Intervention.objects.all(),
+                    help_text=f"Select an intervention for an additional speaker",
+                    initial=default_intervention,
+                )
 
 
 class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
@@ -70,6 +78,16 @@ class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
                 for key in form.cleaned_data
                 if key.startswith("intervention__")
             }
+
+            # if the user only added 1 turn there is only 1 speaker/user created at
+            # this point so we need to create a second to allow conversation to continue
+            # `additional_speaker` is the key for the unknown speaker in the AdditionalTurnsForm
+            if speaker_interventions.get("additional_speaker", None):
+                newuser = silly_user()
+                speaker_interventions[newuser.username] = speaker_interventions[
+                    "additional_speaker"
+                ]
+                del speaker_interventions["additional_speaker"]
 
             self.object.conversation.synthetic_turns_scheduled += n_turns
             self.object.conversation.save()
