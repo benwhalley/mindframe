@@ -6,7 +6,12 @@
 {% load guidance %}
 {% block content %}
 <div class="container mt-5">
-    <h1 class="mb-5 mt-4">Conversation at node: {{turn.uuid|slice:5}}</h1>
+    <h1 class="mb-1 mt-4">Conversation</h1>
+    {% if turn.pk == leaf_node.pk %}
+    <h4 class="mb-4">State at node {{turn.uuid|slice:5}}</h4>
+    {% else %}
+    <h4 class="mb-4">State at node {{turn.uuid|slice:5}} in branch ending {{leaf_node.uuid|slice:5}}</h4>
+    {% endif %}
 
     {% if turn.pk != leaf_node.pk %}
     <div class="alert alert-warning" role="alert">
@@ -31,7 +36,7 @@
                     <a href="{% url 'admin:mindframe_conversation_change' object.pk %}">
                         {{ object }}
                     </a>
-                    <p>ID:<code>{{object.uuid}}</code></p>
+                    <p>Conversation ID: <code>{{object.uuid|slice:8}}</code></p>
 
                 <p>
                     <a class="btn btn-sm btn-primary" href="{{leaf_node.gradio_url}}">
@@ -73,11 +78,17 @@
     </a>
         ({{l.get_ancestors.count}} turns)
     </li>
-    {% else %}
+    {% elif l.uuid != turn.uuid %}
     <li>
-        The end of this branch: <a href="{% url 'conversation_detail' uuid=l.uuid %}">
+        <a href="{% url 'conversation_detail' uuid=l.uuid %}">
             {{l.uuid|slice:4}}
         </a>
+        (the end of this branch, {{l.get_ancestors.count}} turns)
+    </li>
+    {% else %}
+    <li>
+        This branch:
+            {{l.uuid|slice:4}}
     </li>
     {% endif %}
     {% endfor %}
@@ -164,6 +175,11 @@
 
         <div class="col-4 small">
 
+            <span class="badge border border-success rounded-pill float-end">
+                <a  class='text-success' href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch"> Start new branch ⤷ </a>
+                </span>
+
+
 
             <span class="badge border border-primary text-primary rounded-pill mr-2">
                 <a class="mr-3" href="{% url 'admin:mindframe_turn_change' turn.id %}"></a>
@@ -184,6 +200,8 @@
 
 
 
+
+
         {% for n in turn.notes.all %}
         <code>{{n.judgement.variable_name}}</code><pre>{{n.data}}</pre>
         {% if not forloop.last %}<hr>{% endif %}
@@ -196,10 +214,6 @@
             {% endif %}
         {% endfor %}
 
-        <br>
-        <span class="badge border border-success rounded-pill">
-        <a  class='text-success' href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch"> Start new branch ⤷ </a>
-        </span>
 
         </div>
     <hr>
