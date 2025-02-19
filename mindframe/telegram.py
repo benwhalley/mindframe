@@ -73,7 +73,6 @@ def telegram_webhook(request):
     return JsonResponse({"status": "ok"})
 
 
-
 def get_or_create_telegram_user(message) -> CustomUser:
     # TODO: manage updates to user metadata like name and update our user
     user_data = message.from_user
@@ -109,11 +108,14 @@ def handle_web(message, conversation=None, request=None):
     """
     try:
         logger.info("Handling /web command.")
-        url = request.build_absolute_uri(reverse('conversation_detail', args=[conversation.turns.all().last()2.uuid]))
+        url = request.build_absolute_uri(
+            reverse("conversation_detail", args=[conversation.turns.all().last().uuid])
+        )
         send_telegram_message(message.chat.id, f"[{url}]({url})")
         return JsonResponse({"status": "ok"}, status=200), conversation
     except Exception as e:
         raise e
+
 
 def handle_settings(message, conversation=None, request=None):
     """
@@ -146,7 +148,7 @@ def handle_new(message, conversation, request=None):
         send_telegram_message(
             message.chat.id,
             f"Selected the {intervention} intervention.\n"
-            "Starting a new conversation (forgetting everything we talked about so far)."
+            "Starting a new conversation (forgetting everything we talked about so far).",
         )
 
         # Return the newly created conversation
@@ -159,7 +161,7 @@ def handle_new(message, conversation, request=None):
         send_telegram_message(
             message.chat.id,
             f"Couldn't find matching intervention, ignoring /new command.\n"
-            f"(Available interventions: {available})"
+            f"(Available interventions: {available})",
         )
         # Return a JsonResponse and the old conversation
         return JsonResponse({"status": "ok"}, status=200), conversation
@@ -255,10 +257,7 @@ def process_message(message, request=None):
 
         # Fetch default intervention
         default_intervention = (
-            Intervention.objects
-            .filter(is_default_intervention=True)
-            .order_by("?")
-            .first()
+            Intervention.objects.filter(is_default_intervention=True).order_by("?").first()
         )
 
         # Get conversation
@@ -266,7 +265,9 @@ def process_message(message, request=None):
 
         # Dispatch command if recognised
         if potential_cmd in commands_map:
-            response, updated_conversation = commands_map[potential_cmd](message, conversation, request)
+            response, updated_conversation = commands_map[potential_cmd](
+                message, conversation, request
+            )
             if response is not None:
                 # If the command returned a response, return it now
                 return response
@@ -287,7 +288,6 @@ def process_message(message, request=None):
     except Exception:
         logger.error(traceback.format_exc())
         return JsonResponse({"status": "error"}, status=200)
-
 
 
 def is_valid_telegram_request(request):
