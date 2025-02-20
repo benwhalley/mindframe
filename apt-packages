@@ -2,4 +2,4 @@ ffmpeg
 pandoc
 postgresql-client
 curl
-pico
+nano
