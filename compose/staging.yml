@@ -52,7 +52,7 @@ services:
       ~/secrets/test.mindframe.env
     environment:
       - APP_MODE=chat
-    
+
   worker:
     container_name: mindframe-staging-worker
     restart: unless-stopped
@@ -69,4 +69,4 @@ services:
       ~/secrets/test.mindframe.env
     environment:
       - APP_MODE=worker
-    
+

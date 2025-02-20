@@ -73,9 +73,6 @@ class Intervention(LifecycleModel):
     Interventions connect Steps, Judgements, Transitions, and related metadata.
     """
 
-    def natural_key(self) -> str:
-        return slugify(self.title)
-
     def compute_version(self) -> str:
         """Compute a version hash based on all linked objects."""
 
@@ -121,7 +118,7 @@ class Intervention(LifecycleModel):
         return reverse("admin:mindframe_export", args=[self.id])
 
     title = models.CharField(max_length=255)
-    slug = AutoSlugField(populate_from="title", unique=True)
+    slug = AutoSlugField(populate_from="title", unique=True, editable=True)
     version = models.CharField(max_length=64, null=True, editable=False)
     sem_ver = models.CharField(max_length=64, null=True, editable=True)
 
@@ -163,6 +160,9 @@ class Intervention(LifecycleModel):
     def ver(self):
         return self.version and self.version[:8] or "-"
 
+    def natural_key(self) -> str:
+        return slugify(self.title)
+
     def __str__(self):
         return f"{self.title} ({self.sem_ver}/{self.ver()})"
 
@@ -190,10 +190,7 @@ class StepJudgement(models.Model):
     )
 
     def natural_key(self):
-        return (
-            slugify(self.judgement.title),
-            slugify(self.step.title),
-        )
+        return (self.judgement.natural_key(), self.step.natural_key(), self.when)
 
     class Meta:
         unique_together = [("judgement", "step", "when")]
@@ -207,9 +204,6 @@ class Step(models.Model):
     `judgements` are other prompts which need to be run before responding, to inform the response.
 
     """
-
-    def natural_key(self):
-        return slugify(f"{self.intervention.title}__{self.title}")
 
     intervention = models.ForeignKey(Intervention, on_delete=models.CASCADE, related_name="steps")
 
@@ -227,6 +221,9 @@ class Step(models.Model):
 
     def get_absolute_url(self):
         return reverse("admin:mindframe_step_change", args=[str(self.id)])
+
+    def natural_key(self):
+        return (self.intervention.natural_key(), slugify(self.title))
 
     class Meta:
         unique_together = [("intervention", "title"), ("intervention", "slug")]
@@ -252,6 +249,9 @@ class Transition(models.Model):
     def clean(self):
         if self.from_step.intervention != self.to_step.intervention:
             raise ValidationError("from_step and to_step must belong to the same intervention.")
+
+    def natural_key(self):
+        return (self.from_step.natural_key(), self.to_step.natural_key(), self.conditions)
 
     class Meta:
         unique_together = [("from_step", "to_step", "conditions")]
@@ -282,14 +282,27 @@ class Judgement(models.Model):
     def __str__(self) -> str:
         return f"<{self.variable_name}> ({self.intervention.title} {self.intervention.sem_ver})"
 
+    def natural_key(self):
+        return (self.intervention.natural_key(), slugify(self.variable_name))
+
     class Meta:
         unique_together = [
             ("intervention", "variable_name"),
         ]
 
 
+class LLMManager(models.Manager):
+    def get_by_natural_key(
+        self,
+        model_name,
+    ):
+        return self.get(model_name=model_name)
+
+
 class LLM(models.Model):
     """Store details of Language Models used for Step and Judgement execution"""
+
+    objects = LLMManager()
 
     model_name = models.CharField(
         max_length=255, help_text="Litellm model name, e.g. llama3.2 or gpt-4o"
@@ -325,6 +338,15 @@ class LLM(models.Model):
             OpenAI(api_key=config("LITELLM_API_KEY"), base_url=config("LITELLM_ENDPOINT"))
         )
 
+    def natural_key(self):
+        return (self.model_name,)
+
+    def get_by_natural_key(self, model_name):
+        return self.get(model_name=model_name)
+
+    class Meta:
+        unique_together = [("model_name",)]
+
 
 # ################################################ #
 #
@@ -338,6 +360,12 @@ class CustomUser(AbstractUser):
     role = models.CharField(
         max_length=30, choices=RoleChoices.choices, default=RoleChoices.CLIENT.value
     )
+
+    def natural_key(self):
+        return (self.username,)
+
+    class Meta:
+        unique_together = [("username",)]
 
     def __str__(self):
         return self.username

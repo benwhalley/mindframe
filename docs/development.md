@@ -71,9 +71,10 @@ docker-compose run web \
 	mindframe.Transition \
 	mindframe.Judgement \
 	mindframe.LLM \
-	--indent 2 > ~/dev/mindframe/mindframe/fixtures/demo.json
+	--indent 2 \
+	--natural-foreign --natural-primary  \
+	--format=yaml > ~/dev/mindframe/mindframe/fixtures/demo.yaml
 
-head ~/dev/mindframe/mindframe/fixtures/demo.json
 ```
 
 
