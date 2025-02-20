@@ -2,12 +2,12 @@ services:
   base:
     container_name: mindframe-staging-base
     build:
-      context: ../mindframe
+      context: ~/dev/mindframe-staging
       dockerfile: ../mindframe/Dockerfile.prod
       args:
         MINDFRAME_COMMIT: main
         BUILDKIT_PROGRESS: plain
-    image: mindframe-prod:latest
+    image: mindframe-staging:latest
 
   web:
     container_name: mindframe-staging-web
@@ -15,28 +15,23 @@ services:
     labels:
       caddy: "test.mindframe.llemma.net"
       caddy.reverse_proxy: "{{upstreams 8000}}"
-    ports: ["8080:8000"]
+    ports: ["9080:8000"]
     networks:
       - caddy
       - backend
-    image: mindframe-prod:latest
+    image: mindframe-staging:latest
     command:
       [
         "sh",
         "-c",
         "uvicorn config.asgi:application --workers 1 --host 0.0.0.0 --port 8000 --log-level debug"
       ]
-    depends_on:
-      - redis
-      - postgres
-      - chat
-      - worker
     env_file:
-      - ../secrets/test.mindframe.env
+      - ~/secrets/test.mindframe.env
     environment:
       - APP_MODE=web
     volumes:
-      - ~/dev/mindframe/mindframe:/app/mindframe
+      - ~/dev/mindframe-staging/mindframe:/app/mindframe
 
   chat:
     container_name: mindframe-staging-chat
@@ -44,14 +39,11 @@ services:
     labels:
       caddy: "bot.test.mindframe.llemma.net"
       caddy.reverse_proxy: "{{upstreams 8000}}"
-    ports: ["8081:8000"]
+    ports: ["9081:8000"]
     networks:
       - caddy
       - backend
-    depends_on:
-      - redis
-      - postgres
-    image: mindframe-prod:latest
+    image: mindframe-staging:latest
 
     command:
       [
@@ -60,16 +52,19 @@ services:
         "python chatbot.py"
       ]
     env_file:
-      - ../secrets/test.mindframe.env
+      ~/secrets/test.mindframe.env
     environment:
       - APP_MODE=chat
     volumes:
-      - ../mindframe/mindframe:/app/mindframe
+      - ~/dev/mindframe-staging/mindframe:/app/mindframe:rw,rslave
+      - ~/dev/mindframe-staging/llmtools:/app/llmtools:rw,rslave
+      - ~/dev/mindframe-staging/config:/app/config:rw,rslave
+      - ~/dev/mindframe-staging/mindframe/chatbot.py:/app/chatbot.py:rw,rslave
 
   worker:
     container_name: mindframe-staging-worker
     restart: unless-stopped
-    image: mindframe-prod:latest
+    image: mindframe-staging:latest
     networks:
       - backend
     command:
@@ -79,8 +74,8 @@ services:
         "celery --app mindframe worker --pool=solo --loglevel=debug"
       ]
     env_file:
-      - ../secrets/test.mindframe.env
+      ~/secrets/test.mindframe.env
     environment:
       - APP_MODE=worker
     volumes:
-      - ~/dev/mindframe/mindframe:/app/mindframe
+      - ~/dev/mindframe-staging/mindframe:/app/mindframe

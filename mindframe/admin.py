@@ -57,6 +57,7 @@ class CustomUserAdmin(admin.ModelAdmin):
     search_fields = ("username", "email")
     filter_horizontal = ("user_permissions",)
 
+
 class MemoryChunkInline(admin.TabularInline):
     model = MemoryChunk
     extra = 0
