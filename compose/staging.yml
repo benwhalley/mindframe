@@ -69,4 +69,3 @@ services:
       ~/secrets/test.mindframe.env
     environment:
       - APP_MODE=worker
-

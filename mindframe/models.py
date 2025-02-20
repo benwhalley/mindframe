@@ -528,7 +528,7 @@ class MemoryChunk(models.Model):
     )
     start = models.IntegerField(help_text="The start position of the chunk in the memory (chars)")
     end = models.IntegerField(help_text="The end position of the chunk in the memory")
-    embedding = VectorField(dimensions=1024, null=True)
+    embedding = VectorField(dimensions=1024, null=True, blank=True)
 
     objects = MemoryChunkManager()  # Use custom manager
 
@@ -761,7 +761,7 @@ class Turn(NS_Node):
         choices=TurnTextSourceTypes.choices, max_length=25, default=TurnTextSourceTypes.HUMAN
     )
 
-    embedding = VectorField(dimensions=1024, null=True)
+    embedding = VectorField(dimensions=1024, null=True, blank=True)
 
     # how sibling nodes are ordered within the same level
     # we do non-branches first, then by timestamp to enable
