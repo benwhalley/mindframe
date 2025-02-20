@@ -30,8 +30,6 @@ services:
       - ~/secrets/test.mindframe.env
     environment:
       - APP_MODE=web
-    volumes:
-      - ~/dev/mindframe-staging/mindframe:/app/mindframe
 
   chat:
     container_name: mindframe-staging-chat
@@ -44,7 +42,6 @@ services:
       - caddy
       - backend
     image: mindframe-staging:latest
-
     command:
       [
         "sh",
@@ -55,11 +52,7 @@ services:
       ~/secrets/test.mindframe.env
     environment:
       - APP_MODE=chat
-    volumes:
-      - ~/dev/mindframe-staging/mindframe:/app/mindframe:rw,rslave
-      - ~/dev/mindframe-staging/llmtools:/app/llmtools:rw,rslave
-      - ~/dev/mindframe-staging/config:/app/config:rw,rslave
-      - ~/dev/mindframe-staging/mindframe/chatbot.py:/app/chatbot.py:rw,rslave
+    
   worker:
     container_name: mindframe-staging-worker
     restart: unless-stopped
@@ -76,5 +69,4 @@ services:
       ~/secrets/test.mindframe.env
     environment:
       - APP_MODE=worker
-    volumes:
-      - ~/dev/mindframe-staging/mindframe:/app/mindframe
+    
