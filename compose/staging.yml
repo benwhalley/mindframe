@@ -3,7 +3,7 @@ services:
     container_name: mindframe-staging-base
     build:
       context: ~/dev/mindframe-staging/
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile.staging
       args:
         MINDFRAME_COMMIT: main
         BUILDKIT_PROGRESS: plain
