@@ -153,7 +153,7 @@ def handle_new(message, conversation, request=None):
 
         # Return the newly created conversation
         new_conversation, is_new = get_conversation(message)
-        return None, new_conversation
+        return JsonResponse({"status": "ok"}, status=200), new_conversation
 
     except Exception:
         logger.error(traceback.format_exc())
