@@ -2,8 +2,8 @@ services:
   base:
     container_name: mindframe-staging-base
     build:
-      context: ~/dev/mindframe-staging
-      dockerfile: ../mindframe/Dockerfile.prod
+      context: ~/dev/mindframe-staging/
+      dockerfile: Dockerfile.prod
       args:
         MINDFRAME_COMMIT: main
         BUILDKIT_PROGRESS: plain
@@ -60,7 +60,6 @@ services:
       - ~/dev/mindframe-staging/llmtools:/app/llmtools:rw,rslave
       - ~/dev/mindframe-staging/config:/app/config:rw,rslave
       - ~/dev/mindframe-staging/mindframe/chatbot.py:/app/chatbot.py:rw,rslave
-
   worker:
     container_name: mindframe-staging-worker
     restart: unless-stopped
