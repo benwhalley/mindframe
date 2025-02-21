@@ -22,5 +22,6 @@ RUN pip install --no-cache-dir watchdog[watchmedo]
 
 RUN mkdir -p /app /app/static
 COPY . /app
+COPY mindframe/chatbot.py chatbot.py
 
 WORKDIR /app
