@@ -6,19 +6,25 @@
 {% load guidance %}
 {% block content %}
 <div class="container mt-5">
-    <h1 class="mb-1 mt-4">Conversation</h1>
+    <h1 class="mb-1 mt-4">Conversation
     {% if turn.pk == leaf_node.pk %}
-    <h4 class="mb-4">State at node {{turn.uuid|slice:5}}</h4>
+     at node {{turn.uuid|slice:5}}
     {% else %}
-    <h4 class="mb-4">State at node {{turn.uuid|slice:5}} in branch ending {{leaf_node.uuid|slice:5}}</h4>
+    at node {{turn.uuid|slice:5}} (branch ends at 
+        <a href="{% url 'conversation_detail' leaf_node.uuid %}">{{leaf_node.uuid|  slice:5}}</a>)
     {% endif %}
-
+    </h1>
+    <a class="btn btn-outline-primary mb-3" href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">
+        View Tree</a>
+    <hr>
     {% if turn.pk != leaf_node.pk %}
     <div class="alert alert-warning" role="alert">
-    <p>This is a partial view of a conversation branch.</p>
+    
+        <p>This is a partial view of a conversation branch.
+            <a href="{% url 'conversation_detail' leaf_node.uuid %}">See the entire branch</a> or 
+        <a href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">view the tree diagram</a>.
+        </p>
 
-    <a href="{% url 'conversation_detail' leaf_node.uuid %}">See the entire branch</a>
-    or <a href="{% url 'conversation_mermaid' uuid=object.uuid %}">view the tree diagram</a>.
     </div>
     {% endif %}
 
@@ -33,16 +39,15 @@
                     Conversation details
                 </div>
                 <div class="card-body">
+                    
+                    <p>
+                        Participants: {{turn.conversation.speakers|join:", "}}
+                    </p>
+                    
                     <a href="{% url 'admin:mindframe_conversation_change' object.pk %}">
-                        {{ object }}
+                         Edit conversation 
                     </a>
-                    <p>Conversation ID: <code>{{object.uuid|slice:8}}</code></p>
-
-                <p>
-                    <a class="btn btn-sm btn-primary" href="{{leaf_node.gradio_url}}">
-                    Continue conversation at turn {{leaf_node.uuid|slice:5}}</a>
-                </p>
-
+                    <p class="small">Conversation ID: <code>{{object.uuid|slice:8}}</code></p>
                 </div>
             </div>
 
@@ -50,8 +55,7 @@
             <div class="card mt-4">
                 <div class="card-header">
                     Branches
-
-                        <a class="btn btn-sm btn-primary float-end" href="{% url 'conversation_mermaid' uuid=object.uuid %}">
+                        <a class="btn btn-xs btn-primary float-end" href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">
                         View Tree</a>
 
 
@@ -101,19 +105,22 @@
 
             <div class="card mt-4">
                 <div class="card-header">
-                    Adding turns
+                    {% if turn.pk != leaf_node.pk %}
+                    Add turns, branching from <code>{{turn.uuid|slice:4}}</code>
+                    {% else %}
+                    Add turns, appending to <code>{{turn.uuid|slice:4}}</code>
+                    {% endif %}
                 </div>
                 <div class="card-body">
 
-                    <h5>Add synthetic turns</h5>
+                   
+                    <p class="small">
+                        Add addition turns from this node, using specific Interventions for each speaker.
+                    </p>
 
-                    {% if turn.pk != leaf_node.pk %}
-                    <p>Branching from {{turn.uuid|slice:4}}</p>
-                    {% else %}
-                    <p>Appending to {{turn.uuid|slice:4}}</p>
-                    {% endif %}
+                    
                 <form method="post" >
-                <h6>Add additional turns to the conversation</h6>
+
                 <a name="addmore"></a>
                         {% csrf_token %}
                         {{ form|crispy }}
@@ -165,54 +172,71 @@
     <div class="row mb-5">
 
 
-        <div class="col-8 mb-5 speech pr-5">
+        <div class="col-10 mb-5 pr-5">
+            
+            <span class="mb-2 badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source}}</span>
+
+            {% if turn.step %}
+                <a class="badge border border-primary text-primary text-decoration-none  rounded-pill mr-2" href="{% url 'admin:mindframe_step_change' turn.step.id %}">
+                {{turn.step.title}}
+                </a>
+            {% endif %}
+
+            <div class = "speech">
             <b>{{turn.speaker.username.upper}}: </b>
 
             {{turn.text}}
+        </div>
+        
+        
+        
+        <br>
+        
+        <div class="row">
+            <div class="col-6">
+                {% if turn.notes.all %}
+                <h6>Judgements/Notes</h6>
+                {% endif %}
+                {% for n in turn.notes.all %}
+                <code>{{n.judgement.variable_name}}</code><pre>{{n.data}}</pre>
+                {% if not forloop.last %}<hr>{% endif %}
+                {% endfor %}
+            </div>
+            <div class="col-6">
+                {% if turn.metadata.items %}
+                <h6>Thinking</h6>
+                {% endif %}
+                {% for k, v in turn.metadata.items %}
+                {% if k != "response" and  k != "RESPONSE_" %}
+                <code>{{k}}</code>
+                <pre>{{v}}</pre>
+                {% endif %}
+            {% endfor %}
+    
+            </div>
+            
+        </div>
+        
+
 
         </div>
 
+        <!-- align text right -->
+        <div class="col-2 text">
 
-        <div class="col-4 small">
+            
+                <a class='btn btn-xs btn-outline-danger mb-0' 
+                href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch"> Branch </a>
+                
+                <a class='btn btn-xs btn-outline-primary' 
+                     href="{{leaf_node.gradio_url}}">
+                    Continue ⤷</a>
 
-            <span class="badge border border-success rounded-pill float-end">
-                <a  class='text-success' href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch"> Start new branch ⤷ </a>
-                </span>
 
 
-
-            <span class="badge border border-primary text-primary rounded-pill mr-2">
-                <a class="mr-3" href="{% url 'admin:mindframe_turn_change' turn.id %}"></a>
-                {{ turn.uuid|slice:5 }}
-                </a>
-            </span>
-
-            <span class="badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source}}</span>
-
-            {% if turn.step %}
-                <p><a href="{% url 'admin:mindframe_step_change' turn.step.id %}">
-                <code class="small">{{turn.step.title}}</code>
-                </a></p>
-            {% endif %}
 
 
             </a>
-
-
-
-
-
-        {% for n in turn.notes.all %}
-        <code>{{n.judgement.variable_name}}</code><pre>{{n.data}}</pre>
-        {% if not forloop.last %}<hr>{% endif %}
-        {% endfor %}
-
-        {% for k, v in turn.metadata.items %}
-            {% if k != "response" and  k != "RESPONSE_" %}
-            <code>{{k}}</code>
-            <pre>{{v}}</pre>
-            {% endif %}
-        {% endfor %}
 
 
         </div>
@@ -228,8 +252,8 @@
                 <div class="alert alert-warning" role="alert">
                     Note: {{object.synthetic_turns_scheduled}} additional turns are scheduled to be generated for this conversation.
                 </div>
-                <!-- meta refresh every 3 seconds - go to #addmore tag -->
-                <meta http-equiv="refresh" content="3;url=#conversationend">
+
+                <meta http-equiv="refresh" content="5;url=#conversationend">
 
             {% endif %}
 

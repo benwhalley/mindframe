@@ -13,7 +13,12 @@ from itertools import cycle
 
 from mindframe.conversation import listen, continue_conversation_task
 from mindframe.models import Turn, Intervention, CustomUser, Conversation
-from mindframe.tree import conversation_history, generate_mermaid_tree
+from mindframe.tree import (
+    conversation_history,
+    generate_mermaid_tree,
+    generate_d3_tree_data,
+    generate_treant_tree_data,
+)
 from mindframe.silly import silly_user
 from django.shortcuts import get_object_or_404
 
@@ -214,4 +219,5 @@ class ConversationMermaidView(DetailView):
         conversation = self.object  # Retrieved Conversation instance
         root_turn = conversation.turns.get(depth=1)  # Assuming root turn has depth=1
         context["mermaid_code"] = generate_mermaid_tree(root_turn)
+        context["tree_data"] = generate_treant_tree_data(root_turn)
         return context
