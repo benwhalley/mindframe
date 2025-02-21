@@ -174,16 +174,16 @@ def generate_d3_tree_data(root):
     tree_data = traverse(root)
     return json.dumps(tree_data, indent=2)  # Pretty-print for debugging
 
+
 def generate_treant_tree_data(root):
     """
     Recursively builds a JSON structure suitable for Treant.js.
     """
-    
-    
-    step_ids = root.conversation.turns.all().values_list('step__pk', flat=True)
+
+    step_ids = root.conversation.turns.all().values_list("step__pk", flat=True)
     pal = generate_color_palette(len(step_ids))
     step_colors = dict(zip(step_ids, pal))
-        
+
     def traverse(node):
         """Recursive function to build tree structure."""
         return {
@@ -191,7 +191,7 @@ def generate_treant_tree_data(root):
             "innerHTML": f"""
                 <div class="node-content">
                     <a id="node-{node.uuid}" />
-                    <a href="{reverse('conversation_detail', args=[node.uuid])}" 
+                    <a href="{reverse('conversation_detail', args=[node.uuid])}"
                         style="color:{step_colors.get(node.step and node.step.pk or None)};"
                        class="node-title">{node.uuid[:4]}
                     </a>
