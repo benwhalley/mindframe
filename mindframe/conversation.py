@@ -1,12 +1,23 @@
+from typing import Optional
 from collections import OrderedDict
 import pprint
 from django.db.models import QuerySet
-from mindframe.models import Turn, CustomUser, Transition, LLM, Note, Conversation, Intervention
+from mindframe.models import (
+    Turn,
+    CustomUser,
+    Transition,
+    LLM,
+    Note,
+    Conversation,
+    Intervention,
+    Step,
+)
+from mindframe.silly import silly_user
 import traceback
 import logging
 from itertools import cycle
 from django.shortcuts import get_object_or_404
-from mindframe.settings import mfuuid, StepJudgementFrequencyChoices
+from mindframe.settings import mfuuid, StepJudgementFrequencyChoices, RoleChoices
 from mindframe.helpers import make_data_variable, get_ordered_queryset
 from llmtools.llm_calling import chatter
 from mindframe.tree import conversation_history, iter_conversation_path
@@ -309,19 +320,35 @@ def add_turns_task(turn_pk: int, n_turns: int):
     turn.conversation.save()
 
 
-def start_conversation(intervention, therapist, client=None, client_intervention=None) -> Turn:
-    """Create a new conversation between a therapist and a (real or synthetic) client."""
+def start_conversation(
+    step: Step,
+    therapist: Optional[CustomUser] = None,
+    client: Optional[CustomUser] = None,
+    client_step: Optional[Step] = None,
+) -> Turn:
+    """
+    Create a new conversation between a therapist and a (real or synthetic) client, starting from specific Intervention Steps.
+    """
 
     # it's a synthetic conversation if we use an intervention for the client
-    synth = bool(client_intervention)
+    synth = bool(client_step)
     conversation = Conversation.objects.create(is_synthetic=synth)
+    if not therapist:
+        therapist, new_ = CustomUser.objects.get_or_create(
+            username="Linda", role=RoleChoices.THERAPIST
+        )
+
+    if not client:
+        client = silly_user()
 
     turn = Turn.add_root(
         conversation=conversation,
-        speaker=therapist,
-        text=intervention.opening_line,
+        speaker=client,
+        text="/start",
         text_source=TurnTextSourceTypes.OPENING,
-        step=intervention.steps.all().first(),
+    )
+    turn = turn.add_child(
+        conversation=turn.conversation, speaker=therapist, text=step.opening_line, step=step
     )
 
     return turn
@@ -362,6 +389,7 @@ def continue_conversation_task(from_turn_id, speaker_interventions, n_turns):
     }
 
     newleaf = continue_conversation(from_turn, speaker_interventions, n_turns)
+    logger.info("Resetting number of scheduled turns")
     newleaf.conversation.synthetic_turns_scheduled = 0
     newleaf.conversation.save()
     return True

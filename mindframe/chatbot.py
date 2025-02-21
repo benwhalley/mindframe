@@ -68,7 +68,8 @@ def main():
         hist = get_history(turn)
         # TODO: check assumption that
         # the user is the last client user to have spoken
-        user = hist.filter(speaker__role=RoleChoices.CLIENT).last().speaker
+        lastclientturn = hist.filter(speaker__role=RoleChoices.CLIENT).last()
+        user = lastclientturn.speaker
         client_turn = listen(hist.last(), speaker=user, text=user_input)
         bot_turn = respond(client_turn)
 

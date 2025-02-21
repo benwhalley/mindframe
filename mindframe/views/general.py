@@ -11,8 +11,7 @@ from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from itertools import cycle
 from mindframe.conversation import add_turns_task
-
-
+from mindframe.conversation import start_conversation
 import random
 from mindframe.models import Intervention, CustomUser
 
@@ -25,27 +24,10 @@ class IndexView(LoginRequiredMixin, TemplateView):
     template_name = "index.html"
 
 
-# TODO FIXME
 def create_public_session(request, intervention_slug):
 
-    # Get the intervention based on the ID
     intervention = get_object_or_404(Intervention, slug=intervention_slug)
-
-    # Create a temporary or anonymous client (could be a placeholder user, if needed)
-    sn = silly_name()
-    f, l = sn.split(" ")
-    client = CustomUser.objects.create(
-        username=f"{slugify(sn)}{random.randint(1e4, 1e5)}",
-        first_name=f,
-        last_name=l,
-        is_active=False,
-    )
-
-    # Generate a new cycle and session
-    # cycle = Cycle.objects.create(intervention=intervention, client=client)
-    # session = TreatmentSession.objects.create(cycle=cycle, started=timezone.now())
-    # TODO FIXME
-    session = None
-    # Redirect to the chat page with the session UUID
-    chat_url = f"{settings.CHAT_URL}/?session_id={session.uuid}"
+    step = intervention.steps.all().first()
+    turn = start_conversation(step)
+    chat_url = f"{settings.CHAT_URL}/?turn_id={turn.uuid}"
     return redirect(chat_url)

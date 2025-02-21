@@ -370,11 +370,8 @@ class InterventionAdmin(admin.ModelAdmin):
         return obj.ver()
 
     def start_session_button(self, obj):
-        url = reverse("admin:start_session", args=[obj.id])
         anon_url = reverse("public_start_session", args=[obj.slug])
-        return format_html(
-            f'<a class="button" href="{url}">New Session</a> &nbsp;  <a class="button" href="{anon_url}">New Anonymous Session</a> '
-        )
+        return format_html(f'<a class="button" href="{anon_url}">New Anonymous Session</a> ')
 
     start_session_button.short_description = "Start Session"
     start_session_button.allow_tags = True

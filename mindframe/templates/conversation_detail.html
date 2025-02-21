@@ -174,13 +174,15 @@
 
         <div class="col-10 mb-5 pr-5">
 
-            <span class="mb-2 badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source}}</span>
-
-            {% if turn.step %}
-                <a class="badge border border-primary text-primary text-decoration-none  rounded-pill mr-2" href="{% url 'admin:mindframe_step_change' turn.step.id %}">
+            <span class="mb-2 badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source|capfirst}}{% if turn.step %}:
+                <a class="text-decoration-none" href="{% url 'admin:mindframe_step_change' turn.step.id %}">
                 {{turn.step.title}}
                 </a>
             {% endif %}
+
+            </span>
+
+
 
             <div class = "speech">
             <b>{{turn.speaker.username.upper}}: </b>
