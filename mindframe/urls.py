@@ -1,14 +1,21 @@
 from django.urls import path
-from mindframe.views import (
-    create_public_session,
-    SyntheticConversationDetailView,
-    TreatmentSessionDetailView,
+
+
+from mindframe.views.general import create_public_session, IndexView
+
+from mindframe.views.hyde import (
     RAGHyDEComparisonView,
-    SyntheticConversationCreateView,
-    IndexView,
+)
+from mindframe.views.conversation import (
+    ConversationDetailView,
+    ImportConversationView,
+    ConversationMermaidView,
 )
 
+from mindframe.telegram import telegram_webhook
+
 urlpatterns = [
+    path("telegram-webhook/", telegram_webhook, name="telegram_webhook"),
     # Other URLs
     path(
         "start/<str:intervention_slug>/",
@@ -17,18 +24,23 @@ urlpatterns = [
     ),
     path(
         "import/fake/",
-        SyntheticConversationCreateView.as_view(),
-        name="synthetic_conversation_create",
+        ImportConversationView.as_view(),
+        name="import_conversation",
+    ),
+    # path(
+    #     "fake/conversation/<int:pk>/",
+    #     SyntheticConversationDetailView.as_view(),
+    #     name="synthetic_conversation_detail",
+    # ),
+    path(
+        "conversations/<str:uuid>/",
+        ConversationDetailView.as_view(),
+        name="conversation_detail",
     ),
     path(
-        "fake/conversation/<int:pk>/",
-        SyntheticConversationDetailView.as_view(),
-        name="synthetic_conversation_detail",
-    ),
-    path(
-        "sessions/<str:uuid>/",
-        TreatmentSessionDetailView.as_view(),
-        name="treatment_session_detail",
+        "conversation/mermaid/<str:uuid>/",
+        ConversationMermaidView.as_view(),
+        name="conversation_mermaid",
     ),
     path("rag-test/", RAGHyDEComparisonView.as_view(), name="rag_test"),
     path("", IndexView.as_view(), name="index"),  # Index page

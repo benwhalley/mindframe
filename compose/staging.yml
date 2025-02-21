@@ -1,0 +1,79 @@
+networks:
+  backend:
+    external: true
+    name: backend
+  caddy:
+    external: true
+    name: caddy
+
+services:
+  base:
+    container_name: mindframe-staging-base
+    build:
+      context: ~/dev/mindframe-staging/
+      dockerfile: Dockerfile.staging
+      args:
+        MINDFRAME_COMMIT: main
+        BUILDKIT_PROGRESS: plain
+    image: mindframe-staging:latest
+
+  web:
+    container_name: mindframe-staging-web
+    restart: unless-stopped
+    labels:
+      caddy: "test.mindframe.llemma.net"
+      caddy.reverse_proxy: "{{upstreams 8000}}"
+    ports: ["9080:8000"]
+    networks:
+      - caddy
+      - backend
+    image: mindframe-staging:latest
+    command:
+      [
+        "sh",
+        "-c",
+        "uvicorn config.asgi:application --workers 1 --host 0.0.0.0 --port 8000 --log-level debug"
+      ]
+    env_file:
+      - ~/secrets/test.mindframe.env
+    environment:
+      - APP_MODE=web
+
+  chat:
+    container_name: mindframe-staging-chat
+    restart: unless-stopped
+    labels:
+      caddy: "bot.test.mindframe.llemma.net"
+      caddy.reverse_proxy: "{{upstreams 8000}}"
+    ports: ["9081:8000"]
+    networks:
+      - caddy
+      - backend
+    image: mindframe-staging:latest
+    command:
+      [
+        "sh",
+        "-c",
+        "python chatbot.py"
+      ]
+    env_file:
+      ~/secrets/test.mindframe.env
+    environment:
+      - APP_MODE=chat
+
+  worker:
+    container_name: mindframe-staging-worker
+    restart: unless-stopped
+    image: mindframe-staging:latest
+    networks:
+      - backend
+    command:
+      [
+        "sh",
+        "-c",
+        "celery --app mindframe worker --pool=solo --loglevel=debug"
+      ]
+    env_file:
+      ~/secrets/test.mindframe.env
+    environment:
+      - APP_MODE=worker

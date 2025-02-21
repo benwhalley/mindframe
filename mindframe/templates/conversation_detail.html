@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% load pretty %}
+{% load turns %}
+{% load crispy_forms_tags %}
+{% load notes %}
+{% load guidance %}
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-1 mt-4">Conversation
+    {% if turn.pk == leaf_node.pk %}
+     at node {{turn.uuid|slice:5}}
+    {% else %}
+    at node {{turn.uuid|slice:5}} (branch ends at
+        <a href="{% url 'conversation_detail' leaf_node.uuid %}">{{leaf_node.uuid|  slice:5}}</a>)
+    {% endif %}
+    </h1>
+    <a class="btn btn-outline-primary mb-3" href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">
+        View Tree</a>
+    <hr>
+    {% if turn.pk != leaf_node.pk %}
+    <div class="alert alert-warning" role="alert">
+
+        <p>This is a partial view of a conversation branch.
+            <a href="{% url 'conversation_detail' leaf_node.uuid %}">See the entire branch</a> or
+        <a href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">view the tree diagram</a>.
+        </p>
+
+    </div>
+    {% endif %}
+
+
+
+    <div class="row mb-4">
+        <div class="col-1 order-last"></div>
+        <div class="col-3 pr-5 order-last">
+
+            <div class="card">
+                <div class="card-header">
+                    Conversation details
+                </div>
+                <div class="card-body">
+
+                    <p>
+                        Participants: {{turn.conversation.speakers|join:", "}}
+                    </p>
+
+                    <a href="{% url 'admin:mindframe_conversation_change' object.pk %}">
+                         Edit conversation
+                    </a>
+                    <p class="small">Conversation ID: <code>{{object.uuid|slice:8}}</code></p>
+                </div>
+            </div>
+
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    Branches
+                        <a class="btn btn-xs btn-primary float-end" href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">
+                        View Tree</a>
+
+
+                </div>
+                <div class="card-body">
+
+
+
+    {% if leaves.count > 1 %}
+    <p>
+        Branches at:
+    {% for node in branches %}
+    <span class="badge bg-success rounded-pill">{{ node.uuid|slice:5 }}</span>
+    {% endfor %}
+
+    </p>
+    <p>
+    Alternative conversation endings (branch tips):
+    {% for l in leaves %}
+    {% if l.uuid != leaf_node.uuid %}
+    <li>
+    <a href="{% url 'conversation_detail' uuid=l.uuid %}">
+        {{l.uuid|slice:4}}
+    </a>
+        ({{l.get_ancestors.count}} turns)
+    </li>
+    {% elif l.uuid != turn.uuid %}
+    <li>
+        <a href="{% url 'conversation_detail' uuid=l.uuid %}">
+            {{l.uuid|slice:4}}
+        </a>
+        (the end of this branch, {{l.get_ancestors.count}} turns)
+    </li>
+    {% else %}
+    <li>
+        This branch:
+            {{l.uuid|slice:4}}
+    </li>
+    {% endif %}
+    {% endfor %}
+</p>
+    {% endif %}
+
+                </div>
+            </div>
+
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    {% if turn.pk != leaf_node.pk %}
+                    Add turns, branching from <code>{{turn.uuid|slice:4}}</code>
+                    {% else %}
+                    Add turns, appending to <code>{{turn.uuid|slice:4}}</code>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+
+
+                    <p class="small">
+                        Add addition turns from this node, using specific Interventions for each speaker.
+                    </p>
+
+
+                <form method="post" >
+
+                <a name="addmore"></a>
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        <button type="submit" class="btn btn-primary float-end">Add Turns</button>
+                </form>
+
+                </div>
+            </div>
+
+
+
+    </div>
+
+    <div class="col-8 pl-5">
+    <div class="row">
+
+        <style>
+            pre {
+                white-space: pre-wrap; /* Enable wrapping */
+                word-wrap: break-word; /* Break long words if necessary */
+                overflow-wrap: break-word; /* Compatibility for older browsers */
+            }
+        </style>
+    {% regroup turns by session_state as state_turns %}
+    {% for group, turns in state_turns %}
+
+    <div class="row">
+    <div class="col-12">
+
+
+    </h6>
+    </div>
+    </div>
+
+    <style>
+        .speech {
+            font-family: 'Courier New', Courier, monospace;
+            font-size:14pt;
+
+        }
+
+    </style>
+    {% for turn in turns %}
+    {% if forloop.last%}
+    <a name="conversationend"></a>
+    {% endif %}
+
+    <div class="col">
+    <div class="row mb-5">
+
+
+        <div class="col-10 mb-5 pr-5">
+
+            <span class="mb-2 badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source|capfirst}}{% if turn.step %}:
+                <a class="text-decoration-none" href="{% url 'admin:mindframe_step_change' turn.step.id %}">
+                {{turn.step.title}}
+                </a>
+            {% endif %}
+
+            </span>
+
+
+
+            <div class = "speech">
+            <b>{{turn.speaker.username.upper}}: </b>
+
+            {{turn.text}}
+        </div>
+
+
+
+        <br>
+
+        <div class="row">
+            <div class="col-6">
+                {% if turn.notes.all %}
+                <h6>Judgements/Notes</h6>
+                {% endif %}
+                {% for n in turn.notes.all %}
+                <code>{{n.judgement.variable_name}}</code><pre>{{n.data}}</pre>
+                {% if not forloop.last %}<hr>{% endif %}
+                {% endfor %}
+            </div>
+            <div class="col-6">
+                {% if turn.metadata.items %}
+                <h6>Thinking</h6>
+                {% endif %}
+                {% for k, v in turn.metadata.items %}
+                {% if k != "response" and  k != "RESPONSE_" %}
+                <code>{{k}}</code>
+                <pre>{{v}}</pre>
+                {% endif %}
+            {% endfor %}
+
+            </div>
+
+        </div>
+
+
+
+        </div>
+
+        <!-- align text right -->
+        <div class="col-2 text">
+
+
+                <a class='btn btn-xs btn-outline-danger mb-0'
+                href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch"> Branch </a>
+
+                <a class='btn btn-xs btn-outline-primary'
+                     href="{{leaf_node.gradio_url}}">
+                    Continue ⤷</a>
+
+
+
+
+
+            </a>
+
+
+        </div>
+    <hr>
+
+    {% endfor %}
+</div>
+
+
+{% endfor %}
+
+{% if object.synthetic_turns_scheduled > 0 %}
+                <div class="alert alert-warning" role="alert">
+                    Note: {{object.synthetic_turns_scheduled}} additional turns are scheduled to be generated for this conversation.
+                </div>
+
+                <meta http-equiv="refresh" content="5;url=#conversationend">
+
+            {% endif %}
+
+
+
+</div>
+</div>
+{% endblock %}

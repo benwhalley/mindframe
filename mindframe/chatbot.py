@@ -5,6 +5,7 @@ import gradio as gr
 from django.urls import reverse
 from django.conf import settings
 import logging
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -13,57 +14,72 @@ def main():
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     django.setup()
 
-    from mindframe.models import TreatmentSession, RoleChoices, Turn
+    from mindframe.models import Conversation, RoleChoices, Turn
+    from mindframe.tree import conversation_history
 
-    def get_session(id):
-        return TreatmentSession.objects.get(uuid=id)
+    def get_history(turn):
+        tip_ = turn.get_descendants().last()
+        leaf_turn = tip_ or turn
+        turns = conversation_history(leaf_turn)
+        return turns
 
     def initialize_chat(request: gr.Request):
-        session_id = request.query_params.get("session_id")
-        session = get_session(session_id)
+        turn_id = request.query_params.get("turn_id")
+        turn = Turn.objects.get(uuid=turn_id)
+
+        conversation = turn.conversation
 
         history = []
         log_history = ["#### Bot's thoughts:\n\n"]
 
-        for turn in Turn.objects.filter(session_state__session=session).order_by("timestamp"):
+        turns = get_history(turn)
+
+        for turn in turns:
             role = "assistant" if turn.speaker.role == RoleChoices.THERAPIST else "user"
-            if role == "user":
-                history.append((turn.text, ""))
-            else:
-                history.append(("", turn.text))
+            if turn.text and len(turn.text.strip()) > 0:
+                if role == "user":
+                    history.append((turn.text, ""))
+                else:
+                    history.append(("", turn.text))
 
-        if session.turns.all().count() == 0:
-            bot_response = session.respond()
-            history.append(("", bot_response.get("utterance", "Error: No response")))
-            thoughts = bot_response.get("thoughts", "")
-            if thoughts:
-                log_history.append(f"\n\n{thoughts}\n---\n")
+        if turns.count() == 0:
+            history.append(("", "Error: No turns found in conversation"))
 
-        session_detail_url = (
-            f"{settings.WEB_URL}{reverse('treatment_session_detail', args=[session_id])}"
+        conversation_detail_url = settings.WEB_URL + reverse(
+            "conversation_detail",
+            args=[
+                turn.uuid,
+            ],
         )
-        session_link = f"[View Treatment Session Details]({session_detail_url})"
+
+        conversation_link_html = (
+            f'<a href="{conversation_detail_url}" target="_self">View Conversation Detail</a>'
+        )
+        conversation_link_md = gr.HTML(conversation_link_html)
 
         formatted_log_history = "\n".join(log_history) if log_history else ""
-        print(formatted_log_history)
-        return history, session_id, session_link, formatted_log_history
+        return history, turn_id, conversation_link_md, formatted_log_history
 
-    def chat_with_bot(session_id, history, user_input, current_log):
-        session = get_session(session_id)
-        user = session.cycle.client
+    def chat_with_bot(turn_id, history, user_input, current_log):
+        from mindframe.conversation import listen, respond
 
-        session.listen(speaker=user, text=user_input)
-        bot_response = session.respond()
-        utterance = bot_response.get("utterance", "Error: No response")
-        thoughts = "\n\n".join(bot_response.get("thoughts", ""))
+        turn = Turn.objects.get(uuid=turn_id)
+
+        hist = get_history(turn)
+        # TODO: check assumption that
+        # the user is the last client user to have spoken
+        lastclientturn = hist.filter(speaker__role=RoleChoices.CLIENT).last()
+        user = lastclientturn.speaker
+        client_turn = listen(hist.last(), speaker=user, text=user_input)
+        bot_turn = respond(client_turn)
+
+        utterance = bot_turn.text
+        thoughts = bot_turn.notes_data() or "---"
 
         history.append((user_input, utterance))
 
-        if thoughts:
-            new_log_entry = f"{thoughts}\n\n---"
-            updated_log = f"{current_log}\n\n{new_log_entry}" if current_log else new_log_entry
-        else:
-            updated_log = current_log
+        new_log_entry = f"{thoughts}\n\n---"
+        updated_log = f"{current_log}\n\n{new_log_entry}" if current_log else new_log_entry
 
         return history, "", updated_log
 
@@ -82,7 +98,7 @@ def main():
     """
 
     with gr.Blocks(css=custom_css) as iface:
-        session_link_md = gr.Markdown()
+        conversation_link_md = gr.HTML()
 
         with gr.Row(equal_height=True):
             with gr.Column(scale=2):
@@ -94,26 +110,28 @@ def main():
                     label="Bot's Thoughts", elem_classes=["markdown-window"], visible=False
                 )
 
-        session_id_box = gr.Textbox(visible=False)
+        conversation_id_box = gr.Textbox(visible=False)
 
         iface.load(
             initialize_chat,
             inputs=None,
-            outputs=[chatbot, session_id_box, session_link_md, log_window],
+            outputs=[chatbot, conversation_id_box, conversation_link_md, log_window],
         )
 
-        def handle_input(session_id, history, text_input, current_log):
+        def handle_input(turn_id, history, text_input, current_log):
             try:
                 if text_input.strip():
-                    return chat_with_bot(session_id, history, text_input, current_log)
+                    return chat_with_bot(turn_id, history, text_input, current_log)
                 else:
                     return history, text_input, current_log
             except Exception as e:
                 logger.error(f"Error handling input: {e}")
                 history.append(("", str(e)))
+                history.append(("", str(traceback.format_exc())))
+                logger.error(str(traceback.format_exc()))
                 return history, text_input, current_log
 
-        inputs = [session_id_box, chatbot, user_input, log_window]
+        inputs = [conversation_id_box, chatbot, user_input, log_window]
         outputs = [chatbot, user_input, log_window]
 
         user_input.submit(handle_input, inputs, outputs)

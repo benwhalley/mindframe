@@ -13,7 +13,11 @@ REDIS_URL = config("REDIS_URL", default="redis://redis:6379/0")
 CHAT_URL = config("CHAT_URL", default=None)
 WEB_URL = config("WEB_URL", default=None)
 
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*.llemma.net,localhost,127.0.0.1", cast=Csv())
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default=".llemma.net,localhost,127.0.0.1",
+    cast=Csv(),
+)
 
 CSRF_TRUSTED_ORIGINS = config(
     "CSRF_TRUSTED_ORIGINS",

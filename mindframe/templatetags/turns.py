@@ -3,6 +3,8 @@ from django.db.models import Q
 from mindframe.models import Turn
 from django.utils.safestring import mark_safe
 
+from mindframe.tree import conversation_history
+
 register = template.Library()
 
 
@@ -20,21 +22,17 @@ def format_turns(turns):
 def turns(context, filter_type="all", n=None):
 
     # Access `session` from the context
-    session = context.get("session")
-
-    if not session:
-        raise ValueError("Session is not available in the context.")
-
-    turns = Turn.objects.filter(session_state__session__id=session.id).order_by("timestamp")
+    turn = context.get("current_turn")
 
     if filter_type == "all":
-        t = turns
+        t = conversation_history(turn)
 
     elif filter_type == "step":
+        raise NotImplementedError("Filtering by step is not yet implemented.")
         t = turns.filter(session_state__step=session.current_step())
 
     if n:
-        t = turns.order_by("-timestamp")[:n][::-1]
+        t = list(t)[: n - 1]
         # query again because otherwise we return a list not a queryset
         t = Turn.objects.filter(id__in=[turn.id for turn in t])
 

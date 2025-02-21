@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h2>Conversation Tree</h2>
+<!--
+    <p>
+        <a href="{% url 'conversation_detail' conversation.turns.first.uuid %}">
+            Conversation details
+        </a>
+    </p> -->
+
+    <!-- Treant.js container -->
+    <div id="tree-container"></div>
+
+    <!-- Load required scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/treant-js/1.0/Treant.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+    <!-- Treant.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/treant-js/1.0/Treant.css" />
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const treeConfig = {{ tree_data|safe }};  // JSON data from Django context
+            new Treant(treeConfig);
+        });
+    </script>
+
+    <style>
+        /* Max width and text wrapping for nodes */
+        .turn {
+            width: 20em; /* Set max width */
+            text-align: left; /* Center text */
+            margin-left: 9em;
+            white-space: normal; /* Allow wrapping */
+            overflow-wrap: break-word; /* Force wrapping */
+            word-wrap: break-word;
+            padding: 5px;
+            font-size: 12px;
+        }
+
+        /* Adjust node container */
+        .node {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #tree-container a { text-decoration: none;}
+
+        .node-title {
+            font-weight: bold;
+        }
+    </style>
+{% endblock %}

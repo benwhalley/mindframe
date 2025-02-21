@@ -13,3 +13,6 @@ dist
 mindframe.egg-info
 docs/mi/transcripts/*
 sources/AnnoMI-full.csv
+mindframe/telegram-commands.txt
+mindframe/scratch.py
+mindframe/scratch.py

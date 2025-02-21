@@ -71,12 +71,35 @@ docker-compose run web \
 	mindframe.Transition \
 	mindframe.Judgement \
 	mindframe.LLM \
-	--indent 2 > ~/dev/mindframe/mindframe/fixtures/test.json
+	--indent 2 \
+	--natural-foreign --natural-primary  \
+	--format=yaml > ~/dev/mindframe/mindframe/fixtures/demo.yaml
 
-head ~/dev/mindframe/mindframe/fixtures/test.json
 ```
 
 
+
+
+# Using docker-compose
+
+
+```bash
+docker-compose -f base.yml  -f ~/dev/mindframe-staging/compose/staging.yml config  > STAGING__.yml
+
+docker-compose -f base.yml  -f ~/dev/mindframe/compose/production.yml config  > PRODUCTION__.yml
+
+
+docker-compose -f STAGING__.yml build base
+
+docker-compose -f STAGING__.yml run web ls
+
+docker-compose -f PRODUCTION__.yml build base
+
+docker-compose -f STAGING__.yml stop web
+docker-compose -f STAGING__.yml up --build -d web
+
+
+```
 
 
 # Dropping the database

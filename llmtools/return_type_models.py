@@ -89,9 +89,18 @@ def selection_response_model(valid_options):
 
 
 class BooleanResponse(BaseModel):
-    """A boolean response, making a True/False decision based on the question based."""
+    """A boolean response, making a True/False decision based on the question posed."""
 
     response: bool = Field(
         ...,
         description="Returns true or false only, based on the question/statement posed.",
+    )
+
+
+class IntegerResponse(BaseModel):
+    """An integer response, based on the question posed."""
+
+    response: int = Field(
+        ...,
+        description="Valid integers only.",
     )
