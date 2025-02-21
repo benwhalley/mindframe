@@ -80,6 +80,28 @@ docker-compose run web \
 
 
 
+# Using docker-compose
+
+
+```bash
+docker-compose -f base.yml  -f ~/dev/mindframe-staging/compose/staging.yml config  > STAGING__.yml
+
+docker-compose -f base.yml  -f ~/dev/mindframe/compose/production.yml config  > PRODUCTION__.yml
+
+
+docker-compose -f STAGING__.yml build base
+
+docker-compose -f STAGING__.yml run web ls
+
+docker-compose -f PRODUCTION__.yml build base
+
+docker-compose -f STAGING__.yml stop web
+docker-compose -f STAGING__.yml up --build -d web
+
+
+```
+
+
 # Dropping the database
 
 ```sh

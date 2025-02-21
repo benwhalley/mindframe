@@ -1,3 +1,11 @@
+networks:
+  backend:
+    external: true
+    name: backend
+  caddy:
+    external: true
+    name: caddy
+
 services:
   base:
     container_name: mindframe-staging-base
