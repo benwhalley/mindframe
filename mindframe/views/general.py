@@ -49,11 +49,8 @@ def start_gradio_chat(
         step = get_object_or_404(Step, pk=step_id)
         turn = start_conversation(step)
 
-    session_key = request.session.session_key
-
     token = signing.dumps(
         {
-            "session_key": session_key,
             "turn_uuid": turn.uuid,
         },
         salt="gradio-chatbot-auth",

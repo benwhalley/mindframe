@@ -28,57 +28,30 @@ def main():
     def verify_gradio_chat_token(request: gr.Request):
         """
         Verifies the signed token produced by mindframe.views.general.start_gradio_chat.
-        Expects the token to include both 'session_key' and 'turn_uuid'.
-        Returns (turn, session_data, None) on success, or (None, None, error_message) on failure.
+        Expects the token to include 'turn_uuid'.
+        Returns (turn, None) on success, or (None, error_message) on failure.
         """
 
         token = request.query_params.get("token")
         if not token:
-            return None, None, "Error: No token provided."
+            return None, "Error: No token provided."
 
         try:
             # Unsigned token returns a dictionary with 'session_key' and 'turn_uuid'.
-            data = signing.loads(token, salt="gradio-chatbot-auth")
-            token_session_key = data.get("session_key")
+            # max age of link is 1 day
+            data = signing.loads(token, salt="gradio-chatbot-auth", max_age=60 * 60 * 24)
             turn_uuid = data.get("turn_uuid")
-            if not token_session_key or not turn_uuid:
-                return None, "Error: Invalid token data."
-        except signing.BadSignature:
-            return None, None, "Error: Invalid token."
+        except signing.BadSignature as e:
+            return None, f"Error: Invalid token: \n{e}"
 
-        # Retrieve the session cookie from the request.
-        session_cookie = request.cookies.get(settings.SESSION_COOKIE_NAME)
-        if not session_cookie:
-            return None, None, "Error: No session cookie found. Please login."
-
-        # Ensure that the session cookie matches the session key stored in the token.
-        if session_cookie != token_session_key:
-            return None, None, "Error: Session mismatch. Please login again."
-
-        logger.info(f"Session cookie: {session_cookie}")
-
-        try:
-            session_data = signing.loads(
-                session_cookie, salt="django.contrib.sessions.backends.signed_cookies"
-            )
-        except Exception as e:
-            return None, None, f"Error: Session not found. Please login. {e}"
-
-        # Check if the user is authenticated (Django stores '_auth_user_id' in the session)
-        if not session_data.get("_auth_user_id"):
-            login_url = settings.LOGIN_URL if hasattr(settings, "LOGIN_URL") else "/login/"
-            return None, None, f"Error: User not logged in. Please <a href='{login_url}'>login</a>."
-
-        logger.info(f"Looking up turn {turn_uuid}")
         turn = get_object_or_404(Turn, uuid=turn_uuid)
-
-        return turn, session_data, None
+        return turn, None
 
     def initialize_chat(request: gr.Request):
 
-        turn, session_data, error = verify_gradio_chat_token(request)
+        turn, error = verify_gradio_chat_token(request)
         if error:
-            raise SuspiciousOperation(error)
+            raise Exception(error)
 
         turns = conversation_history(turn)
 
