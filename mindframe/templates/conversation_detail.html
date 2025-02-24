@@ -169,10 +169,11 @@
     {% endif %}
 
     <div class="col">
+
     <div class="row mb-5">
 
 
-        <div class="col-10 mb-5 pr-5">
+        <div class="col-10 mb-2 pr-2">
 
             <span class="mb-2 badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source|capfirst}}{% if turn.step %}:
                 <a class="text-decoration-none" href="{% url 'admin:mindframe_step_change' turn.step.id %}">
@@ -190,55 +191,44 @@
             {{turn.text}}
         </div>
 
-
-
-        <br>
-
-        <div class="row">
-            <div class="col-6">
-                {% if turn.notes.all %}
-                <h6>Judgements/Notes</h6>
-                {% endif %}
-                {% for n in turn.notes.all %}
-                <code>{{n.judgement.variable_name}}</code><pre>{{n.data}}</pre>
-                {% if not forloop.last %}<hr>{% endif %}
-                {% endfor %}
-            </div>
-            <div class="col-6">
-                {% if turn.metadata.items %}
-                <h6>Thinking</h6>
-                {% endif %}
-                {% for k, v in turn.metadata.items %}
-                {% if k != "response" and  k != "RESPONSE_" %}
-                <code>{{k}}</code>
-                <pre>{{v}}</pre>
-                {% endif %}
-            {% endfor %}
-
-            </div>
-
         </div>
 
-
-
-        </div>
-
-        <!-- align text right -->
-        <div class="col-2 text">
-
+        <div class="col-2">
 
                 <a class='btn btn-xs btn-outline-danger mb-0'
-                href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch"> Branch </a>
+                href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch"> Make branch </a>
 
                 <a class='btn btn-xs btn-outline-primary'
                 href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=gradio">
-                    Continue from here ({{turn.uuid|slice:3}}) ⤷</a>
+                    Chat from #{{turn.uuid|slice:3}}</a>
 
             </a>
-
-
         </div>
-    <hr>
+    </div>
+
+
+    <div class="row">
+        <div class="col-6">
+            {% if turn.notes.all %}
+            <h6>Judgements/Notes</h6>
+            {% endif %}
+            {% for n in turn.notes.all %}
+            <code>{{n.judgement.variable_name}}</code><pre>{{n.data}}</pre>
+            {% if not forloop.last %}<hr>{% endif %}
+            {% endfor %}
+        </div>
+        <div class="col-6">
+            {% if turn.metadata.items %}
+            <h6>Thinking</h6>
+            {% endif %}
+            {% for k, v in turn.metadata.items %}
+            {% if k != "response" and  k != "RESPONSE_" %}
+            <code>{{k}}</code>
+            <pre>{{v}}</pre>
+            {% endif %}
+        {% endfor %}
+        </div>
+    </div>
 
     {% endfor %}
 </div>

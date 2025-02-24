@@ -6,6 +6,7 @@ import traceback
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 import logging
+from django.shortcuts import get_object_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ def main():
     django.setup()
 
     from mindframe.models import Conversation, RoleChoices, Turn
+    from mindframe.conversation import listen, respond
     from mindframe.tree import conversation_history
     from django.conf import settings
     from django.urls import reverse
@@ -23,7 +25,6 @@ def main():
     from django.core.exceptions import SuspiciousOperation
     from django.contrib.sessions.models import Session
     from django.shortcuts import get_object_or_404
-    from mindframe.models import Turn
 
     def verify_gradio_chat_token(request: gr.Request):
         """
@@ -48,7 +49,6 @@ def main():
         return turn, None
 
     def initialize_chat(request: gr.Request):
-
         turn, error = verify_gradio_chat_token(request)
         if error:
             raise Exception(error)
@@ -56,7 +56,6 @@ def main():
         turns = conversation_history(turn)
 
         history = []
-        log_history = ["#### Bot's thoughts:\n\n"]
 
         for turn in turns:
             role = "assistant" if turn.speaker.role == RoleChoices.THERAPIST else "user"
@@ -79,21 +78,19 @@ def main():
                 turn.uuid,
             ],
         )
-        conversation_link_html = (
-            f'<a href="{conversation_detail_url}" target="_self">View Conversation Detail</a>'
-        )
+        conversation_link_html = f'<a href="{conversation_detail_url}" target="_self">View Conversation Detail {turn.uuid[:4]}</a>'
         conversation_link_md = gr.HTML(conversation_link_html)
 
-        formatted_log_history = "\n".join(log_history) if log_history else ""
-        # outputs=[chatbot, conversation_id_box, conversation_link_md, log_window],
-        return history, turn.uuid, conversation_link_md, formatted_log_history
+        return history, turn.uuid, conversation_link_md
 
-    def chat_with_bot(turn_id, history, user_input, current_log):
-        from mindframe.conversation import listen, respond
+    def chat_with_bot(turn_id, history, user_input):
+        logger.info(f"loading {turn_id}")
 
-        turn = Turn.objects.get(uuid=turn_id)
+        # Ensure turn_id exists
+        turn = get_object_or_404(Turn, uuid=turn_id)
 
         hist = conversation_history(turn)
+
         lastclientturn = hist.filter(speaker__role=RoleChoices.CLIENT).last()
         if lastclientturn:
             user = lastclientturn.speaker
@@ -103,15 +100,9 @@ def main():
         client_turn = listen(hist.last(), speaker=user, text=user_input)
         bot_turn = respond(client_turn)
 
-        utterance = bot_turn.text
-        thoughts = bot_turn.notes_data() or "---"
+        history.append((user_input, bot_turn.text))
 
-        history.append((user_input, utterance))
-
-        new_log_entry = f"{thoughts}\n\n---"
-        updated_log = f"{current_log}\n\n{new_log_entry}" if current_log else new_log_entry
-
-        return history, "", updated_log
+        return bot_turn.uuid, history, ""
 
     # Custom CSS for the markdown window
     custom_css = """
@@ -131,38 +122,50 @@ def main():
         conversation_link_md = gr.HTML()
 
         with gr.Row(equal_height=True):
-            with gr.Column(scale=2):
+            with gr.Column():
                 chatbot = gr.Chatbot()
                 user_input = gr.Textbox(show_label=False, placeholder="Type your message here...")
 
-            with gr.Column(scale=1):
-                log_window = gr.Markdown(
-                    label="Bot's Thoughts", elem_classes=["markdown-window"], visible=False
-                )
-
-        conversation_id_box = gr.Textbox(visible=False)
+        turn_id_box = gr.Textbox(visible=False)
 
         iface.load(
             initialize_chat,
             inputs=None,
-            outputs=[chatbot, conversation_id_box, conversation_link_md, log_window],
+            outputs=[chatbot, turn_id_box, conversation_link_md],
         )
 
-        def handle_input(turn_id, history, text_input, current_log):
+        def handle_input(turn_id, history, text_input):
             try:
                 if text_input.strip():
-                    return chat_with_bot(turn_id, history, text_input, current_log)
+                    new_turn_id, history, new_log = chat_with_bot(turn_id, history, text_input)
+
+                    # Update conversation link dynamically
+                    conversation_detail_url = settings.WEB_URL + reverse(
+                        "conversation_detail_to_leaf",
+                        args=[new_turn_id],
+                    )
+                    conversation_link_html = (
+                        f'<a href="{conversation_detail_url}" target="_self">'
+                        f"View Conversation Detail {new_turn_id[:4]}</a>"
+                    )
+                    conversation_link_md = gr.HTML(conversation_link_html)
+
+                    return new_turn_id, history, new_log, conversation_link_md
                 else:
-                    return history, text_input, current_log
+                    return turn_id, history, "---", gr.HTML.update()
+
             except Exception as e:
                 logger.error(f"Error handling input: {e}")
                 history.append(("", str(e)))
                 history.append(("", str(traceback.format_exc())))
                 logger.error(str(traceback.format_exc()))
-                return history, text_input, current_log
+                conversation_link_html = f'<a href="{settings.WEB_URL + reverse("conversation_detail_to_leaf", args=[turn_id])}" target="_self">View Conversation Detail {turn_id[:4]}</a>'
+                conversation_link_md = gr.HTML.update(value=conversation_link_html)
 
-        inputs = [conversation_id_box, chatbot, user_input, log_window]
-        outputs = [chatbot, user_input, log_window]
+                return turn_id, history, text_input, conversation_link_md
+
+        inputs = [turn_id_box, chatbot, user_input]
+        outputs = [turn_id_box, chatbot, user_input, conversation_link_md]
 
         user_input.submit(handle_input, inputs, outputs)
 
