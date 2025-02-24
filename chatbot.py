@@ -149,18 +149,18 @@ def main():
                         f"View Conversation Detail {new_turn_id[:4]}</a>"
                     )
                     conversation_link_md = gr.HTML(conversation_link_html)
-
                     return new_turn_id, history, new_log, conversation_link_md
                 else:
-                    return turn_id, history, "---", gr.HTML.update()
+                    return turn_id, history, "---", gr.HTML("ERROR")
 
             except Exception as e:
                 logger.error(f"Error handling input: {e}")
                 history.append(("", str(e)))
                 history.append(("", str(traceback.format_exc())))
                 logger.error(str(traceback.format_exc()))
+
                 conversation_link_html = f'<a href="{settings.WEB_URL + reverse("conversation_detail_to_leaf", args=[turn_id])}" target="_self">View Conversation Detail {turn_id[:4]}</a>'
-                conversation_link_md = gr.HTML.update(value=conversation_link_html)
+                conversation_link_md = gr.HTML(conversation_link_html)  # FIXED
 
                 return turn_id, history, text_input, conversation_link_md
 
