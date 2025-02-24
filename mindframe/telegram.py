@@ -22,7 +22,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from telegram import Update, Bot
-from mindframe.models import Conversation, Intervention, RoleChoices, Turn, CustomUser
+from mindframe.models import Conversation, Intervention, Step, Turn, CustomUser
 from mindframe.settings import TurnTextSourceTypes
 from mindframe.conversation import listen, respond
 import requests
@@ -145,6 +145,7 @@ def handle_new(message, conversation, request=None):
         # Archive old conversation and notify user
         conversation.archived = True
         conversation.save()
+
         send_telegram_message(
             message.chat.id,
             f"Selected the {intervention} intervention.\n"
@@ -153,6 +154,15 @@ def handle_new(message, conversation, request=None):
 
         # Return the newly created conversation
         new_conversation, is_new = get_conversation(message)
+        stp = intervention.steps.all().first()
+
+        if not stp and stp.opening_line:
+            logger.warning(f"No opening line set for {stp}")
+
+        send_telegram_message(
+            message.chat.id, stp.opening_line or "Hello! How are you doing today?"
+        )
+
         return JsonResponse({"status": "ok"}, status=200), new_conversation
 
     except Exception:
@@ -187,7 +197,9 @@ def start_new_conversation(intervention, conversation, chat_id):
         step=first_step,
     )
 
-    send_telegram_message(chat_id, f"Creating a new conversation using {intervention}")
+    send_telegram_message(chat_id, f"Creating a new conversation using {intervention}.")
+    send_telegram_message(chat_id, first_step.opening_line)
+
     return bot_turn
 
 

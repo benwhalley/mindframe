@@ -46,8 +46,12 @@ docker-compose run web sh -c \
     --username=$(whoami) \
     --email=test@example.com"
 
+# register telegram webhooks if using
+docker compose run web ./manage.py register_telegram_webhook
+
 # run the site
 docker-compose up --build web chat worker
+
 # open http://127.0.0.1:8080
 
 
@@ -72,6 +76,8 @@ git reset
 docker-compose build base
 
 docker-compose up --build -d web chat worker
+docker-compose logs -f web chat worker
+
 
 
 
