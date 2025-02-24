@@ -19,6 +19,10 @@ ALLOWED_HOSTS = config(
     cast=Csv(),
 )
 
+SESSION_COOKIE_DOMAIN = ".mindframe.llemma.net"  # Notice the leading dot
+# SESSION_COOKIE_SECURE = True  # Ensure HTTPS is used
+SESSION_COOKIE_SAMESITE = "None"  # Required for cross-subdomain access in some cases
+
 CSRF_TRUSTED_ORIGINS = config(
     "CSRF_TRUSTED_ORIGINS",
     default="https://*.llemma.net,http://localhost,http://127.0.0.1",
