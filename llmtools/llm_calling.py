@@ -300,14 +300,12 @@ def chatter(multipart_prompt, model, context={}):
             # Build the prompt for this completion from the parts within this segment.
             try:
                 segment_prompt = "\n\n--\n\n".join(filter(bool, prompt_parts))
-            except Exception:
-                import pdb
-
-                pdb.set_trace()
+            except Exception as e:
+                logger.error(f"Error building segment prompt: {prompt_parts}\n{e}")
 
             # Merge the provided context with the accumulated completions
             # so that any template variable like {{JOKE}} gets replaced.
-            merged_context = context.copy()
+            merged_context = context and context.copy() or {}
             merged_context.update(accumulated_context)
 
             # Render the prompt template.
