@@ -5,9 +5,15 @@ services:
   web:
     env_file:
       - ~/.secrets/test.mindframe.llemma.net.env
+    labels:
+      caddy: "test.mindframe.llemma.net"
+      caddy.reverse_proxy: "{{upstreams 8000}}"
   chat:
     env_file:
       - ~/.secrets/test.mindframe.llemma.net.env
+    labels:
+      caddy: "bot.test.mindframe.llemma.net"
+      caddy.reverse_proxy: "{{upstreams 8000}}"
   worker:
     env_file:
       - ~/.secrets/test.mindframe.llemma.net.env

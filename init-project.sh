@@ -69,6 +69,8 @@ git reset
     -f compose/constraints.yml \
     -f compose/staging.yml \
     config) > docker-compose.yml
+docker-compose build base
+
 
 
 
