@@ -14,6 +14,7 @@ docker network create backend
 # FOR DEVELOPMENT
 
 (echo "# \! AUTO GENERATED FILE DO NOT EDIT"; \
+    CONTAINER_NAME_PREFIX=dev-mindframe \
     WEB_PORT=8080 \
     CHAT_PORT=8081 \
     BASE_IMAGE_NAME="mindframe:dev" \
@@ -23,25 +24,7 @@ docker network create backend
     -f compose/mindframe.yml \
     -f compose/development.yml \
     -f compose/constraints.yml \
-    -p mf \
     config) > docker-compose.yml
-
-
-# LIVE/PRODUCTION
-
-(echo "# \! AUTO GENERATED FILE DO NOT EDIT"; \
-    WEB_PORT=8080 \
-    CHAT_PORT=8081 \
-    BASE_IMAGE_NAME="mindframe:production" \
-    docker-compose \
-    -f compose/networks.yml \
-    -f compose/services.yml \
-    -f compose/mindframe.yml \
-    -f compose/live.yml \
-    -f compose/constraints.yml \
-    -p mflive \
-    config) > docker-compose.yml
-
 
 
 # BUILD AND START THE PROJECT
@@ -71,4 +54,22 @@ docker-compose up --build web chat worker
 
 
 
-# DEVLOPMENT WORKFLOW
+# STAGING
+cd ~/dev/mindframe-staging
+git reset
+(echo "# \! AUTO GENERATED FILE DO NOT EDIT"; \
+    CONTAINER_NAME_PREFIX=staging-mindframe \
+    WEB_PORT=9080 \
+    CHAT_PORT=9081 \
+    BASE_IMAGE_NAME="mindframe:staging" \
+    docker-compose \
+    -f compose/networks.yml \
+    -f compose/services.yml \
+    -f compose/mindframe.yml \
+    -f compose/constraints.yml \
+    -f compose/staging.yml \
+    config) > docker-compose.yml
+
+
+
+# LIVE/PRODUCTION

@@ -12,7 +12,7 @@ services:
       - backend
 
   web:
-    container_name: mindframe-web
+    container_name: "${CONTAINER_NAME_PREFIX:-}web"
     restart: unless-stopped
     labels:
       caddy: "web.mindframe.llemma.net"
@@ -31,7 +31,7 @@ services:
       ]
 
   chat:
-    container_name: mindframe-chat
+    container_name: "${CONTAINER_NAME_PREFIX:-}chat"
     restart: unless-stopped
     labels:
       caddy: "bot.mindframe.llemma.net"
@@ -51,7 +51,7 @@ services:
 
   worker:
     user: "1000:1000" # celery can't run as root
-    container_name: mindframe-worker
+    container_name: "${CONTAINER_NAME_PREFIX:-mindframe}-worker"
     restart: unless-stopped
     image: "${BASE_IMAGE_NAME:-mindframe:production}"
     networks:
@@ -62,4 +62,3 @@ services:
         "-c",
         "celery --app mindframe worker --pool=solo --loglevel=debug"
       ]
-
