@@ -259,19 +259,17 @@ def chatter(multipart_prompt, model, context={}):
     """
     Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next.
 
-    If the prompt contains a segment break (by default, any occurrence of "|||===..."
-    i.e. three or more "=" following "|||"), the prompt is split into segments.
-    Each segment is processed separately. For segments after the break, previous
-    completions are not automatically appended to the prompt text; however, any
-    desired value from a previous segment can be injected via the template's
-    double-curly syntax (e.g. {{VAR}}).
+    If the prompt contains a segment break (by default, any occurrence of "¡OBLIVIATE"
+    i.e. inverted exclamation mark + the word "OBLIVIATE", then the prompt is split into segments.
+    Each segment is processed separately. For segments after the spell, previous
+    completions are NOT automatically included in the prompt text as they normally would be; however, any desired value from a previous segment can be injected via the template's double-curly syntax (e.g. {{VAR}}).
 
     The completions from earlier segments are accumulated into a context dictionary,
     making them available for explicit use in later segments.
     """
     # Define a regex to split the prompt into segments.
     # e.g. |||=== or ||| ===
-    SEGMENT_SPLIT_RE = re.compile(r"\|\|\|\s*={3,}\s*")
+    SEGMENT_SPLIT_RE = re.compile(r"¡OBLIVIATE\s*")
 
     logger.warning("ENTIRE PROMPT\n\n")
     logger.warning(multipart_prompt + "\n\n\n")
@@ -371,7 +369,7 @@ if False:
     from mindframe.models import LLM
     from llmtools.llm_calling import chatter, parse_prompt
 
-    mini = LLM.objects.filter(provider_name="AZURE", model_name="gpt-4o-mini").first()
+    mini = LLM.objects.filter(model_name="gpt-4o-mini").first()
 
     t4 = chatter(
         """
@@ -417,7 +415,8 @@ if False:
 
     |||===
 
-    tell me if the {{JOKE}} is funny
+    tell me if this joke is funny
+    {{JOKE}}
     [[JOKE_EVALUATION]]
     """
 
