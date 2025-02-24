@@ -74,8 +74,8 @@ git reset
     -f compose/staging.yml \
     config) > docker-compose.yml
 docker-compose build base
-
 docker-compose up --build -d web chat worker
+docker-compose run web ./manage.py register_telegram_webhook
 docker-compose logs -f web chat worker
 
 

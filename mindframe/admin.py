@@ -155,7 +155,7 @@ class ConversationAdmin(admin.ModelAdmin):
     save_on_top = True
     list_filter = (IsSyntheticFilter, "archived")
     inlines = [TurnInline]
-    list_display = ["__str__", "summary", "speakers", "active", "n_turns", "intervention"]
+    list_display = ["__str__", "summary", "speakers", "active", "n_turns", "intervention", "uuid"]
 
     def n_turns(self, obj):
         return obj.turns.count()

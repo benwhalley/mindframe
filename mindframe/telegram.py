@@ -89,7 +89,7 @@ def get_or_create_telegram_user(message) -> CustomUser:
 def handle_help(message, conversation=None, request=None):
     """
     Reply with a summary of available bot commands.
-    Returns (JsonResponse, conversation) so the caller can decide how to proceed.
+    Returns (JsonResponse, message) so the caller can decide how to proceed.
     """
     logger.info("Handling /help command.")
     send_telegram_message(
@@ -99,7 +99,7 @@ def handle_help(message, conversation=None, request=None):
         "/help - show this message\n"
         "/settings - show settings",
     )
-    return JsonResponse({"status": "ok"}, status=200), conversation
+    return JsonResponse({"status": "ok"}, status=200), None
 
 
 def handle_web(message, conversation=None, request=None):
@@ -112,7 +112,7 @@ def handle_web(message, conversation=None, request=None):
             reverse("conversation_detail", args=[conversation.turns.all().last().uuid])
         )
         send_telegram_message(message.chat.id, f"[{url}]({url})")
-        return JsonResponse({"status": "ok"}, status=200), conversation
+        return JsonResponse({"status": "ok"}, status=200), None
     except Exception as e:
         raise e
 
@@ -124,7 +124,7 @@ def handle_settings(message, conversation=None, request=None):
     """
     logger.info("Handling /settings command.")
     send_telegram_message(message.chat.id, "No settings available")
-    return JsonResponse({"status": "ok"}, status=200), conversation
+    return JsonResponse({"status": "ok"}, status=200), None
 
 
 def handle_new(message, conversation, request=None):
@@ -144,23 +144,20 @@ def handle_new(message, conversation, request=None):
 
         # Archive old conversation and notify user
         conversation.archived = True
-        conversation.save()
-
+        conversation.save(update_fields=["archived"])  # Ensures DB commit
         send_telegram_message(
             message.chat.id,
-            f"Selected the {intervention} intervention.\n"
             "Starting a new conversation (forgetting everything we talked about so far).",
         )
+        logger.info(f"conv id {conversation.uuid}")
+        del conversation
 
-        # Return the newly created conversation
         new_conversation, is_new = get_conversation(message)
-        telegram_user = get_or_create_telegram_user(message)
+        start_new_conversation(intervention, new_conversation, message.chat.id)
 
-        continue_conversation(message, telegram_user, new_conversation, intervention)
+        return JsonResponse({"status": "ok"}, status=200), None
 
-        return JsonResponse({"status": "ok"}, status=200), new_conversation
-
-    except Exception:
+    except Exception as e:
         logger.error(traceback.format_exc())
         available = ", ".join(Intervention.objects.all().values_list("slug", flat=True))
         send_telegram_message(
@@ -169,7 +166,7 @@ def handle_new(message, conversation, request=None):
             f"(Available interventions: {available})",
         )
         # Return a JsonResponse and the old conversation
-        return JsonResponse({"status": "ok"}, status=200), conversation
+        return None, None
 
 
 def start_new_conversation(intervention, conversation, chat_id):
@@ -272,16 +269,12 @@ def process_message(message, request=None):
 
         # Dispatch command if recognised
         if potential_cmd in commands_map:
-            response, updated_conversation = commands_map[potential_cmd](
-                message, conversation, request
-            )
+            response, message = commands_map[potential_cmd](message, conversation, request)
             if response is not None:
                 # If the command returned a response, return it now
                 return response
-
-            # The command might have updated the conversation (like /new did)
-            if updated_conversation is not None:
-                conversation = updated_conversation
+            if message is not None:
+                send_telegram_message(message.chat.id, message)
 
         # If conversation is brand-new or newly replaced, start anew
         if is_new_conv or conversation.turns.count() == 0:
