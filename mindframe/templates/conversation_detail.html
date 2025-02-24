@@ -231,12 +231,8 @@
                 href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch"> Branch </a>
 
                 <a class='btn btn-xs btn-outline-primary'
-                     href="{{leaf_node.gradio_url}}">
-                    Continue ⤷</a>
-
-
-
-
+                href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=gradio">
+                    Continue from here ({{turn.uuid|slice:3}}) ⤷</a>
 
             </a>
 

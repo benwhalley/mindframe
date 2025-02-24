@@ -1,7 +1,7 @@
 from django.urls import path
 
 
-from mindframe.views.general import create_public_session, IndexView
+from mindframe.views.general import start_gradio_chat, IndexView
 
 from mindframe.views.hyde import (
     RAGHyDEComparisonView,
@@ -18,24 +18,29 @@ urlpatterns = [
     path("telegram-webhook/", telegram_webhook, name="telegram_webhook"),
     # Other URLs
     path(
+        "start/from-turn/<str:turn_uuid>/",
+        start_gradio_chat,
+        name="start_gradio_chat_from_turn",
+    ),
+    path(
         "start/<str:intervention_slug>/",
-        create_public_session,
-        name="public_start_session",
+        start_gradio_chat,
+        name="start_gradio_chat",
     ),
     path(
         "import/fake/",
         ImportConversationView.as_view(),
         name="import_conversation",
     ),
-    # path(
-    #     "fake/conversation/<int:pk>/",
-    #     SyntheticConversationDetailView.as_view(),
-    #     name="synthetic_conversation_detail",
-    # ),
     path(
         "conversations/<str:uuid>/",
         ConversationDetailView.as_view(),
         name="conversation_detail",
+    ),
+    path(
+        "conversations/<str:uuid>/",
+        ConversationDetailView.as_view(to_leaf=True),
+        name="conversation_detail_to_leaf",
     ),
     path(
         "conversation/mermaid/<str:uuid>/",

@@ -1,75 +1,132 @@
 import sys
 import os
-import django
 import gradio as gr
-from django.urls import reverse
-from django.conf import settings
-import logging
 import traceback
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+
+import logging
 
 logger = logging.getLogger(__name__)
 
 
 def main():
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+    import django
+
     django.setup()
 
     from mindframe.models import Conversation, RoleChoices, Turn
     from mindframe.tree import conversation_history
+    from django.conf import settings
+    from django.urls import reverse
+    from django.core import signing
+    from django.core.exceptions import SuspiciousOperation
+    from django.contrib.sessions.models import Session
+    from django.shortcuts import get_object_or_404
+    from mindframe.models import Turn
 
-    def get_history(turn):
-        tip_ = turn.get_descendants().last()
-        leaf_turn = tip_ or turn
-        turns = conversation_history(leaf_turn)
-        return turns
+    def verify_gradio_chat_token(request: gr.Request):
+        """
+        Verifies the signed token produced by mindframe.views.general.start_gradio_chat.
+        Expects the token to include both 'session_key' and 'turn_uuid'.
+        Returns (turn, session_data, None) on success, or (None, None, error_message) on failure.
+        """
+
+        token = request.query_params.get("token")
+        if not token:
+            return None, None, "Error: No token provided."
+
+        try:
+            # Unsigned token returns a dictionary with 'session_key' and 'turn_uuid'.
+            data = signing.loads(token, salt="gradio-chatbot-auth")
+            token_session_key = data.get("session_key")
+            turn_uuid = data.get("turn_uuid")
+            if not token_session_key or not turn_uuid:
+                return None, "Error: Invalid token data."
+        except signing.BadSignature:
+            return None, None, "Error: Invalid token."
+
+        # Retrieve the session cookie from the request.
+        session_cookie = request.cookies.get(settings.SESSION_COOKIE_NAME)
+        if not session_cookie:
+            return None, None, "Error: No session cookie found. Please login."
+
+        # Ensure that the session cookie matches the session key stored in the token.
+        if session_cookie != token_session_key:
+            return None, None, "Error: Session mismatch. Please login again."
+
+        logger.info(f"Session cookie: {session_cookie}")
+
+        try:
+            session_data = signing.loads(
+                session_cookie, salt="django.contrib.sessions.backends.signed_cookies"
+            )
+        except Exception as e:
+            return None, None, f"Error: Session not found. Please login. {e}"
+
+        # Check if the user is authenticated (Django stores '_auth_user_id' in the session)
+        if not session_data.get("_auth_user_id"):
+            login_url = settings.LOGIN_URL if hasattr(settings, "LOGIN_URL") else "/login/"
+            return None, None, f"Error: User not logged in. Please <a href='{login_url}'>login</a>."
+
+        logger.info(f"Looking up turn {turn_uuid}")
+        turn = get_object_or_404(Turn, uuid=turn_uuid)
+
+        return turn, session_data, None
 
     def initialize_chat(request: gr.Request):
-        turn_id = request.query_params.get("turn_id")
-        turn = Turn.objects.get(uuid=turn_id)
 
-        conversation = turn.conversation
+        turn, session_data, error = verify_gradio_chat_token(request)
+        if error:
+            raise SuspiciousOperation(error)
+
+        turns = conversation_history(turn)
 
         history = []
         log_history = ["#### Bot's thoughts:\n\n"]
 
-        turns = get_history(turn)
-
         for turn in turns:
             role = "assistant" if turn.speaker.role == RoleChoices.THERAPIST else "user"
-            if turn.text and len(turn.text.strip()) > 0:
+            txt = turn.text and turn.text.strip() or None
+            logger.info("here!!")
+            logger.info(txt)
+            txt = f"{turn.uuid[:3]}{txt}"
+            if txt and len(txt) > 0:
                 if role == "user":
-                    history.append((turn.text, ""))
+                    history.append((turn.text, None))
                 else:
-                    history.append(("", turn.text))
+                    history.append((None, turn.text))
 
         if turns.count() == 0:
             history.append(("", "Error: No turns found in conversation"))
 
         conversation_detail_url = settings.WEB_URL + reverse(
-            "conversation_detail",
+            "conversation_detail_to_leaf",
             args=[
                 turn.uuid,
             ],
         )
-
         conversation_link_html = (
             f'<a href="{conversation_detail_url}" target="_self">View Conversation Detail</a>'
         )
         conversation_link_md = gr.HTML(conversation_link_html)
 
         formatted_log_history = "\n".join(log_history) if log_history else ""
-        return history, turn_id, conversation_link_md, formatted_log_history
+        # outputs=[chatbot, conversation_id_box, conversation_link_md, log_window],
+        return history, turn.uuid, conversation_link_md, formatted_log_history
 
     def chat_with_bot(turn_id, history, user_input, current_log):
         from mindframe.conversation import listen, respond
 
         turn = Turn.objects.get(uuid=turn_id)
 
-        hist = get_history(turn)
-        # TODO: check assumption that
-        # the user is the last client user to have spoken
+        hist = conversation_history(turn)
         lastclientturn = hist.filter(speaker__role=RoleChoices.CLIENT).last()
-        user = lastclientturn.speaker
+        if lastclientturn:
+            user = lastclientturn.speaker
+        else:
+            user = turn.speaker
+
         client_turn = listen(hist.last(), speaker=user, text=user_input)
         bot_turn = respond(client_turn)
 

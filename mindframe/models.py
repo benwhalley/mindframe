@@ -398,6 +398,9 @@ class Note(models.Model):
     # todo? add some validatio?
     data = models.JSONField(default=dict, null=True, blank=True)
 
+    class Meta:
+        ordering = ["timestamp"]
+
     def val(self):
         return Box(self.data, default_box=True)
 
@@ -735,8 +738,10 @@ class Turn(NS_Node):
         choices=BranchReasons.choices, max_length=25, default=BranchReasons.MAIN
     )
 
-    def gradio_url(self):
-        return settings.CHAT_URL + f"?turn_id={self.uuid}"
+    def gradio_url(self, request):
+        from mindframe.views.general import start_gradio_chat
+
+        return start_gradio_chat(request, turn_uuid=self.uuid).url
 
     branch_author = models.ForeignKey(
         CustomUser,

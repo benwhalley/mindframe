@@ -1,15 +1,21 @@
 volumes:
-  postgres_data: {}
+  postgres_data:
+    external: true
 
 services:
   redis:
+    container_name: redis
+    networks:
+      - backend
     image: redis:alpine
     ports: ["6379:6379"]
 
   postgres:
+    container_name: postgres
+    networks:
+      - backend
     image: pgvector/pgvector:pg17
     ports: ["5432:5432"]
-    env_file: [secrets.env]
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./create-database.sh:/usr/bin/create-database.sh

@@ -3,3 +3,4 @@ pandoc
 postgresql-client
 curl
 nano
+curl

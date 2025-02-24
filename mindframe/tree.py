@@ -9,12 +9,19 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 
-def conversation_history(node):
+def conversation_history(node, to_leaf=False):
     """
     Get the conversation history as an iterable of turns, starting from
-    the end point
+    the end point.
+
+    If to_leaf is True, then it also includes turns from the current
+    node to the default leaf from there.
     """
     from mindframe.models import Turn
+
+    if to_leaf:
+        # find the leaf node first, then show history back to that point
+        node = list(iter_conversation_path(node, direction="down"))[-1]
 
     turns = reversed(list(iter_conversation_path(node, direction="up")))
     return get_ordered_queryset(Turn, [i.pk for i in turns])

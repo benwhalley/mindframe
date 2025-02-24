@@ -1,0 +1,16 @@
+services:
+  web:
+    mem_limit: 500m
+    restart: unless-stopped
+  chat:
+    mem_limit: 500m
+    restart: unless-stopped
+  worker:
+    mem_limit: 500m
+    restart: unless-stopped
+  postgres:
+    mem_limit: 500m
+    restart: unless-stopped
+  redis:
+    mem_limit: 500m
+    restart: unless-stopped

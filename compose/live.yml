@@ -1,0 +1,13 @@
+services:
+  postgres:
+    env_file:
+      - ~/.secrets/mindframe.llemma.net.env
+  web:
+    env_file:
+      - ~/.secrets/mindframe.llemma.net.env
+  chat:
+    env_file:
+      - ~/.secrets/mindframe.llemma.net.env
+  worker:
+    env_file:
+      - ~/.secrets/mindframe.llemma.net.env

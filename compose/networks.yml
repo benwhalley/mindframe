@@ -1,0 +1,5 @@
+networks:
+  caddy:
+    external: true
+  backend:
+    external: true

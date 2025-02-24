@@ -1,65 +1,43 @@
 services:
-  base:
-    build:
-      context: ../
-      dockerfile: Dockerfile
-      args:
-        MINDFRAME_COMMIT: main
-    image: mindframe-base:latest
-
+  postgres:
+    env_file:
+      - ~/.secrets/mindframe.dev.env
   web:
+    env_file:
+      - ~/.secrets/mindframe.dev.env
     ports:
-      - "8080:8000"
-    image: mindframe-base:latest
+      - "${WEB_PORT:-8080}:8000"
     command:
       [
         "sh",
         "-c",
-        "uvicorn config.asgi:application --workers 1 --host 0.0.0.0 --port 8000 --log-level debug --reload"
+        "watchmedo auto-restart --directory=/app --pattern=*.py --recursive --  uv run ./manage.py runserver_plus 0.0.0.0:8000"
       ]
-    depends_on:
-      - redis
-      - postgres
-    env_file: [secrets.env]
-    environment:
-      - APP_MODE=web
     volumes:
-      - ~/dev/mindframe/mindframe:/app/mindframe:rw,rslave
-      - ~/dev/mindframe/llmtools:/app/llmtools:rw,rslave
-      - ~/dev/mindframe/config:/app/config:rw,rslave
+      - ~/dev/mindframe:/app:rw
+
   chat:
-    depends_on:
-      - redis
-      - postgres
-    image: mindframe-base:latest
-    ports: ["8081:8000"]
+    env_file:
+      - ~/.secrets/mindframe.dev.env
+    ports:
+      - "${CHAT_PORT:-8081}:8000"
     command:
       [
         "sh",
         "-c",
-        "watchmedo auto-restart --directory=/app --pattern=*.py --recursive -- python chatbot.py"
+        "watchmedo auto-restart --directory=/app --pattern=*.py --recursive -- uv run chatbot.py"
       ]
-    env_file: [secrets.env]
-    environment:
-      - APP_MODE=chat
-    restart: unless-stopped
     volumes:
-      - ~/dev/mindframe/mindframe:/app/mindframe:rw,rslave
-      - ~/dev/mindframe/llmtools:/app/llmtools:rw,rslave
-      - ~/dev/mindframe/config:/app/config:rw,rslave
-      - ~/dev/mindframe/mindframe/chatbot.py:/app/chatbot.py:rw,rslave
+      - ~/dev/mindframe:/app:rw
+
   worker:
-    image: mindframe-base:latest
+    env_file:
+      - ~/.secrets/mindframe.dev.env
     command:
       [
         "sh",
         "-c",
-        "watchmedo auto-restart --directory=/app --pattern=*.py --recursive -- celery --app mindframe worker --pool=solo --loglevel=debug"
+        "watchmedo auto-restart --directory=/app --pattern=*.py --recursive -- uv run celery --app mindframe worker --pool=solo --loglevel=debug"
       ]
-    env_file: [secrets.env]
-    environment:
-      - APP_MODE=worker
     volumes:
-      - ~/dev/mindframe/mindframe:/app/mindframe:rw,rslave
-      - ~/dev/mindframe/llmtools:/app/llmtools:rw,rslave
-      - ~/dev/mindframe/config:/app/config:rw,rslave
+      - ~/dev/mindframe:/app:rw

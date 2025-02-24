@@ -2,7 +2,6 @@
 import re
 from django.db import models
 from django.urls import reverse
-from mindframe.models import LLM
 import uuid
 
 
@@ -11,7 +10,7 @@ class Tool(models.Model):
     prompt = models.TextField(
         help_text="Use curly braces for placeholders, e.g.: 'Hello {user_name}, how are you?'"
     )
-    model = models.ForeignKey(LLM, on_delete=models.CASCADE)
+    model = models.ForeignKey("mindframe.LLM", on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name

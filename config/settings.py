@@ -51,12 +51,8 @@ logger.info("DJMAIL_REAL_BACKEND is set to", DJMAIL_REAL_BACKEND)
 langfuse_handler = CallbackHandler()
 # logger.info("Langfuse auth: ", langfuse_handler.auth_check())
 
-AUTH_USER_MODEL = "mindframe.CustomUser"
-
-
 # Build paths inside the project like this: BASE_DIR / "subdir".
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Application definitions
 INSTALLED_APPS = [
@@ -311,3 +307,4 @@ MAGICLINK_EMAIL_SUBJECT = config(
 )
 
 SHELL_PLUS = "ipython"
+AUTH_USER_MODEL = "mindframe.CustomUser"

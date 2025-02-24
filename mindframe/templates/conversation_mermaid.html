@@ -2,15 +2,14 @@
 
 {% block content %}
     <h2>Conversation Tree</h2>
-<!--
-    <p>
-        <a href="{% url 'conversation_detail' conversation.turns.first.uuid %}">
-            Conversation details
-        </a>
-    </p> -->
 
     <!-- Treant.js container -->
-    <div id="tree-container"></div>
+    
+    <div class="row">
+        <div class="col-10">
+            <div id="tree-container"></div>
+        </div>
+    </div>
 
     <!-- Load required scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
@@ -30,27 +29,28 @@
     <style>
         /* Max width and text wrapping for nodes */
         .turn {
-            width: 20em; /* Set max width */
-            text-align: left; /* Center text */
-            margin-left: 9em;
-            white-space: normal; /* Allow wrapping */
-            overflow-wrap: break-word; /* Force wrapping */
+            width: 20em;
+            text-align: left;
+            margin-left: 0; /* Remove excessive left margin */
+            white-space: normal;
+            overflow-wrap: break-word;
             word-wrap: break-word;
             padding: 5px;
             font-size: 12px;
         }
-
-        /* Adjust node container */
+        
         .node {
             display: flex;
-            align-items: center;
-            justify-content: center;
+            align-items: left;
+            justify-content: left;
         }
 
-        #tree-container a { text-decoration: none;}
+        #tree-container a { text-decoration: none; text-align: left;}
 
         .node-title {
             font-weight: bold;
         }
+        
+        
     </style>
 {% endblock %}

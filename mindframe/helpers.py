@@ -1,5 +1,8 @@
 from django.db.models import Case, When
 from box import Box
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_ordered_queryset(model, pk_list):
@@ -31,6 +34,7 @@ def make_data_variable(notes):
     # get all notes for this session and flatten them so that we can access the latest
     # instance of each Judgement/Note by variable name
     vars = set(notes.values_list("judgement__variable_name", flat=True))
+    logger.info(f"Variables to include: {vars}")
     dd = {}
     for i in vars:
         dd.update(getv(notes, i))

@@ -43,11 +43,9 @@ def pick_speaker_for_next_response(turn: Turn):
 
     # return the previous-but-one speaker
     try:
-        hist = iter_conversation_path(turn, direction="up")
-        speakers = [i.speaker for i in hist]
-        unique_speakers = list(OrderedDict.fromkeys(speakers))
-        second_speaker = unique_speakers[1] if len(unique_speakers) > 1 else None
-        return second_speaker
+        hist = conversation_history(turn)
+        prev_speaker = hist.exclude(speaker=turn.speaker).last().speaker
+        return prev_speaker
     except Exception as e:
         logger.error("No speaker found to respond with.")
         logger.error(str(e))
@@ -61,6 +59,7 @@ def transition_permitted(transition, turn) -> bool:
     # Test whether the conditions for a Transition are met at this Turn
 
     ctx_data = speaker_context(turn).get("data")
+    logger.info(f"Checking transition {transition} with context data: {ctx_data}")
     clean_conditions = [cond.strip() for cond in transition.conditions.splitlines() if cond.strip()]
 
     condition_evals = []
@@ -150,7 +149,7 @@ def speaker_context(turn) -> dict:
     # this means we can navigate up the tree to identify context which this speaker
     # would have access to when making their contribution
 
-    history_list = list(iter_conversation_path(turn.get_root(), direction="down"))
+    history_list = conversation_history(turn)
     history = get_ordered_queryset(Turn, [i.pk for i in history_list])
 
     speaker_turns = history.filter(speaker=turn.speaker)
@@ -197,7 +196,8 @@ def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=No
     if not with_intervention_step:
         # get turns made by this speaker and the step they are on
         spkr_history = conversation_history(turn).filter(speaker=as_speaker)
-        speakers_prev_step = spkr_history and list(reversed(list(spkr_history))).pop().step or None
+        speakers_prev_turn = spkr_history.filter(step__isnull=False).last()
+        speakers_prev_step = speakers_prev_turn and speakers_prev_turn.step or None
         if not speakers_prev_step:
             if turn.conversation.synthetic_client:
                 speakers_prev_step = turn.conversation.synthetic_client.steps.all().first()

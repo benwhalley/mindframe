@@ -69,6 +69,7 @@ class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
     slug_field = "uuid"
     slug_url_kwarg = "uuid"
     form_class = AdditionalTurnsForm
+    to_leaf = False
 
     def get_success_url(self):
         return reverse("conversation_detail", kwargs={"uuid": self.object.uuid})
@@ -122,7 +123,8 @@ class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
         context["object"] = self.object.conversation
         # deepest leaf node on this branch
         leaf_node = self.object.get_descendants().order_by("-depth", "-rgt").first() or self.object
-        turns = conversation_history(self.object)
+
+        turns = conversation_history(self.object, to_leaf=self.to_leaf)
 
         context["turns"] = turns.prefetch_related(
             "speaker",
@@ -143,32 +145,34 @@ class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
 
 class ImportConversationForm(forms.Form):
     therapist_first = forms.BooleanField(
-        required=False, initial=True, help_text="Therapist speaks first"
+        required=False,
+        initial=True,
+        help_text="Therapist speaks first. Deselect if the client speaks first.",
     )
     transcript = forms.CharField(
         widget=forms.Textarea(attrs={"rows": 10, "cols": 80}),
         initial="Hi, welcome to the session. Do you have any questions about Mindframe?",
         help_text="Paste conversation transcript, one row per speaker. Splits on line breaks and assumes client/therapist alternate turns.",
     )
-    therapist = forms.ModelChoiceField(
-        required=False,
-        queryset=CustomUser.objects.none(),
-        help_text="Optionally select an existing therapist user",
-    )
+    # therapist = forms.ModelChoiceField(
+    #     required=False,
+    #     queryset=CustomUser.objects.none(),
+    #     help_text="Optionally select an existing therapist user",
+    # )
 
-    client = forms.ModelChoiceField(
-        queryset=CustomUser.objects.none(),
-        required=False,
-        help_text="Optionally select an existing client user",
-    )
+    # client = forms.ModelChoiceField(
+    #     queryset=CustomUser.objects.none(),
+    #     required=False,
+    #     help_text="Optionally select an existing client user",
+    # )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if Intervention.objects.exists():
-            self.fields["therapist"].queryset = CustomUser.objects.filter(role="therapist")
-            self.fields["therapist"].initial = CustomUser.objects.filter(role="therapist").first()
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     if Intervention.objects.exists():
+    #         self.fields["therapist"].queryset = CustomUser.objects.filter(role="therapist")
+    #         self.fields["therapist"].initial = CustomUser.objects.filter(role="therapist").first()
 
-            self.fields["therapist"].queryset = CustomUser.objects.filter(role="client")
+    #         self.fields["therapist"].queryset = CustomUser.objects.filter(role="client")
 
 
 class ImportConversationView(LoginRequiredMixin, FormView):
@@ -178,18 +182,18 @@ class ImportConversationView(LoginRequiredMixin, FormView):
 
     def form_valid(self, form):
         transcript = [i.strip() for i in form.cleaned_data["transcript"].split("\n")]
-        therapist = form.cleaned_data["therapist"]
-        client = form.cleaned_data["client"]
+        # therapist = form.cleaned_data["therapist"]
+        # client = form.cleaned_data["client"]
 
         # Create users if not provided
-        if not therapist:
-            therapist = CustomUser.objects.create(
-                username=f"therapist_{random.randint(1000, 9999)}", role="therapist"
-            )
-        if not client:
-            client = CustomUser.objects.create(
-                username=f"client_{random.randint(1000, 9999)}", role="client"
-            )
+        # if not therapist:
+        therapist = CustomUser.objects.create(
+            username=f"therapist_{random.randint(1000, 9999)}", role="therapist"
+        )
+        # if not client:
+        client = CustomUser.objects.create(
+            username=f"client_{random.randint(1000, 9999)}", role="client"
+        )
 
         conversation = Conversation.objects.create()
         speakers_ = (

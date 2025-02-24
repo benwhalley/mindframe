@@ -1,5 +1,5 @@
+.venv
 .dockerignore
-.env
 .git/
 .pytest_cache/
 __pycache__/

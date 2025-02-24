@@ -13,6 +13,7 @@ from django.urls import reverse
 from django.contrib import admin
 from django.shortcuts import render, redirect
 from django.shortcuts import get_object_or_404
+from django.http import HttpResponseRedirect
 
 import shortuuid
 from django.contrib import admin
@@ -200,7 +201,8 @@ class ConversationAdmin(admin.ModelAdmin):
         # If the user included ?next=some_url, redirect there; otherwise, go to conversation admin.
         next_loc = request.GET.get("next")
         if next_loc == "gradio":
-            return redirect(new_turn.gradio_url())
+            chaturl = new_turn.gradio_url(request)
+            return redirect(chaturl)
         if next_loc == "branch":
             return redirect(reverse("conversation_detail", args=[new_turn.uuid]))
         else:
@@ -370,7 +372,7 @@ class InterventionAdmin(admin.ModelAdmin):
         return obj.ver()
 
     def start_session_button(self, obj):
-        anon_url = reverse("public_start_session", args=[obj.slug])
+        anon_url = reverse("start_gradio_chat", kwargs={"intervention_slug": obj.slug})
         return format_html(f'<a class="button" href="{anon_url}">New Anonymous Session</a> ')
 
     start_session_button.short_description = "Start Session"
@@ -573,12 +575,6 @@ class InterventionAdmin(admin.ModelAdmin):
         obj = self.get_object(request, object_id)
         extra_context.update(
             {
-                "new_session": reverse(
-                    "admin:start_session",
-                    args=[
-                        object_id,
-                    ],
-                ),
                 "diagram": reverse(
                     "admin:mermaid_diagram",
                     args=[
@@ -587,7 +583,7 @@ class InterventionAdmin(admin.ModelAdmin):
                 ),
                 "mermaid": self.mermaid_diagram(obj),
                 "start_new_chat_link": settings.WEB_URL
-                + reverse("public_start_session", args=[obj.slug]),
+                + reverse("start_gradio_chat", kwargs={"intervention_slug": obj.slug}),
             }
         )
 

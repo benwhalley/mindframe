@@ -2,12 +2,14 @@ services:
   base:
     container_name: mindframe-base
     build:
-      context: ../mindframe
-      dockerfile: ../mindframe/Dockerfile.prod
+      context: ../
+      dockerfile: Dockerfile
       args:
         MINDFRAME_COMMIT: main
         BUILDKIT_PROGRESS: plain
-    image: mindframe-prod:latest
+    image: "${BASE_IMAGE_NAME:-mindframe:production}"
+    networks:
+      - backend
 
   web:
     container_name: mindframe-web
@@ -15,28 +17,18 @@ services:
     labels:
       caddy: "web.mindframe.llemma.net"
       caddy.reverse_proxy: "{{upstreams 8000}}"
-    ports: ["8080:8000"]
+    ports:
+      - "${WEB_PORT:-8080}:8000"
     networks:
       - caddy
       - backend
-    image: mindframe-prod:latest
+    image: "${BASE_IMAGE_NAME:-mindframe:production}"
     command:
       [
         "sh",
         "-c",
         "uvicorn config.asgi:application --workers 1 --host 0.0.0.0 --port 8000 --log-level debug"
       ]
-    depends_on:
-      - redis
-      - postgres
-      - chat
-      - worker
-    env_file:
-      - ../secrets/mindframe.env
-    environment:
-      - APP_MODE=web
-    volumes:
-      - ~/dev/mindframe/mindframe:/app/mindframe
 
   chat:
     container_name: mindframe-chat
@@ -44,32 +36,24 @@ services:
     labels:
       caddy: "bot.mindframe.llemma.net"
       caddy.reverse_proxy: "{{upstreams 8000}}"
-    ports: ["8081:8000"]
+    ports:
+      - "${CHAT_PORT:-8081}:8000"
     networks:
       - caddy
       - backend
-    depends_on:
-      - redis
-      - postgres
-    image: mindframe-prod:latest
-
+    image: "${BASE_IMAGE_NAME:-mindframe:production}"
     command:
       [
         "sh",
         "-c",
         "python chatbot.py"
       ]
-    env_file:
-      - ../secrets/mindframe.env
-    environment:
-      - APP_MODE=chat
-    volumes:
-      - ../mindframe/mindframe:/app/mindframe
 
   worker:
+    user: "1000:1000" # celery can't run as root
     container_name: mindframe-worker
     restart: unless-stopped
-    image: mindframe-prod:latest
+    image: "${BASE_IMAGE_NAME:-mindframe:production}"
     networks:
       - backend
     command:
@@ -78,9 +62,4 @@ services:
         "-c",
         "celery --app mindframe worker --pool=solo --loglevel=debug"
       ]
-    env_file:
-      - ../secrets/mindframe.env
-    environment:
-      - APP_MODE=worker
-    volumes:
-      - ~/dev/mindframe/mindframe:/app/mindframe
+
