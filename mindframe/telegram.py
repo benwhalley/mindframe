@@ -154,14 +154,9 @@ def handle_new(message, conversation, request=None):
 
         # Return the newly created conversation
         new_conversation, is_new = get_conversation(message)
-        stp = intervention.steps.all().first()
+        telegram_user = get_or_create_telegram_user(message)
 
-        if not stp and stp.opening_line:
-            logger.warning(f"No opening line set for {stp}")
-
-        send_telegram_message(
-            message.chat.id, stp.opening_line or "Hello! How are you doing today?"
-        )
+        continue_conversation(message, telegram_user, new_conversation, intervention)
 
         return JsonResponse({"status": "ok"}, status=200), new_conversation
 
