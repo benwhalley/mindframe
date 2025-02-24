@@ -79,7 +79,7 @@ def main():
             ],
         )
         conversation_link_html = f'<a href="{conversation_detail_url}" target="_self">View Conversation Detail {turn.uuid[:4]}</a>'
-        conversation_link_md = gr.HTML(conversation_link_html)
+        conversation_link_md = gr.Markdown(conversation_link_html)
 
         return history, turn.uuid, conversation_link_md
 
@@ -119,7 +119,7 @@ def main():
     """
 
     with gr.Blocks(css=custom_css) as iface:
-        conversation_link_md = gr.HTML()
+        conversation_link_md = gr.Markdown()
 
         with gr.Row(equal_height=True):
             with gr.Column():
@@ -139,19 +139,18 @@ def main():
                 if text_input.strip():
                     new_turn_id, history, new_log = chat_with_bot(turn_id, history, text_input)
 
-                    # Update conversation link dynamically
+                    # Generate updated conversation link
                     conversation_detail_url = settings.WEB_URL + reverse(
                         "conversation_detail_to_leaf",
                         args=[new_turn_id],
                     )
-                    conversation_link_html = (
-                        f'<a href="{conversation_detail_url}" target="_self">'
-                        f"View Conversation Detail {new_turn_id[:4]}</a>"
+                    conversation_link_md = (
+                        f"[View Conversation Detail {new_turn_id[:4]}]({conversation_detail_url})"
                     )
-                    conversation_link_md = gr.HTML(conversation_link_html)
+
                     return new_turn_id, history, new_log, conversation_link_md
                 else:
-                    return turn_id, history, "---", gr.HTML("ERROR")
+                    return turn_id, history, "---", "ERRROR: NO LINK AVAILABLE"
 
             except Exception as e:
                 logger.error(f"Error handling input: {e}")
@@ -159,8 +158,13 @@ def main():
                 history.append(("", str(traceback.format_exc())))
                 logger.error(str(traceback.format_exc()))
 
-                conversation_link_html = f'<a href="{settings.WEB_URL + reverse("conversation_detail_to_leaf", args=[turn_id])}" target="_self">View Conversation Detail {turn_id[:4]}</a>'
-                conversation_link_md = gr.HTML(conversation_link_html)  # FIXED
+                conversation_detail_url = settings.WEB_URL + reverse(
+                    "conversation_detail_to_leaf",
+                    args=[turn_id],
+                )
+                conversation_link_md = (
+                    f"[View Conversation Detail {turn_id[:4]}]({conversation_detail_url})"
+                )
 
                 return turn_id, history, text_input, conversation_link_md
 

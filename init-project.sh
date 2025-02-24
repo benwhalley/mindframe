@@ -71,6 +71,7 @@ git reset
     config) > docker-compose.yml
 docker-compose build base
 
+docker-compose up --build -d web chat worker
 
 
 
