@@ -1,0 +1,19 @@
+services:
+  postgres:
+    env_file:
+      - ~/.secrets/tankeram.llemma.net.env
+  web:
+    env_file:
+      - ~/.secrets/tankeram.llemma.net.env
+    labels:
+      caddy: "tankeram.llemma.net"
+      caddy.reverse_proxy: "{{upstreams 8000}}"
+  chat:
+    env_file:
+      - ~/.secrets/tankeram.llemma.net.env
+    labels:
+      caddy: "bot.tankeram.llemma.net"
+      caddy.reverse_proxy: "{{upstreams 8000}}"
+  worker:
+    env_file:
+      - ~/.secrets/tankeram.llemma.net.env
