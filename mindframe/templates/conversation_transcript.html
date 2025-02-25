@@ -13,7 +13,7 @@
      at node {{turn.uuid|slice:5}}
     {% else %}
     at node {{turn.uuid|slice:5}} (branch ends at
-        <a href="{% url 'conversation_detail' leaf_node.uuid %}">{{leaf_node.uuid|  slice:5}}</a>)
+        <a href="{% url 'conversation_transcript' leaf_node.uuid %}">{{leaf_node.uuid|  slice:5}}</a>)
     {% endif %}
     </h2>
 
