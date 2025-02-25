@@ -11,12 +11,12 @@ repos:
     hooks:
       - id: black
 
-  - repo: local
-    hooks:
-      - id: poetry2setup
-        name: Generate setup.py from poetry
-        entry: bash -c 'poetry2setup > setup.py'
-        language: python
-        additional_dependencies:
-          - poetry2setup
-        files: ^pyproject\.toml$
+  # - repo: local
+  #   hooks:
+  #     - id: poetry2setup
+  #       name: Generate setup.py from poetry
+  #       entry: bash -c 'poetry2setup > setup.py'
+  #       language: python
+  #       additional_dependencies:
+  #         - poetry2setup
+  #       files: ^pyproject\.toml$
