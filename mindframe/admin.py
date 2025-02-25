@@ -293,13 +293,13 @@ class TransitionAdmin(admin.ModelAdmin):
 @admin.register(Turn)
 class TurnAdmin(admin.ModelAdmin):
     list_display = (
+        "text",
+        "speaker",
+        "timestamp",
         "uuid",
         "branch",
         "depth",
         "conversation__uuid",
-        "speaker",
-        "text",
-        "timestamp",
     )
     list_filter = ("branch", "branch_reason")
     date_hierarchy = "timestamp"
