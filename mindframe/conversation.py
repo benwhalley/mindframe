@@ -218,6 +218,7 @@ def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=No
         text_source=TurnTextSourceTypes.GENERATED,
     )
     new_turn.save()
+    logger.info(f"New turn created: {new_turn.uuid}")
 
     # run all the judgements to be made every Turn and ignore the Notes they produce
     judgements_to_make = [
@@ -232,12 +233,15 @@ def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=No
 
     # do the final completion, using all the new context available from Judgements
     new_turn_complete = complete_the_turn(new_turn)
+    logger.info(f"Finalized new turn UUID: {new_turn_complete.uuid}")
 
     run_offline_judgements(new_turn_complete.pk)
 
     # ensure all the langfuse traces are identifiable by the Turn uuid
     langfuse_context.update_current_observation(
-        name=f"Response in turn: {turn}", session_id=turn.uuid, output=new_turn_complete.text
+        name=f"Response in turn: {new_turn_complete.uuid}",  # Use new turn ID
+        session_id=new_turn_complete.uuid,  # Make sure the session ID is correct
+        output=new_turn_complete.text,
     )
     langfuse_context.flush()
 
