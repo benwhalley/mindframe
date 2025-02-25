@@ -1,9 +1,10 @@
 volumes:
-  # give specific names because otherwise we can get confused 
+  # give specific names because otherwise we can get confused
   # about which volumes are which
   caddy_data:
     name: caddy_data
-    
+
+services:
   # don't allow caddy direct access to the docker socket for auto config - use a proxy
   dsp:
     container_name: dsp
@@ -18,7 +19,7 @@ volumes:
     networks:
       - backend
     restart: unless-stopped
-  
+
   caddy:
     container_name: caddy
     mem_limit: 500m
@@ -37,7 +38,7 @@ volumes:
     volumes:
       - caddy_data:/data
     restart: unless-stopped
-    
+
   caddy-default:
     container_name: caddydefault
     mem_limit: 250m
