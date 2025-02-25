@@ -34,7 +34,12 @@
         <p
         class="{{turn.speaker.role}}"
         >
+        <a id="turn-{{turn.uuid}}"></a>
         <span class="speaker-name">{{turn.speaker}}</span>: {{turn.text}}
+        <a href="{% url 'conversation_detail' turn.uuid %}#turn-{{turn.uuid}}">
+            <i class="bi bi-info-circle"></i>
+        </a>
+
         </p>
     {% endfor %}
 

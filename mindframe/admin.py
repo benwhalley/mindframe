@@ -299,7 +299,7 @@ class TurnAdmin(admin.ModelAdmin):
         "text",
         "timestamp",
     )
-    list_filter = ("speaker",)
+    list_filter = ("branch", "branch_reason")
     date_hierarchy = "timestamp"
     inlines = [NoteInline]
     search_fields = (

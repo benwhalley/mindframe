@@ -164,6 +164,7 @@
 
     </style>
     {% for turn in turns %}
+    <a id="turn-{{turn.uuid}}"></a>
     {% if forloop.last%}
     <a name="conversationend"></a>
     {% endif %}

@@ -782,5 +782,8 @@ class Turn(NS_Node):
 
     notes_data.short_description = "Notes Data"
 
+    def get_absolute_url(self):
+        return reverse("conversation_transcript", args=[self.uuid]) + "#turn-" + self.uuid
+
     def __str__(self):
         return f"{self.uuid}"
