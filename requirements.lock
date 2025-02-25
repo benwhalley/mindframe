@@ -22,6 +22,7 @@ anyio==4.8.0
     #   langfuse
     #   openai
     #   starlette
+    #   watchfiles
 asgiref==3.8.1
     # via django
 asttokens==3.0.0
@@ -603,6 +604,8 @@ vine==5.1.0
 virtualenv==20.29.2
     # via poetry
 watchdog==6.0.0
+    # via mindframe (pyproject.toml)
+watchfiles==1.0.4
     # via mindframe (pyproject.toml)
 wcwidth==0.2.13
     # via prompt-toolkit

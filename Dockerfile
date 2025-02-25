@@ -19,8 +19,9 @@ RUN uv pip install --system -r requirements.lock
 # now we make sure any extras in the pyproject.toml are installed
 # this shouldn't be necessary, but will help if we forget to update the requirements.lock file
 # it also means rebuilding the container is faster as only new python packages are installed
+RUN uv venv /app/.venv
 RUN uv pip compile --output-file requirements-updated.lock pyproject.toml
-RUN uv pip install --system -r requirements-updated.lock
+RUN uv pip install -r requirements-updated.lock
 
 # copy project code and settings
 COPY . /app

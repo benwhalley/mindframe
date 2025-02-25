@@ -8,36 +8,28 @@ services:
     ports:
       - "${WEB_PORT:-8080}:8000"
     command:
-      [
-        "sh",
-        "-c",
-        "watchmedo auto-restart --directory=/app --pattern=*.py --recursive --  uv run ./manage.py runserver_plus 0.0.0.0:8000"
-      ]
+      - sh
+      - -c
+      - python -m watchfiles --filter python 'python manage.py runserver 0.0.0.0:8000'
     volumes:
       - ~/dev/mindframe:/app:rw
-
   chat:
     env_file:
       - ~/.secrets/mindframe.dev.env
     ports:
       - "${CHAT_PORT:-8081}:8000"
     command:
-      [
-        "sh",
-        "-c",
-        "watchmedo auto-restart --directory=/app --pattern=*.py --recursive -- uv run chatbot.py"
-      ]
+      - sh
+      - -c
+      - python -m watchfiles --filter python 'python chatbot.py'
     volumes:
       - ~/dev/mindframe:/app:rw
-
   worker:
     env_file:
       - ~/.secrets/mindframe.dev.env
     command:
-      [
-        "sh",
-        "-c",
-        "watchmedo auto-restart --directory=/app --pattern=*.py --recursive -- uv run celery --app mindframe worker --pool=solo --loglevel=debug"
-      ]
+      - sh
+      - -c
+      - python -m watchfiles --filter python 'celery --app mindframe worker --pool=solo --loglevel=debug'
     volumes:
       - ~/dev/mindframe:/app:rw

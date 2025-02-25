@@ -308,6 +308,7 @@ class TurnAdmin(admin.ModelAdmin):
         "speaker__username",
         "speaker__last_name",
         "conversation__uuid",
+        "conversation__telegram_conversation_id",
     )
 
 

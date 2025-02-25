@@ -19,9 +19,12 @@ ALLOWED_HOSTS = config(
     cast=Csv(),
 )
 
-SESSION_COOKIE_DOMAIN = ".mindframe.llemma.net"  # Notice the leading dot
-# SESSION_COOKIE_SECURE = True  # Ensure HTTPS is used
-SESSION_COOKIE_SAMESITE = "None"  # Required for cross-subdomain access in some cases
+
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"  # use Redis
+SESSION_CACHE_ALIAS = "default"
+SESSION_COOKIE_AGE = 60 * 60 * 24  # 1 day in seconds
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Keep session even if browser closes
 
 CSRF_TRUSTED_ORIGINS = config(
     "CSRF_TRUSTED_ORIGINS",
@@ -144,7 +147,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
 CACHES = {
     "default": {
