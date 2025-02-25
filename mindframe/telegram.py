@@ -13,6 +13,8 @@ curl -X GET "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo"
 
 """
 
+import threading
+import time
 import os
 import json
 import logging
@@ -37,6 +39,25 @@ TELEGRAM_WEBHOOK_VALIDATION_TOKEN = config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN")
 TELEGRAM_IP_RANGES = [ipaddress.ip_network(ip) for ip in ["149.154.160.0/20", "91.108.4.0/22"]]
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
+
+
+def send_typing_status_continuous(chat_id, stop_event):
+    """Continuously send 'typing' status to Telegram until stop_event is set."""
+    while not stop_event.is_set():
+        send_typing_status(chat_id)
+        time.sleep(5.5)  # Send 'typing' every 4 seconds (before the 5s expiry)
+
+
+def send_typing_status(chat_id):
+    """Send 'typing' status to Telegram."""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendChatAction"
+    data = {"chat_id": chat_id, "action": "typing"}
+
+    try:
+        logger.info("Sending 'typing' status.")
+        requests.post(url, data=data, timeout=5)
+    except requests.RequestException as e:
+        logger.warning(f"Failed to send 'typing' status: {e}")
 
 
 def send_telegram_message(chat_id, text):
@@ -224,7 +245,20 @@ def continue_conversation(message, telegram_user, conversation, intervention):
     # Generate bot response
     last_turn = conversation.turns.last()
     logger.info(f"Responding to this: {last_turn.text}")
-    bot_turn = respond(last_turn)
+
+    # continuously send 'typing' status messages while generating response
+    # using a thread (because typing status expires after 5 seconds)
+    stop_event = threading.Event()
+    typing_thread = threading.Thread(
+        target=send_typing_status_continuous, args=(message.chat.id, stop_event)
+    )
+    typing_thread.start()
+    try:
+        bot_turn = respond(last_turn)  # This could take time
+    finally:
+        stop_event.set()  # Stop sending 'typing' once `respond` completes
+        typing_thread.join()
+
     bot_turn.save()
     logger.info(f"Bot response: {bot_turn.text}")
 
@@ -307,6 +341,7 @@ def is_valid_telegram_request(request):
 
 
 def get_conversation(message):
+    logger.info(f"Getting conversation for chat ID {message.chat.id}")
     conversation, new_conv = Conversation.objects.get_or_create(
         telegram_conversation_id=message.chat.id, archived=False
     )
