@@ -33,7 +33,7 @@ from .models import (
 )
 
 
-from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, TurnTextSourceTypes
+from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, BranchReasons, TurnTextSourceTypes
 from mindframe.graphing import mermaid_diagram
 from mindframe.tree import create_branch
 
@@ -196,7 +196,7 @@ class ConversationAdmin(admin.ModelAdmin):
         Supports an optional 'next' GET param for custom redirection.
         """
         turn = get_object_or_404(Turn, pk=turn_id)
-        new_turn = create_branch(turn, reason="Admin UI branch")
+        new_turn = create_branch(turn, reason=BranchReasons.PLAY)
 
         # If the user included ?next=some_url, redirect there; otherwise, go to conversation admin.
         next_loc = request.GET.get("next")
@@ -294,6 +294,8 @@ class TransitionAdmin(admin.ModelAdmin):
 class TurnAdmin(admin.ModelAdmin):
     list_display = (
         "uuid",
+        "branch",
+        "depth",
         "conversation__uuid",
         "speaker",
         "text",
