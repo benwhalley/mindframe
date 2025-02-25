@@ -299,10 +299,8 @@ class TurnAdmin(admin.ModelAdmin):
         "text",
         "timestamp",
     )
-    list_filter = (
-        "speaker",
-    )
-    date_hierarchy  = 'timestamp'
+    list_filter = ("speaker",)
+    date_hierarchy = "timestamp"
     inlines = [NoteInline]
     search_fields = (
         "uuid",
