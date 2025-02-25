@@ -309,6 +309,14 @@ Briefly, which is the MOST important thing you are communicating here, from the 
 
 [[think:most_important]]
 
+
+Your supervisor overheard this conversation and provided the follwing guidance/suggestions:
+
+<guidance>
+{{data.mi_setup.advice}}
+</guidance>
+
+
 You want to make sure what you say is:
 
 - simple and clear.
@@ -318,5 +326,8 @@ You want to make sure what you say is:
 Adapt your response.
 Use line breaks to separate different ideas/sentences.
 Use emoji's sparingly if they are appropriate (check the recent conversation and don't repeat them)
+
+DO NOT CHECK IF THE CLIENT IS READY TO START UNLESS WE HAVE GIVEN THEM ALL THE REQUIRED INFORMATION
+
 
 [[speak:response]]

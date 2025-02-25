@@ -30,7 +30,8 @@ deciding whether to move to the Focusing Step
 
 ### The Engaging Step
 
-In Engaging, the AI’s goal is to build trust, connection, and understanding before narrowing the conversation.
+In Engaging, the AI’s goal is to build trust, connection,
+and understanding before narrowing the conversation.
 
 At this stage, the client may:
 
@@ -48,6 +49,7 @@ The Focusing step begins when there is a clear topic for change—something the 
 Signals that a client is ready to move into Focusing include:
 
 Expressing a specific concern or goal
+
 <example>
 - "I know I should eat better, but I don’t know where to start."
 - "I used to be more active, but I’ve stopped, and I don’t like it."
@@ -57,6 +59,7 @@ Expressing a specific concern or goal
 </example>
 
 Asking about change
+
 <example>
 "What do most people do when they want to eat healthier?"
 "Is it hard to get into a workout routine?"
@@ -70,6 +73,7 @@ Ambivalence emerging
 "I kind of want to change, but I also feel like I don’t have the energy."
 "Part of me thinks I should work out, but I don’t know if it’s worth it."
 </example>
+
 
 ### What to Do When a Client Shows These Signals?
 
@@ -102,9 +106,7 @@ This maintains engagement while gently guiding the client towards selecting a fo
 <state>
 # Data on the client
 
-<clinical-notes>
-{{data}}
-</clinical-notes>
+THE CONVERSATION SO FAR
 
 <transcript>
 {% turns 'all' %}
@@ -113,29 +115,26 @@ This maintains engagement while gently guiding the client towards selecting a fo
 </state>
 
 
-
 # Your task now
 
 Use the data on THIS client
+
 Think carefully about where they are in the process
+
 How much evidence do we have they are ready to begin the focussing step?
 What should the therapist do next?
 
-Take a moment to check the conversation and think carefully.
-Refer to the principles of MI and the guidance provided to make your decision.
+Briefly, concisely, collate evidence for a decision to move to the Focussing step.
 
-[[think:plan]]
-
-Collate evidence for a decision to move to the Focussing step.
-Focus on HOW MANY examples there are of the right sort of client talk to support our decision.
+Focus on HOW MANY examples there are of the right sort of client talk to support our decision. Give extra weight to more recent things the client said. If they shift, allow us to move on.
 
 [[speak:evidence]]
 
 Decide if the therapist should move on to the Focussing step.
-We can go back to engaging later if needed, there is no great harm in moving forward if the client is ready. Respond with True or False.
+Respond with True or False.
 
-[[boolean:move]]
+[[boolean:decision]]
 
-Explain your answer. If the answer was False, Give guidance to the therapist on what they might do next to check readiness and help the client get ready.
+Briefly, explain your answer. If the answer was False, then give guidance to the therapist on what they could do next to check readiness and help the client get ready.
 
 [[think:guidance]]

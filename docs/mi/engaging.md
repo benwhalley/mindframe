@@ -159,7 +159,7 @@ Good MI practitioners will:
 
 <guidance>
 
-Guidance from your supervisor therapist, based on their view of the conversation so far:
+THIS IS Guidance from your supervisor therapist, based on their view of the conversation so far:
 
 {{data.move_focussing.guidance}}
 
