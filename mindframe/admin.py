@@ -156,6 +156,7 @@ class ConversationAdmin(admin.ModelAdmin):
     list_filter = (IsSyntheticFilter, "archived")
     inlines = [TurnInline]
     list_display = ["__str__", "summary", "speakers", "active", "n_turns", "intervention", "uuid"]
+    list_prefetch_related = ["intervention", "speakers"]
 
     def n_turns(self, obj):
         return obj.turns.count()
@@ -304,6 +305,7 @@ class TurnAdmin(admin.ModelAdmin):
     list_filter = ("branch", "branch_reason")
     date_hierarchy = "timestamp"
     inlines = [NoteInline]
+    list_select_related = ["conversation"]
     search_fields = (
         "uuid",
         "text",
@@ -319,6 +321,9 @@ class NoteAdmin(admin.ModelAdmin):
     list_display = ("turn__uuid", "judgement", "val", "timestamp")
 
     list_filter = ("timestamp", "judgement")
+
+    list_select_related = ["turn", "judgement", "judgement__intervention"]
+
     exclude = ["data"]
     readonly_fields = ["turn", "judgement", "timestamp", "pprint_data"]
     search_fields = ("turn__speaker__username",)
