@@ -11,6 +11,10 @@ RUN apt-get update && \
     gcc python3-dev git libpq-dev
 RUN  xargs -a apt-packages apt-get install -y
 
+# Create a non-root user for celery (UID 1000, GID 1000)
+RUN addgroup --system --gid 1000 celery && \
+    adduser --system --uid 1000 --gid 1000 celery
+
 # Ensure `uv` installs dependencies system-wide
 # first we install the dependencies from the lock file
 COPY pyproject.toml uv.lock requirements.lock /app/
@@ -29,7 +33,3 @@ RUN mkdir -p /app /app/static
 
 # Ensure the installed packages are visible
 RUN uv pip list && python -m site
-
-# Create a non-root user for celery (UID 1000, GID 1000)
-RUN addgroup --system --gid 1000 celery && \
-    adduser --system --uid 1000 --gid 1000 celery
