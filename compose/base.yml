@@ -1,0 +1,54 @@
+volumes:
+  # give specific names because otherwise we can get confused 
+  # about which volumes are which
+  caddy_data:
+    name: caddy_data
+    
+  # don't allow caddy direct access to the docker socket for auto config - use a proxy
+  dsp:
+    container_name: dsp
+    image: tecnativa/docker-socket-proxy:latest
+    environment:
+      - CONTAINERS=1
+      - NETWORKS=1
+      - SERVICES=1
+      - POST=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - backend
+    restart: unless-stopped
+  
+  caddy:
+    container_name: caddy
+    mem_limit: 500m
+    image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      - caddy
+      - backend
+    depends_on:
+      - dsp
+      - caddy-default
+    environment:
+      DOCKER_HOST: tcp://dsp:2375
+    volumes:
+      - caddy_data:/data
+    restart: unless-stopped
+    
+  caddy-default:
+    container_name: caddydefault
+    mem_limit: 250m
+    image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    labels:
+      caddy: "http://"
+      caddy.respond: "\"Domain not configured\" 501"
+    environment:
+      DOCKER_HOST: tcp://dsp:2375
+    depends_on:
+      - dsp
+    networks:
+      - caddy
+    restart: unless-stopped
