@@ -48,6 +48,8 @@
                          Edit conversation
                     </a>
                     <p class="small">Conversation ID: <code>{{object.uuid|slice:8}}</code></p>
+                    
+                    <a href="{% url 'conversation_transcript' leaf_node.uuid %}">Conversation transcript</a>
                 </div>
             </div>
 
@@ -144,9 +146,7 @@
                 overflow-wrap: break-word; /* Compatibility for older browsers */
             }
         </style>
-    {% regroup turns by session_state as state_turns %}
-    {% for group, turns in state_turns %}
-
+    
     <div class="row">
     <div class="col-12">
 
@@ -234,7 +234,6 @@
 </div>
 
 
-{% endfor %}
 
 {% if object.synthetic_turns_scheduled > 0 %}
                 <div class="alert alert-warning" role="alert">

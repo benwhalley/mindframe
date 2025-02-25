@@ -38,6 +38,11 @@ urlpatterns = [
         name="conversation_detail",
     ),
     path(
+        "conversations/<str:uuid>/transcript/",
+        ConversationDetailView.as_view(template_name="conversation_transcript.html"),
+        name="conversation_transcript",
+    ),
+    path(
         "conversations/<str:uuid>/",
         ConversationDetailView.as_view(to_leaf=True),
         name="conversation_detail_to_leaf",

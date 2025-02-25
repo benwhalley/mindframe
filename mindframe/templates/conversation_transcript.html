@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load pretty %}
+{% load turns %}
+{% load crispy_forms_tags %}
+{% load notes %}
+{% load guidance %}
+{% block content %}
+
+<div class="container mt-5">
+    <h2 class="mb-1 mt-4 mb-5">Conversation
+    
+    {% if turn.pk == leaf_node.pk %}
+     at node {{turn.uuid|slice:5}}
+    {% else %}
+    at node {{turn.uuid|slice:5}} (branch ends at
+        <a href="{% url 'conversation_detail' leaf_node.uuid %}">{{leaf_node.uuid|  slice:5}}</a>)
+    {% endif %}
+    </h2>
+    
+
+<div class="row">
+    <div class="col-8 pl-5">
+        
+        <style>
+            .speaker-name { font-weight: bold; }
+            .therapist { font-style: italic; }
+        </style>
+        
+    {% for turn in turns %}
+        {% if forloop.last%}
+        <a name="conversationend"></a>
+        {% endif %}
+            
+        <p
+        class="{{turn.speaker.role}}"
+        >
+        <span class="speaker-name">{{turn.speaker}}</span>: {{turn.text}}
+        </p>
+    {% endfor %}
+    
+    
+    {% if object.synthetic_turns_scheduled > 0 %}
+    <div class="alert alert-warning" role="alert">
+        Note: {{object.synthetic_turns_scheduled}} additional turns are scheduled to be generated for this conversation.
+    </div>
+
+    <meta http-equiv="refresh" content="5;url=#conversationend">
+
+    {% endif %}
+    </div>
+
+
+
+   
+
+<div class="col-4">
+    <a class="btn btn-outline-primary mb-3" href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">
+        View Tree</a>
+        
+        <p>
+            <a href="{% url 'conversation_detail' leaf_node.uuid %}">Conversation details</a>
+        </p>
+    <hr>
+    {% if turn.pk != leaf_node.pk %}
+    <div class="alert alert-warning" role="alert">
+
+        <p>This is a partial view of a conversation branch.
+            <a href="{% url 'conversation_detail' leaf_node.uuid %}">See the entire branch</a> or
+        <a href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">view the tree diagram</a>.
+        </p>
+
+    </div>
+    {% endif %}
+
+</div>
+
+</div>
+{% endblock %}

@@ -679,7 +679,7 @@ class Conversation(LifecycleModel):
 
     def get_absolute_url(self):
         return settings.WEB_URL + reverse(
-            "conversation_detail",
+            "conversation_transcript",
             args=[
                 self.turns.all().order_by("depth").last().uuid,
             ],

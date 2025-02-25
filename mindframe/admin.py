@@ -301,11 +301,12 @@ class TurnAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "speaker",
-        "timestamp",
     )
+    date_hierarchy  = 'timestamp'
     inlines = [NoteInline]
     search_fields = (
         "uuid",
+        "text",
         "speaker__username",
         "speaker__last_name",
         "conversation__uuid",
