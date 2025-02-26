@@ -1,13 +1,13 @@
 # MINDFRAME SPECIFIC SETTINGS
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
-from types import SimpleNamespace
 import os
 from django.db import models
 import shortuuid
 from decouple import config
 
+
+TELEGRAM_BOT_NAME = config("TELEGRAM_BOT_NAME", None)
 
 DEFAULT_CONVERSATION_MODEL_NAME = config("DEFAULT_CONVERSATION_MODEL_NAME", "gpt-4o-mini")
 DEFAULT_JUDGEMENT_MODEL_NAME = config("DEFAULT_JUDGEMENT_MODEL_NAME", "gpt-4o-mini")
