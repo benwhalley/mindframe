@@ -43,12 +43,12 @@ urlpatterns = [
         name="conversation_transcript",
     ),
     path(
-        "conversations/<str:uuid>/",
+        "conversations/<str:uuid>/leaf/",
         ConversationDetailView.as_view(to_leaf=True),
         name="conversation_detail_to_leaf",
     ),
     path(
-        "conversation/mermaid/<str:uuid>/",
+        "conversation/<str:uuid>/mermaid/",
         ConversationMermaidView.as_view(),
         name="conversation_mermaid",
     ),
