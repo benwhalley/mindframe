@@ -1,6 +1,6 @@
 # PERSONA
 
-It's good practice to instruct AI models to adopt a persona and highlight 
+It's good practice to instruct AI models to adopt a persona and highlight
 heir expertise. For example we might say
 
         You are an AI: An expert in behaviour change techniques.
@@ -8,8 +8,8 @@ heir expertise. For example we might say
 
 # ENRICHING THE CONTEXT
 
-By giving context and instructions to the AI, we can help it to provide more 
-relevant responses. We can do this by 
+By giving context and instructions to the AI, we can help it to provide more
+relevant responses. We can do this by
 
 1. Hand-writing instructions into the prompt
 2. Dynamically querying a database of good examples
@@ -25,8 +25,8 @@ are designd to provide examples of good practice.
 The syntax for including examples is:
 
         {% examples "therapist introducing multisensory imagery" %}
-        
-        
+
+
 Depending on the examples saved in the database, this might include text like this:
 
 ```
@@ -34,7 +34,7 @@ CLIENT: I don't know if I can do this. I've tried so many times before and faile
 
 > The therapist encourages multisensory imagery about a positive future state:
 THERAPIST: I'd like to imagine yourself at your daughter's graduation, and having lost some weight. What would that be like? Can you see yourself there? What do you smell? How is it to be in the room?
-        
+
 ```
 
 
@@ -45,14 +45,14 @@ We can also query the database for specific types of examples. For example, we m
 refer to something the client has said when querying for good examples.
 
 In all templates, there is a variable called `notes` which contains all the notes made by Judgements.
-We can use this to update our templates dynamically. For example, writing this would specifically instruct 
+We can use this to update our templates dynamically. For example, writing this would specifically instruct
 the AI that the client is working on whatever was previously identified as a problem.
 
-        You are working with a client to help them with {{data.problem_identified.problem}}. 
-    
-    
+        You are working with a client to help them with {{data.problem_identified.problem}}.
+
+
 We can also use this notes variable within a query:
-        
+
         {% examples data.problem_identified.problem %}
 
 In this case, the `data.problem_identified.problem` variable is used directly as a lookup in the database.
@@ -60,15 +60,15 @@ In this case, the `data.problem_identified.problem` variable is used directly as
 
 ##### Adjusting what is included
 
-There are two options to 'tweak' to adjust how 
+There are two options to 'tweak' to adjust how
 inclusive the results are:
 
         {% examples "therapist introducing multisensory imagery"  n=1 window=0 %}
 
 
-This would reduce the set of results. First, only n=1 result is returned. 
+This would reduce the set of results. First, only n=1 result is returned.
 Additionally, the 'window' is set to 0, meaning that only the top-matching sentence
-is shown. If window is set > 0 then the sentences before and after the matching results 
+is shown. If window is set > 0 then the sentences before and after the matching results
 are also shown.
 
 
@@ -124,8 +124,8 @@ The `turn` tag does this for us.
 
 To include ALL utterances from the whole conversation so far:
 
-        {% turns "all" %}   
-        
+        {% turns "all" %}
+
 
 Results are formatted like this:
 
@@ -141,7 +141,7 @@ This only includes turns from the current step:
 
 
 This restricts to the last 5 turns in this step:
-        
+
         {% turns "step" n=5 %}
 
 
@@ -154,7 +154,7 @@ can improve the quality of the responses.
 `mindframe` includes the ability to break up a task into multiple parts, scripting
 a conversation with the AI.
 
-At any point in the template we we can use [[square_brackets]] to instruct the AI 
+At any point in the template we we can use [[square_brackets]] to instruct the AI
 to respond. Each time the AI responds, this text is included in the context/instructions
 of subseuqent responses.
 
@@ -164,13 +164,13 @@ Before speaking, we can give the AI instructions like these:
 
         Please think step by step.
 
-        - What have you said previously? 
-        - Is the client asking you anything? 
+        - What have you said previously?
+        - Is the client asking you anything?
 
         [[think:PLANS]]
 
 
-Here we ask the model to `think` using the square-bracket tag. We save the 
+Here we ask the model to `think` using the square-bracket tag. We save the
 response as `PLANS` (this response can be inspected later).
 
 There are several different types of responses we can instruct the AI to make:
@@ -181,7 +181,7 @@ There are several different types of responses we can instruct the AI to make:
 - `boolean` (yes/no responses; again see the example template for Judgements)
 
 Having elicited a plan, we can _continue_ the conversation with the AI and ask it
-to use it's thoughts to craft a better spoken response. After the final response tag below, 
+to use it's thoughts to craft a better spoken response. After the final response tag below,
 the spoken response from the  AI will respond is returned to the user, and the Turn is over.
 
         Now, respond to the client:
@@ -190,4 +190,3 @@ the spoken response from the  AI will respond is returned to the user, and the T
             - use British English
 
         [[speak:RESPONSE]]
-        

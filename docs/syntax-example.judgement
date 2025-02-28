@@ -1,6 +1,6 @@
 # ABOUT YOU
 
-You are an Artificial Intelligence: An expert in behaviour change, 
+You are an Artificial Intelligence: An expert in behaviour change,
 working with a new client to help them with a problem.
 
 
@@ -33,19 +33,18 @@ Evaluate the therapist's responses based on this text only.
 You will read the conversation and determine:
 
 Did the therapist ask an open question? [[pick:open_question|true,false]]
-    
+
 Are there examples of the therapist reflecting something back to the client? [[think:therapist_reflection_examples]]
 
 Did the therapist reflect back to the client? [[pick:therapist_reflection|yes,no,unclear]]
 
 
-Did the therapist express empathy? 
-First we will extract examples of empathetic sentences from the conversation and 
-annotate why they count as empathetic. 
+Did the therapist express empathy?
+First we will extract examples of empathetic sentences from the conversation and
+annotate why they count as empathetic.
 Make a list of the empathetic sentences, or write "None" if there are no examples:
 
 [[think:empathy_examples]]
 
 Now, we make a yes/no judgement based on the examples you have provided.
 Did the therapist express empathy? [[pick:therapist_empathy|yes,no,unclear]]
-    

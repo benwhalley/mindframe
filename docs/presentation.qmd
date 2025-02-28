@@ -95,7 +95,7 @@ Flow/control structures not documented (?)
 - Tree-based systems/Flows/DAGs (structured inputs)
 - Fine-tuning/multimodal models (therapy-like)
 - Exemplar based (semantic search/RAG)
-- LLM base-models + prompt-engineering 
+- LLM base-models + prompt-engineering
 
 
 <!---
@@ -214,7 +214,7 @@ This is the conversations so far:
 
 {{turns}}
 
-Your task: 
+Your task:
 
 - Help them work on  {{desired_change}}
 - Ask them to think about barriers to {{desired_change}}
@@ -253,7 +253,7 @@ They describe feeling overwhelmed by their workload.
 
 These are the last few things the client said:
 
-CLIENT: "I have so much to do, and it feels like I’ll 
+CLIENT: "I have so much to do, and it feels like I’ll
 never get through it. I don’t even know where to start."
 
 Before responding, think step by step about the situation:
@@ -362,7 +362,7 @@ No real therapist would say this much.
 Make this more realistic.
 Make it fit the dialogue.
 Avoid repetition.
-Ideally only 1 sentence response 
+Ideally only 1 sentence response
 (we can say more later)
 ```
 
@@ -388,10 +388,10 @@ This is the conversation:
 {turns:step:previous}
 {turns:step:current}
 
-Summarise this conversations. 
+Summarise this conversations.
 Make a note which will be useful later.
-Focus on: 
-- what the client said and 
+Focus on:
+- what the client said and
 - what the client's goals are.
 
 Respond in < 3 paragraphs.

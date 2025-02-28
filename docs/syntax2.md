@@ -1,19 +1,19 @@
 
 # mindframe prompting
 
-THIS IS an alternative syntax proposal to simplify  
+THIS IS an alternative syntax proposal to simplify
 
 
 ## TLDR
 
-Prompts are written in plain text/markdown, with some additional 
-tags for dynamic content, like conversation history or extracted data. 
+Prompts are written in plain text/markdown, with some additional
+tags for dynamic content, like conversation history or extracted data.
 
 An example prompt for a step:
 
 
 ```
-You are an expert in behaviour change. You and the client 
+You are an expert in behaviour change. You and the client
 are working on @problem.summary and @problem.elicited
 which is the focus of this session.
 
@@ -82,7 +82,7 @@ Details of the different prefixes for responsess (like `pick` and `boolean`) are
 
 # Detailed syntax guide
 
-Prompts for steps and judgements are written in a simple markdown format, 
+Prompts for steps and judgements are written in a simple markdown format,
 with some additional tags for dynamic content.
 
 
@@ -132,7 +132,7 @@ E.g. a Judgement identifies a 'problem' we want to work on:
 ```
 
 
-Or we use a Judgement to make a clinical summary of conversation in previous steps. 
+Or we use a Judgement to make a clinical summary of conversation in previous steps.
 Here the Judgement variable name is `step_summary`, and the
 response that we want to use is called `summary`:
 
@@ -167,7 +167,7 @@ Examples of good practice relevant to something a client said (i.e. dynamically 
 ### Requesting AI responses
 
 As part of a template, we can ask the AI to respond multiple times.
-Each time we want a response, we include a `[[RESPONSE]]` tag: 
+Each time we want a response, we include a `[[RESPONSE]]` tag:
 At minimum, two square braces surrounding a variable name.
 
 Example of a two-part response:
@@ -179,7 +179,7 @@ Consider both systemic and individual factors.
 
 [[formulation]]
 
-Now, think about what to say next. 
+Now, think about what to say next.
 You can only say one thing. Keep it simple
 
 [[therapist_response]]
@@ -193,7 +193,7 @@ Presently `think` and `speak` are supported, but more may be added:
 [[speak:response]]
 ```
 
-A `think` response is more reflective, longer, and can include notes/plans. 
+A `think` response is more reflective, longer, and can include notes/plans.
 The `speak` response is more direct an the AI is requested to use spoken idioms.
 These different styles of responses are achieved by adding hints to the call to the AI model.
 
@@ -220,7 +220,7 @@ Two other prefixes are also supported to allow for classification responses:
 - `pick` guarantees that the response is one of the options provided, after the `|` character, separated by commas.
 - `boolean` guarantees that the response is either True or False.
 
-These are useful when making classifications, or for Judgements that determine whether a 
+These are useful when making classifications, or for Judgements that determine whether a
 step transition should take place.
 
 
