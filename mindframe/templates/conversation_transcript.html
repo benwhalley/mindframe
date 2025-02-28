@@ -70,7 +70,7 @@
     <div class="alert alert-warning" role="alert">
 
         <p>This is a partial view of a conversation branch.
-            <a href="{% url 'conversation_detail' leaf_node.uuid %}">See the entire branch</a> or
+            <a href="{% url 'conversation_transcript' leaf_node.uuid %}">See the entire branch</a> or
         <a href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">view the tree diagram</a>.
         </p>
 
