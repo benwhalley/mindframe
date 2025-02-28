@@ -6,7 +6,7 @@ Dimensions on which to categorise LLM based therapy papers
     - open/closed
     - model name/version
     - model size
-    
+
 
 Data used
     - source
@@ -16,7 +16,7 @@ Data used
     - reward signals
         - human feedback
         - machine classifications
-    
+
 
 - Prompting strategies/techniques
     - zero-shot

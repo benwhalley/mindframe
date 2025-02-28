@@ -17,13 +17,13 @@ Models like DeepSeek R1 (Deepseek) suggest a way around these constraints, throu
 Replicating DeepSeek’s approach for a therapist AI, requires a corpus of therapy sessions in which both the therapeutic reasoning _and_ interactions with clients are connected, and which contains annotations to incentivise models to reproduce both the therapuetic reasoning and client facing output (via RLHF/RLAIF).
 
 We can separate this into two steps: first, generating a corpus of clinical-chains of thought (CCT), and second annotating that corpus with reward signals for later training.
-There are two potential sources of such a corpus. 
+There are two potential sources of such a corpus.
 
 - Expert-generated chains of thought and responses to clients in response to real or realistic clinical scenarios.
 
-- Prompting-only systems, which provide the necessary context and instructions for foundation models to produce CCT's and interact with clients (again, either in real or realistic clinical scenarios). 
+- Prompting-only systems, which provide the necessary context and instructions for foundation models to produce CCT's and interact with clients (again, either in real or realistic clinical scenarios).
 
-Although potentially feasible, using experts to generate extended chains of thought and client output to train foundation models has disadvantages of cost, time, and lack of variety and control. In contrast, prompting-only systems could be used to generate a large, diverse, and controlled dataset of CCT's and client output. Prompts could be varied systematically to optimise for desired characteristics, and the system could be used as part of an iterative process to refine the dataset and the model. These systems could also be used to deliver clinical services whilst models are developed, or be used to adapt/customise services to specific clinical contexts or individual client preferences. 
+Although potentially feasible, using experts to generate extended chains of thought and client output to train foundation models has disadvantages of cost, time, and lack of variety and control. In contrast, prompting-only systems could be used to generate a large, diverse, and controlled dataset of CCT's and client output. Prompts could be varied systematically to optimise for desired characteristics, and the system could be used as part of an iterative process to refine the dataset and the model. These systems could also be used to deliver clinical services whilst models are developed, or be used to adapt/customise services to specific clinical contexts or individual client preferences.
 
 Compared with AI-therapy implementations that prompt foundation models to simulate therapist speech and interact with clients, a system designed to generate COT would be slower and (marginally) more expensive, but also more introspectable and accountable, and substantially more informative for clinicians and researchers seeking to adapt and improve AI-based interventions. Another advantage of systems based on CCT-prompting is that they offer a clear path for collaboration between research groups and comparison of competing operationalisations of existing and novel therapeutic approaches.
 
@@ -33,19 +33,19 @@ Prerequisites for This Approach to Work
 
 2. Human evaluators or automated classifiers must be able to reliably assess the model's reasoning and responses. If used for reinforcement learning, these reward signals must effectively capture the qualitative aspects of good therapeutic thinking and responses.
 
-In this paper we outline the steps necessary to produce a therapeutic equivalent of Deepseek R1, and report initial results from an open-source CCT-prompting system, [Mindframe](http://github.com/benwhalley/mindframe). 
+In this paper we outline the steps necessary to produce a therapeutic equivalent of Deepseek R1, and report initial results from an open-source CCT-prompting system, [Mindframe](http://github.com/benwhalley/mindframe).
 
 
 
 ### A prompting-based system with hidden chain of thought reasoning
 
-To generate the corpus of CCTs required to train a Deepseek-style therapist, 
-it is necessary to represent the structure and desired outputs of a therapeutic appraoch in a way that can be used to prompt a foundation model. 
-These prompts explicitly instruct the model to generate a _structured_ response, including an internal CoT reasoning component that remains hidden from the user. 
+To generate the corpus of CCTs required to train a Deepseek-style therapist,
+it is necessary to represent the structure and desired outputs of a therapeutic appraoch in a way that can be used to prompt a foundation model.
+These prompts explicitly instruct the model to generate a _structured_ response, including an internal CoT reasoning component that remains hidden from the user.
 This requires an explicit model of the therapeutic process intended — for example,, describing the goals and structure of a treatment session, or the broader principles of a specific therapeutic approach and the trajectory across a number of sessions.
 
 Describing this broader structure in a single prompt is unlikely to be sucessful.
-Studies on chain-of-thought prompting indicate that iterative, stepwise reasoning helps models maintain internal consistency and produce more accurate, context-sensitive outputs [@Wei2022chain]. By contrast, a single prompt encourages models to rely on static or memorised patterns, which would be incompatible with the complexity and personalised nature of mental health interventions [@Shatte2019]. 
+Studies on chain-of-thought prompting indicate that iterative, stepwise reasoning helps models maintain internal consistency and produce more accurate, context-sensitive outputs [@Wei2022chain]. By contrast, a single prompt encourages models to rely on static or memorised patterns, which would be incompatible with the complexity and personalised nature of mental health interventions [@Shatte2019].
 
 
 >Brown et al. (2020). “Language Models are Few-Shot Learners.”
@@ -99,12 +99,12 @@ The optimization process employs **Group Relative Policy Optimization (GRPO)**, 
 
 - Longitudinal user outcomes (weak signals, likely too noisy)
 - Human evaluators (expensive, but probbly necessary in part)
-- Automated scoring mechanisms 
+- Automated scoring mechanisms
 
 
 ### Standing on the shoulders of giants
 
-For this approach to work, it is important that the profession collaborates to produce a large, high-quality dataset. 
+For this approach to work, it is important that the profession collaborates to produce a large, high-quality dataset.
 
 We need this to be in our control — if abdicated to large tech companies, the data will be used for other purposes, and the quality of the data will be suboptimal for our purposes.
 
@@ -144,7 +144,7 @@ Benefits of retaining the scaffold in the longer term include:
 
 - adaptability - e.g. to create 'intersectional' therapeutic models which combine therapeutic approaches in novel ways
 
-- control: e.g. for research we may want to 
+- control: e.g. for research we may want to
 
 
 ### Conclusion and Future Directions
@@ -265,5 +265,3 @@ This multi-stage approach—beginning with a structured prompting system, transi
 
 
 showing promise in complex domains like psychotherapy, where context, empathy, and ethical considerations are paramount [@Levine2022]. Early attempts at integrating AI into mental health interventions underscore both the potential and the pitfalls: small-scale deployments of conversational agents have demonstrated feasibility in delivering cognitive-behavioural strategies to young adults, but their efficacy still depends heavily on transparent, evidence-based reasoning [@Fitzpatrick2017].
-
-

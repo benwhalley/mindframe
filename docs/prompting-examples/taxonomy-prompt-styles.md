@@ -25,7 +25,7 @@ This is one of the simplest possible structures.
 
 Imagine pasting a conversation transcript into ChatGPT's web interface, and continuing the conversation in repeated turns.
 
-```         
+```
 [therapist] hi, how are are you today?
 not feeling so good
 ⨁
@@ -47,7 +47,7 @@ It's perhaps obvious, but worth emphasising that most current LLM APIs are state
 
 When the model makes the final response, it is to a single prompt that is equivalent to all previous prompts and answers concatenated together:
 
-```         
+```
 [therapist] hi, how are are you today?
 not feeling so good
 [therapist] I'm sorry to hear that. Do you want to talk about what's been going on?
@@ -61,7 +61,7 @@ not really
 
 A common extension this approach is to include instructions or a role or persona definiton *before* the conversation context:
 
-```         
+```
 You are an expert therapist.  Always be kind when you speak.
 
 [therapist] hi, how are are you today
@@ -89,13 +89,13 @@ In the context of conversational agents for therapy, this templating process is 
 #### Context, Instruction, Response
 
 A simple templated prompt is below:
-```         
-[therapist] hi, how are are you today    
+```
+[therapist] hi, how are are you today
 [client] not feeling so good
                 [turns omitted]
 
-Pretend to be a therapist. Continue this   
-conversation with the client.              
+Pretend to be a therapist. Continue this
+conversation with the client.
 
 ⨁
 ```
@@ -109,7 +109,7 @@ The form here is:
 ```
 
 
-In practice, templates like this are often amended slightly to include _cues_ to the model about the desired response. For example, adding the speaker name in square brackets before the end of prompt emphasises to the model that 
+In practice, templates like this are often amended slightly to include _cues_ to the model about the desired response. For example, adding the speaker name in square brackets before the end of prompt emphasises to the model that
 - it should simulate the therapist utterance
 - it is not necessry to include the speaker name in the response (because it is already in the prompt)
 
@@ -139,14 +139,14 @@ The important point here is that:
 
 Given this, we can imagine a wide range of prompt structures including roles, instructions, context, guidance and formatting instructions.
 
-```         
+```
 You are an excellent therapist.
 This is your conversation so far. Read carefully.
 
-[therapist] hi, how are are you today      
+[therapist] hi, how are are you today
 [client] not feeling so good
 ...                [turns omitted]
-                
+
 Follow the principles of CBT.
 Open questions help the client express themselves.
 Use reflections to show you are listening.
@@ -163,24 +163,24 @@ Use reflections to show you are listening.
 You are an excellent therapist.
 This is your conversation so far. Read carefully.
 
-[therapist] hi, how are are you today      
+[therapist] hi, how are are you today
 [client] not feeling so good
 ...                [turns omitted]
-                
+
 Follow the principles of CBT.
 Open questions help the client express themselves.
 Use reflections to show you are listening.
 
-Think carefully. What could the therapist do at this point? 
+Think carefully. What could the therapist do at this point?
 
 Ⓐ
 ```
 
-The problem here is that 
+The problem here is that
 
 
-One workaround is to request a response format in which different components of the answer can be parsed by the user interface and stored and displayed separately. 
- 
+One workaround is to request a response format in which different components of the answer can be parsed by the user interface and stored and displayed separately.
+
 For example,  it's common to append the instruction to respond in JSON format:
 
 ```
@@ -207,15 +207,15 @@ Prompt 1:
 You are an excellent therapist.
 This is your conversation so far. Read carefully.
 
-[therapist] hi, how are are you today      
+[therapist] hi, how are are you today
 [client] not feeling so good
 ...                [turns omitted]
-                
+
 Follow the principles of CBT.
 Open questions help the client express themselves.
 Use reflections to show you are listening.
 
-Think carefully. What could the therapist do at this point? 
+Think carefully. What could the therapist do at this point?
 ⨁
 ```
 
@@ -226,7 +226,7 @@ In a second prompt, we can ask the model to continue the conversation:
 You are an excellent therapist.
 This is your conversation so far.
 
-[therapist] hi, how are are you today      
+[therapist] hi, how are are you today
 [client] not feeling so good
 
 You have decided a good course of action is to:
@@ -289,4 +289,3 @@ Mindframe attempts to provide simple solutions to the most common prompting patt
 Given the list of components (role, orientation, context, format, continuation, response) we can ask which of these are most effective in generating good quality responses from the model?
 
 The existing literature is not clear on this point, and papers often fail to report prompts in detail, or how they were templated.
-
