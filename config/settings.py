@@ -81,8 +81,9 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "whitenoise.runserver_nostatic",
     "rules.apps.AutodiscoverRulesConfig",
-    "magiclink",
+    # "magiclink",
     "djmail",
+    "django_celery_beat",
 ]
 
 MIDDLEWARE = [
@@ -219,21 +220,21 @@ AUTHENTICATION_BACKENDS = (
 LOGIN_URL = "magiclink:login"
 
 
-MAGICLINK_REQUIRE_SAME_IP = False
-MAGICLINK_TOKEN_USES = config("MAGICLINK_TOKEN_USES", default=5, cast=int)
-MAGICLINK_REQUIRE_SAME_BROWSER = config("MAGICLINK_REQUIRE_SAME_BROWSER", default=False, cast=bool)
-MAGICLINK_ANTISPAM_FORMS = False
-MAGICLINK_AUTH_TIMEOUT = config(
-    "MAGICLINK_AUTH_TIMEOUT", default=60 * 60 * 24 * 2, cast=int
-)  # 24 hours * X days
-MAGICLINK_LOGIN_REQUEST_TIME_LIMIT = config(
-    "MAGICLINK_LOGIN_REQUEST_TIME_LIMIT", default=30, cast=int
-)  # 24 hours
-MAGICLINK_VERIFY_INCLUDE_EMAIL = False
-MAGICLINK_ONE_TOKEN_PER_USER = True
-MAGICLINK_LOGIN_TEMPLATE_NAME = "magiclink/login.html"
-MAGICLINK_LOGIN_SENT_TEMPLATE_NAME = "magiclink/login_sent.html"
-MAGICLINK_LOGIN_FAILED_TEMPLATE_NAME = "magiclink/login_failed.html"
+# MAGICLINK_REQUIRE_SAME_IP = False
+# MAGICLINK_TOKEN_USES = config("MAGICLINK_TOKEN_USES", default=5, cast=int)
+# MAGICLINK_REQUIRE_SAME_BROWSER = config("MAGICLINK_REQUIRE_SAME_BROWSER", default=False, cast=bool)
+# MAGICLINK_ANTISPAM_FORMS = False
+# MAGICLINK_AUTH_TIMEOUT = config(
+#     "MAGICLINK_AUTH_TIMEOUT", default=60 * 60 * 24 * 2, cast=int
+# )  # 24 hours * X days
+# MAGICLINK_LOGIN_REQUEST_TIME_LIMIT = config(
+#     "MAGICLINK_LOGIN_REQUEST_TIME_LIMIT", default=30, cast=int
+# )  # 24 hours
+# MAGICLINK_VERIFY_INCLUDE_EMAIL = False
+# MAGICLINK_ONE_TOKEN_PER_USER = True
+# MAGICLINK_LOGIN_TEMPLATE_NAME = "magiclink/login.html"
+# MAGICLINK_LOGIN_SENT_TEMPLATE_NAME = "magiclink/login_sent.html"
+# MAGICLINK_LOGIN_FAILED_TEMPLATE_NAME = "magiclink/login_failed.html"
 
 
 STORAGES = {
