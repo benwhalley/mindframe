@@ -188,7 +188,7 @@ def parse_prompt(prompt_text) -> OrderedDict:
 
 
 @observe(capture_input=False, capture_output=False)
-def structured_chat(prompt, llm, return_type, max_retries=3):
+def structured_chat(prompt, llm, return_type, max_retries=3, extra_body={}):
     """
     Make a tool call to an LLM, returning the `response` field, and a completion object
     """
@@ -200,6 +200,7 @@ def structured_chat(prompt, llm, return_type, max_retries=3):
             response_model=return_type,
             messages=[{"role": "user", "content": prompt}],
             max_retries=max_retries,
+            extra_body=extra_body,
         )
         msg, lt, meta = res, None, com.dict()
 
@@ -211,7 +212,7 @@ def structured_chat(prompt, llm, return_type, max_retries=3):
 
 
 @observe(capture_input=False, capture_output=False)
-def simple_chat(prompt, llm):
+def simple_chat(prompt, llm, extra_body={}):
     """For a text prompt and LLM model, return a string completion."""
 
     # we can't use chat_with_completion because it needs a response model
@@ -224,6 +225,7 @@ def simple_chat(prompt, llm):
             model=llm.model_name,
             response_model=None,
             messages=[{"role": "user", "content": prompt}],
+            extra_body=extra_body,
         )
         res_text = res.choices[0].message.content
         res, com = (
@@ -255,7 +257,7 @@ class ChatterResult(OrderedDict):
 
 
 @observe(capture_input=False, capture_output=False)
-def chatter(multipart_prompt, model, context={}):
+def chatter(multipart_prompt, model, context={}, cache=True):
     """
     Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next.
 
@@ -267,6 +269,20 @@ def chatter(multipart_prompt, model, context={}):
     The completions from earlier segments are accumulated into a context dictionary,
     making them available for explicit use in later segments.
     """
+
+    # litellm takes a cache param in extra_body, see
+    # https://docs.litellm.ai/docs/proxy/caching
+    # ttl	Optional(int)	Will cache the response for the user-defined amount of time (in seconds)
+    # s-maxage	Optional(int)	Will only accept cached responses that are within user-defined range (in seconds)
+    # no-cache	Optional(bool)	Will not store the response in cache.
+    # no-store	Optional(bool)	Will not cache the response
+    # namespace	Optional(str)	Will cache the response under a user-defined namespace
+
+    if not cache:
+        extra_body = {"cache": {"no-store": True}}
+    else:
+        extra_body = {}
+
     # Define a regex to split the prompt into segments.
     # e.g. |||=== or ||| ===
     SEGMENT_SPLIT_RE = re.compile(r"¡OBLIVIATE\s*")
@@ -323,7 +339,9 @@ def chatter(multipart_prompt, model, context={}):
                 rt = prompt_part.return_type
 
             # Call the LLM via structured_chat.
-            res, completion_obj = structured_chat(rendered_prompt, model, return_type=rt)
+            res, completion_obj = structured_chat(
+                rendered_prompt, model, return_type=rt, extra_body=extra_body
+            )
             res = res and res.response or None
 
             if key in ["RESPONSE_", "response"]:
