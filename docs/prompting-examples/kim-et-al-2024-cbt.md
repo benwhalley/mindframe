@@ -17,7 +17,7 @@ Condition prompt
 The client starts the conversation as [client] and the psychotherapist starts the conversation as [psychotherapist]. Please use the dialog and speakers info as a guide to continue your consultation like #format#. Never create anything other than the #format# and just complete the “utterance” part.
 
 #format#
-[client]: “utterance” 
+[client]: “utterance”
 [psychotherapist]: “utterance”
 ```
 
