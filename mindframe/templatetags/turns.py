@@ -8,16 +8,6 @@ from mindframe.tree import conversation_history
 register = template.Library()
 
 
-def format_turns(turns):
-    if not turns.count():
-        return "No conversation history yet."
-
-    formatted_turns = "\n\n".join(
-        [f"{t.speaker.role.upper()}: {t.text}" for t in turns.order_by("timestamp")]
-    )
-    return mark_safe(formatted_turns)
-
-
 @register.simple_tag(takes_context=True)
 def turns(context, filter_type="all", n=None):
 
@@ -32,37 +22,50 @@ def turns(context, filter_type="all", n=None):
         t = turns.filter(session_state__step=session.current_step())
 
     if n:
-        t = list(t)[: n - 1]
+        t = list(t)[:n]
         # query again because otherwise we return a list not a queryset
         t = Turn.objects.filter(id__in=[turn.id for turn in t])
 
-    return format_turns(t)
+    formatted_turns = "\n\n".join(
+        [
+            f"{t.depth}. {t.speaker.transcript_speaker_label()} {t.text}"
+            for i, t in enumerate(t.order_by("timestamp"), start=1)
+        ]
+    )
+    return mark_safe(formatted_turns)
 
 
-# @register.filter
-# def turns(session, filter_type):
-#     turns = Turn.objects.filter(session_state__session__id=session.id).order_by("timestamp")
+@register.simple_tag(takes_context=True)
+def turns_with_reminder(context, reminder_text, every_n_turns, filter_type="all", total_turns=None):
 
-#     if filter_type == "all":
-#         t = turns
+    # Access `session` from the context
+    turn = context.get("current_turn")
 
-#     if filter_type == "step":
-#         t = turns.filter(session_state__step=session.current_step())
+    if filter_type == "all":
+        trns = conversation_history(turn).order_by("timestamp")
 
-#     # handle 'recent:10' syntax
-#     if filter_type.startswith("recent:"):
-#         try:
-#             limit = int(filter_type.split(":")[1])
-#             t = turns[:limit]
-#         except (IndexError, ValueError):
-#             t = turns
+    elif filter_type == "step":
+        raise NotImplementedError("Filtering by step is not yet implemented.")
 
-#     return format_turns(t)
+    if total_turns:
+        trns = list(trns)[:n]
+        # query again because otherwise we return a list not a queryset
+        trns = Turn.objects.filter(id__in=[turn.id for turn in trns])
 
+    formatted_turns = [
+        f"{t.depth}. {t.speaker.transcript_speaker_label()} {t.text}"
+        for i, t in enumerate(trns, start=1)
+    ]
 
-# @register.filter
-# def format_turns(turns):
-#     return format_turns(turns)
+    def insert_reminder(lst, reminder_text, every_n_turns):
+        result = []
+        for i, item in enumerate(lst, start=1):
+            result.append(item)
+            if i % every_n_turns == 0:
+                result.append(reminder_text)
+        return result
+
+    return mark_safe("\n\n".join(insert_reminder(formatted_turns, reminder_text, every_n_turns)))
 
 
 @register.simple_tag
