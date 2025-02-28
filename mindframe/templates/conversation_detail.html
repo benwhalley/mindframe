@@ -241,7 +241,7 @@
                     Note: {{object.synthetic_turns_scheduled}} additional turns are scheduled to be generated for this conversation.
                 </div>
 
-                <meta http-equiv="refresh" content="5;url=#conversationend">
+                <meta http-equiv="refresh" content="5;url={% url 'conversation_detail' leaf_node.uuid %}#conversationend">
 
             {% endif %}
 
