@@ -1,11 +1,13 @@
-import sys
 import os
-import gradio as gr
+import sys
 import traceback
+
+import gradio as gr
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 import logging
+
 from django.shortcuts import get_object_or_404
 
 logger = logging.getLogger(__name__)
@@ -16,15 +18,16 @@ def main():
 
     django.setup()
 
-    from mindframe.models import Conversation, RoleChoices, Turn
-    from mindframe.conversation import listen, respond
-    from mindframe.tree import conversation_history
     from django.conf import settings
-    from django.urls import reverse
+    from django.contrib.sessions.models import Session
     from django.core import signing
     from django.core.exceptions import SuspiciousOperation
-    from django.contrib.sessions.models import Session
     from django.shortcuts import get_object_or_404
+    from django.urls import reverse
+
+    from mindframe.conversation import listen, respond
+    from mindframe.models import Conversation, RoleChoices, Turn
+    from mindframe.tree import conversation_history
 
     def verify_gradio_chat_token(request: gr.Request):
         """

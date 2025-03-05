@@ -1,43 +1,37 @@
 import logging
 import pprint
-from django.forms.models import model_to_dict
-from django.contrib import admin
-from django.db import models
-from django.shortcuts import redirect
-from django.urls import path
-from django.utils.html import format_html
-from django.conf import settings
-from django.forms import Textarea
-from django.utils.html import format_html, format_html_join
-from django.urls import reverse
-from django.contrib import admin
-from django.shortcuts import render, redirect
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponseRedirect
 
 import shortuuid
+from django.conf import settings
 from django.contrib import admin
-from .models import (
-    CustomUser,
-    Intervention,
-    Step,
-    Transition,
-    Turn,
-    Note,
-    Judgement,
-    StepJudgement,
-    LLM,
-    Memory,
-    MemoryChunk,
-    Conversation,
-)
+from django.db import models
+from django.forms import Textarea
+from django.forms.models import model_to_dict
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import path, reverse
+from django.utils.html import format_html, format_html_join
+from ruamel.yaml import YAML
 
-
-from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, BranchReasons, TurnTextSourceTypes
 from mindframe.graphing import mermaid_diagram
+from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, BranchReasons, TurnTextSourceTypes
 from mindframe.tree import create_branch
 
-from ruamel.yaml import YAML
+from .models import (
+    LLM,
+    Conversation,
+    CustomUser,
+    Intervention,
+    Judgement,
+    Memory,
+    MemoryChunk,
+    Note,
+    Nudge,
+    Step,
+    StepJudgement,
+    Transition,
+    Turn,
+)
 
 yaml = YAML()
 yaml.default_flow_style = False  # Use block style

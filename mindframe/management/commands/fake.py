@@ -3,18 +3,20 @@
 ./manage.py fake --turns=2 --continue 41
 """
 
+import logging
+
 from django.core.management.base import BaseCommand, CommandError
 from django.shortcuts import get_object_or_404
+
 from mindframe.models import (
-    Intervention,
-    TreatmentSession,
-    SyntheticConversation,
     Cycle,
+    Intervention,
     RoleChoices,
+    SyntheticConversation,
+    TreatmentSession,
 )
-from mindframe.synthetic import add_turns
-import logging
 from mindframe.silly import silly_user
+from mindframe.synthetic import add_turns
 
 logger = logging.getLogger(__name__)
 

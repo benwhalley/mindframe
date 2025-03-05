@@ -1,6 +1,7 @@
 from django.db.models import Q
-from mindframe.models import Transition
 from django.urls import reverse
+
+from mindframe.models import Transition
 
 
 def mermaid_diagram(obj):

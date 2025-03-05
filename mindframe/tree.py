@@ -1,10 +1,12 @@
-import logging
+import hashlib
 import json
+import logging
+
 from django.urls import reverse
 from django.utils.html import escape
-from mindframe.helpers import get_ordered_queryset, generate_color_palette
+
+from mindframe.helpers import generate_color_palette, get_ordered_queryset
 from mindframe.settings import BranchReasons
-import hashlib
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,7 @@
-from django.db.models import Case, When
-from box import Box
 import logging
+
+from box import Box
+from django.db.models import Case, When
 
 logger = logging.getLogger(__name__)
 

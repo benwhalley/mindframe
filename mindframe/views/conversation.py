@@ -1,29 +1,24 @@
-from django.shortcuts import redirect
-from django import forms
-from django.urls import reverse
+import logging
 import random
-
-from django.views.generic.detail import DetailView
-from django.views.generic.edit import FormView
-from django.views.generic.edit import FormMixin
-from django.urls import reverse_lazy
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import F
 from itertools import cycle
 
-from mindframe.conversation import listen, continue_conversation_task
-from mindframe.models import Turn, Intervention, CustomUser, Conversation
+from django import forms
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import F
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse, reverse_lazy
+from django.views.generic.detail import DetailView
+from django.views.generic.edit import FormMixin, FormView
+
+from mindframe.conversation import continue_conversation_task, listen
+from mindframe.models import Conversation, CustomUser, Intervention, Step, Turn
+from mindframe.silly import silly_user
 from mindframe.tree import (
     conversation_history,
-    generate_mermaid_tree,
     generate_d3_tree_data,
+    generate_mermaid_tree,
     generate_treant_tree_data,
 )
-from mindframe.silly import silly_user
-from django.shortcuts import get_object_or_404
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 

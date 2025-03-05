@@ -1,7 +1,7 @@
 import json
-from pydantic import BaseModel, create_model, Field
 from typing import List, Literal, Optional
 
+from pydantic import BaseModel, Field, create_model
 
 # Standard RTs for template syntax
 

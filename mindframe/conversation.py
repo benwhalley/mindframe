@@ -1,34 +1,28 @@
-from typing import Optional
-from collections import OrderedDict
-import pprint
-from django.db.models import QuerySet
-from mindframe.models import (
-    Turn,
-    CustomUser,
-    Transition,
-    LLM,
-    Note,
-    Conversation,
-    Intervention,
-    Step,
-)
-from mindframe.silly import silly_user
-import traceback
 import logging
+import pprint
+import traceback
+from collections import OrderedDict
 from itertools import cycle
-from django.shortcuts import get_object_or_404
-from mindframe.settings import mfuuid, StepJudgementFrequencyChoices, RoleChoices
-from mindframe.helpers import make_data_variable, get_ordered_queryset
-from llmtools.llm_calling import chatter
-from mindframe.tree import conversation_history, iter_conversation_path
-from mindframe.settings import (
-    TurnTextSourceTypes,
-    DEFAULT_CONVERSATION_MODEL_NAME,
-    DEFAULT_JUDGEMENT_MODEL_NAME,
-)
-from langfuse.decorators import langfuse_context, observe
+from typing import Optional
 
 from celery import shared_task
+from django.db.models import QuerySet
+from django.shortcuts import get_object_or_404
+from langfuse.decorators import langfuse_context, observe
+
+from llmtools.llm_calling import chatter
+from mindframe.helpers import get_ordered_queryset, make_data_variable
+from mindframe.models import LLM, Conversation, CustomUser, Judgement, Note, Step, Transition, Turn
+from mindframe.settings import (
+    DEFAULT_CONVERSATION_MODEL_NAME,
+    DEFAULT_JUDGEMENT_MODEL_NAME,
+    RoleChoices,
+    StepJudgementFrequencyChoices,
+    TurnTextSourceTypes,
+    mfuuid,
+)
+from mindframe.silly import silly_user
+from mindframe.tree import conversation_history, iter_conversation_path
 
 logger = logging.getLogger(__name__)
 

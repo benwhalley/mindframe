@@ -1,10 +1,12 @@
-from django.shortcuts import render, get_object_or_404, redirect
-from llmtools.llm_calling import chatter
-from .models import Tool
-from django import forms
 import re
-
 from string import Template
+
+from django import forms
+from django.shortcuts import get_object_or_404, redirect, render
+
+from llmtools.llm_calling import chatter
+
+from .models import Tool
 
 
 class ToolInputForm(forms.Form):

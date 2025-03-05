@@ -1,7 +1,9 @@
+from typing import List, Optional
+
 from django.test import TestCase
 from pydantic import BaseModel, Field
+
 from llmtools.llm_calling import chatter, split_multipart_prompt
-from typing import List, Optional
 from mindframe.models import LLM
 
 

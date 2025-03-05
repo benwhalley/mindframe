@@ -1,5 +1,6 @@
 import django.db.models.deletion
 from django.db import migrations
+
 from mindframe.shortuuidfield import MFShortUUIDField
 
 

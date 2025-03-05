@@ -1,5 +1,6 @@
 from django import template
-from django.db.models import Subquery, OuterRef
+from django.db.models import OuterRef, Subquery
+
 from mindframe.models import Note
 
 register = template.Library()

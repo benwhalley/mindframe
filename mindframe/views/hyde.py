@@ -1,34 +1,23 @@
-from django.utils.text import slugify
-from django.shortcuts import redirect
-from django.utils import timezone
-from django import forms
-from django.views.generic.edit import FormMixin
-from django.urls import reverse
-from django.conf import settings
-from django.shortcuts import get_object_or_404
-from mindframe.silly import silly_name
-from django.views.generic.detail import DetailView
-from django.views.generic.base import TemplateView
-from django.views.generic.edit import FormView
-from django.urls import reverse_lazy
-from django.contrib.auth.mixins import LoginRequiredMixin
-from itertools import cycle
-from mindframe.conversation import add_turns_task
-from django.db.models import F
-
-import random
-from mindframe.models import (
-    Intervention,
-    CustomUser,
-    Conversation,
-    Memory,
-    Turn,
-    Note,
-    LLM,
-)
-from mindframe.tree import conversation_history
-
 import logging
+import random
+from itertools import cycle
+
+from django import forms
+from django.conf import settings
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import F
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse, reverse_lazy
+from django.utils import timezone
+from django.utils.text import slugify
+from django.views.generic.base import TemplateView
+from django.views.generic.detail import DetailView
+from django.views.generic.edit import FormMixin, FormView
+
+from mindframe.conversation import add_turns_task
+from mindframe.models import LLM, Conversation, CustomUser, Intervention, Memory, Note, Turn
+from mindframe.silly import silly_name
+from mindframe.tree import conversation_history
 
 logger = logging.getLogger(__name__)
 

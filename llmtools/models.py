@@ -1,8 +1,9 @@
 # models.py
 import re
+import uuid
+
 from django.db import models
 from django.urls import reverse
-import uuid
 
 
 class Tool(models.Model):

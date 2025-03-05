@@ -2,9 +2,9 @@ import io
 import os
 
 from rest_framework import serializers
-from mindframe.models import Intervention, Step, Judgement, Example, Transition, StepJudgement
-
 from ruamel.yaml import YAML
+
+from mindframe.models import Example, Intervention, Judgement, Step, StepJudgement, Transition
 
 yaml = YAML()
 # yaml.default_flow_style = False  # Use block style

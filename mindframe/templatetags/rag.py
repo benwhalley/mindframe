@@ -1,8 +1,10 @@
+import logging
+
 from django import template
 from django.db.models import Q
-from mindframe.models import MemoryChunk, Memory, LLM
 from django.utils.safestring import mark_safe
-import logging
+
+from mindframe.models import LLM, Memory, MemoryChunk
 
 logger = logging.getLogger(__name__)
 register = template.Library()

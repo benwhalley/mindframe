@@ -1,6 +1,7 @@
+import sys
+
 import shortuuid
 import six
-import sys
 from shortuuidfield import ShortUUIDField
 
 

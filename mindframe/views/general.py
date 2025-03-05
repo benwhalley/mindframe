@@ -1,27 +1,22 @@
-from django.utils.text import slugify
-from django.shortcuts import redirect
-from django.urls import reverse
-from django.conf import settings
-from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404
-from mindframe.silly import silly_name
-from django.views.generic.detail import DetailView
-from django.views.generic.base import TemplateView
-from django.views.generic.edit import FormView
-from django.urls import reverse_lazy
-from django.contrib.auth.mixins import LoginRequiredMixin
-from itertools import cycle
-from mindframe.conversation import add_turns_task
-from mindframe.conversation import start_conversation
-import random
-from mindframe.models import Intervention, CustomUser, Turn
-
-from django.contrib.auth.decorators import login_required
-from django.core import signing
-from django.shortcuts import render
-
-
 import logging
+import random
+from itertools import cycle
+
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core import signing
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse, reverse_lazy
+from django.utils.text import slugify
+from django.views.generic.base import TemplateView
+from django.views.generic.detail import DetailView
+from django.views.generic.edit import FormView
+
+from mindframe.conversation import add_turns_task, start_conversation
+from mindframe.models import CustomUser, Intervention, Turn
+from mindframe.silly import silly_name
 
 logger = logging.getLogger(__name__)
 

@@ -1,18 +1,13 @@
 from django.urls import path
 
-
-from mindframe.views.general import start_gradio_chat, IndexView
-
-from mindframe.views.hyde import (
-    RAGHyDEComparisonView,
-)
+from mindframe.telegram import telegram_webhook
 from mindframe.views.conversation import (
     ConversationDetailView,
-    ImportConversationView,
     ConversationMermaidView,
+    ImportConversationView,
 )
-
-from mindframe.telegram import telegram_webhook
+from mindframe.views.general import IndexView, start_gradio_chat
+from mindframe.views.hyde import RAGHyDEComparisonView
 
 urlpatterns = [
     path("telegram-webhook/", telegram_webhook, name="telegram_webhook"),

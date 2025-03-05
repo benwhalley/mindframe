@@ -1,24 +1,24 @@
 import os
-import django
 from datetime import timedelta
+
+import django
 from django.utils import timezone
 
-from mindframe.models import (
-    CustomUser,
-    Conversation,
-    Turn,
-    Transition,
-    Note,
-    Judgement,
-    LLM,
-    Intervention,
-    StepJudgement,
-)
-from mindframe.tree import iter_conversation_path, conversation_history
-from mindframe.templatetags.turns import format_turns
-from mindframe.settings import TurnTextSourceTypes
 from mindframe.conversation import *
-
+from mindframe.models import (
+    LLM,
+    Conversation,
+    CustomUser,
+    Intervention,
+    Judgement,
+    Note,
+    StepJudgement,
+    Transition,
+    Turn,
+)
+from mindframe.settings import TurnTextSourceTypes
+from mindframe.templatetags.turns import format_turns
+from mindframe.tree import conversation_history, iter_conversation_path
 
 # setup intervention
 

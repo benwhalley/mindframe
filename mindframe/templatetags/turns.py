@@ -1,8 +1,8 @@
 from django import template
 from django.db.models import Q
-from mindframe.models import Turn
 from django.utils.safestring import mark_safe
 
+from mindframe.models import Turn
 from mindframe.tree import conversation_history
 
 register = template.Library()

@@ -13,24 +13,26 @@ curl -X GET "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo"
 
 """
 
-import threading
-import time
-import os
+import ipaddress
 import json
 import logging
-from django.http import JsonResponse
+import os
+import threading
+import time
 import traceback
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth import get_user_model
-from django.urls import reverse
-from telegram import Update, Bot
-from mindframe.models import Conversation, Intervention, Step, Turn, CustomUser
-from mindframe.settings import TurnTextSourceTypes
-from mindframe.conversation import listen, respond
+
 import requests
+from decouple import Csv, config
+from django.contrib.auth import get_user_model
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-import ipaddress
-from decouple import config, Csv
+from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
+from telegram import Bot, Update
+
+from mindframe.conversation import listen, respond
+from mindframe.models import Conversation, CustomUser, Intervention, Step, Turn
+from mindframe.settings import TurnTextSourceTypes
 
 logger = logging.getLogger(__name__)
 User = get_user_model()

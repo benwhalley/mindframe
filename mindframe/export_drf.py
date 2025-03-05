@@ -1,16 +1,16 @@
 # TODO FIX BROKEN SERIALIZATION
 
-from django.db import transaction
-
 import hashlib
-import itertools
 import io
+import itertools
 import os
 from collections import defaultdict
 
+from django.db import transaction
 from rest_framework import serializers
-from mindframe.models import Intervention, Step, Judgement, Example, Transition, StepJudgement
 from ruamel.yaml import YAML
+
+from mindframe.models import Example, Intervention, Judgement, Step, StepJudgement, Transition
 
 yaml = YAML()
 

@@ -1,11 +1,11 @@
 # MINDFRAME SPECIFIC SETTINGS
 
-from django.conf import settings
 import os
-from django.db import models
+
 import shortuuid
 from decouple import config
-
+from django.conf import settings
+from django.db import models
 
 TELEGRAM_BOT_NAME = config("TELEGRAM_BOT_NAME", None)
 

@@ -1,58 +1,49 @@
 import hashlib
 import json
 import logging
-from collections.abc import Iterable
-import traceback
-from treebeard.ns_tree import NS_Node
-from pgvector.django import L2Distance
-from django.db.models import Window, F
-from box import Box
-
-
-from django.db.models import QuerySet, Q
-
-from django.db.models.functions import RowNumber
 from itertools import groupby
 
-from mindframe.shortuuidfield import MFShortUUIDField as ShortUUIDField
+import dateparser
 import instructor
+import shortuuid
 from autoslug import AutoSlugField
+from box import Box
+from dateutil import rrule
 from decouple import config
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import F, Q, QuerySet, Subquery, Window
+from django.db.models.functions import RowNumber
+from django.forms.models import model_to_dict
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.text import slugify
+from django_lifecycle import AFTER_CREATE, AFTER_UPDATE, LifecycleModel, hook
+from langfuse.decorators import langfuse_context, observe
 
 # use langfuse for tracing
 from langfuse.openai import OpenAI
-from langfuse.decorators import langfuse_context, observe
+from pgvector.django import HnswIndex, L2Distance, VectorField
+from recurrent.event_parser import RecurringEvent
+from treebeard.ns_tree import NS_Node
 
-
-from django.forms.models import model_to_dict
-from django.db import models
-from django.contrib.auth.models import AbstractUser
-from django.core.exceptions import ValidationError
-from django.urls import reverse
-from django.db.models import Q, QuerySet, Subquery
-from django.conf import settings
-
-from django.utils import timezone
-from django.utils.text import slugify
-
-import shortuuid
-from pgvector.django import VectorField, HnswIndex
-from django_lifecycle import LifecycleModel, hook, AFTER_UPDATE, AFTER_CREATE
-
-from mindframe.tree import iter_conversation_path
-from mindframe.chunking import CHUNKER_TEMPLATE
 from llmtools.llm_calling import chatter, get_embedding, simple_chat
+from mindframe.chunking import CHUNKER_TEMPLATE
 from mindframe.settings import (
+    DEFAULT_CHUNKING_MODEL_NAME,
+    DEFAULT_CONVERSATION_MODEL_NAME,
+    DEFAULT_JUDGEMENT_MODEL_NAME,
     MINDFRAME_SHORTUUID_ALPHABET,
-    InterventionTypes,
     BranchReasons,
-    TurnTextSourceTypes,
+    InterventionTypes,
     RoleChoices,
     StepJudgementFrequencyChoices,
-    DEFAULT_CONVERSATION_MODEL_NAME,
-    DEFAULT_CHUNKING_MODEL_NAME,
-    DEFAULT_JUDGEMENT_MODEL_NAME,
+    TurnTextSourceTypes,
 )
+from mindframe.shortuuidfield import MFShortUUIDField as ShortUUIDField
+from mindframe.tree import iter_conversation_path
 
 logger = logging.getLogger(__name__)
 langfuse_context.configure(debug=False)

@@ -1,9 +1,7 @@
 from django import template
-from django.db.models import Q
-from mindframe.models import Note
-from django.db.models import Max
-from django.db.models import OuterRef, Subquery
+from django.db.models import Max, OuterRef, Q, Subquery
 
+from mindframe.models import Note
 
 register = template.Library()
 

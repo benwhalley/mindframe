@@ -1,9 +1,10 @@
-import os
-import requests
 import logging
-from django.core.management.base import BaseCommand
-from django.conf import settings
+import os
+
+import requests
 from decouple import config
+from django.conf import settings
+from django.core.management.base import BaseCommand
 
 logger = logging.getLogger(__name__)
 

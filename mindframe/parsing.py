@@ -1,21 +1,20 @@
 from pyparsing import (
-    Word,
-    alphas,
-    alphanums,
-    delimitedList,
-    Suppress,
+    Combine,
+    Dict,
     Group,
+    Literal,
+    OneOrMore,
     Optional,
     QuotedString,
-    Dict,
-    ZeroOrMore,
-    Literal,
-    restOfLine,
     StringEnd,
-    Combine,
-    OneOrMore,
+    Suppress,
+    Word,
+    ZeroOrMore,
+    alphanums,
+    alphas,
+    delimitedList,
+    restOfLine,
 )
-
 
 # Example input
 example_text = """

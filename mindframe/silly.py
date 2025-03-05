@@ -1,6 +1,8 @@
 import random
-from mindframe.models import CustomUser
+
 from django.utils.text import slugify
+
+from mindframe.models import CustomUser
 
 first_names = [
     "Jacob",

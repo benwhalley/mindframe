@@ -5,9 +5,10 @@ from uuid import UUID
 
 from django.shortcuts import get_object_or_404
 from ninja import Router, Schema
-from .models import Tool, ToolKey
+
 from llmtools.llm_calling import chatter
 
+from .models import Tool, ToolKey
 
 router = Router()
 

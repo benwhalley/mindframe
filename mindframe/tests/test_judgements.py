@@ -1,18 +1,20 @@
 # Tests of creating pydantic models, using them as a schema for judgement return types and then processing judgements to make Notes
 
+import json
+from typing import List
+
 from django.test import TestCase
+from pydantic import BaseModel
+
 from mindframe.models import (
+    CustomUser,
+    Cycle,
+    Intervention,
     Judgement,
     JudgementReturnType,
-    Intervention,
-    TreatmentSession,
-    Cycle,
-    CustomUser,
     Note,
+    TreatmentSession,
 )
-from pydantic import BaseModel
-from typing import List
-import json
 
 
 # Define the Pydantic models for return types
@@ -41,7 +43,6 @@ from mindframe.structured_judgements import (
     data_extraction_function_factory,
     pydantic_model_from_schema,
 )
-
 
 # tt = TreatmentSession.objects.all().first()
 # tt.respond()

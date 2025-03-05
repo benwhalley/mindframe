@@ -1,33 +1,32 @@
-import traceback
 import logging
 import re
-from collections import namedtuple, OrderedDict, defaultdict
+import traceback
+from collections import OrderedDict, defaultdict, namedtuple
 from hashlib import sha256
-from typing import List
 from types import FunctionType
-from django.apps import apps
+from typing import List
 
+from django.apps import apps
 from django.conf import settings
 from django.template import Context, Template
+from langfuse.decorators import langfuse_context, observe
 from pydantic import BaseModel, Field
+
 from llmtools.return_type_models import (
-    SpokenResponse,
-    InternalThoughtsResponse,
-    selection_response_model,
     BooleanResponse,
-    DefaultResponse,
-    IntegerResponse,
-    PoeticalResponse,
-    ExtractedResponse,
     ChunkedConversationResponse,
+    DefaultResponse,
+    ExtractedResponse,
+    IntegerResponse,
+    InternalThoughtsResponse,
+    PoeticalResponse,
+    SpokenResponse,
+    selection_response_model,
 )
 
-from langfuse.decorators import observe
-from langfuse.decorators import langfuse_context
-
 langfuse_context.configure(debug=False)
-from langfuse.openai import OpenAI  # OpenAI integration with tracing
 from decouple import config
+from langfuse.openai import OpenAI  # OpenAI integration with tracing
 
 logger = logging.getLogger(__name__)
 
@@ -382,8 +381,9 @@ def get_embedding(texts, dimensions=1024) -> list:
 
 if False:
     from pprint import pprint
-    from mindframe.models import LLM
+
     from llmtools.llm_calling import chatter, parse_prompt
+    from mindframe.models import LLM
 
     mini = LLM.objects.filter(model_name="gpt-4o-mini").first()
 

@@ -1,10 +1,11 @@
-import os
 import json
+import os
+
+from django.core.management.base import BaseCommand
 from django.core.serializers import serialize
 from django.db import transaction
-from django.core.management.base import BaseCommand
 
-from mindframe.models import Intervention, Step, Transition, Judgement, Example, LLM, StepJudgement
+from mindframe.models import LLM, Example, Intervention, Judgement, Step, StepJudgement, Transition
 
 
 class Command(BaseCommand):

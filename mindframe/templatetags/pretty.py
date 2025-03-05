@@ -1,8 +1,8 @@
 import json
-from django import template
-import pandoc
-from django.utils.safestring import mark_safe
 
+import pandoc
+from django import template
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
