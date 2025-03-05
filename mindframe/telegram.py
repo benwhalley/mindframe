@@ -35,10 +35,15 @@ from decouple import config, Csv
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
-TELEGRAM_WEBHOOK_VALIDATION_TOKEN = config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN")
+TELEGRAM_WEBHOOK_VALIDATION_TOKEN = config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN", None)
 TELEGRAM_IP_RANGES = [ipaddress.ip_network(ip) for ip in ["149.154.160.0/20", "91.108.4.0/22"]]
-TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-bot = Bot(token=TELEGRAM_BOT_TOKEN)
+TELEGRAM_BOT_TOKEN = config("TELEGRAM_BOT_TOKEN", default=None)
+
+bot = TELEGRAM_BOT_TOKEN and Bot(token=TELEGRAM_BOT_TOKEN) or None
+
+
+if not (TELEGRAM_WEBHOOK_VALIDATION_TOKEN and TELEGRAM_BOT_TOKEN):
+    logger.warning("No telegram bot configured")
 
 
 def send_typing_status_continuous(chat_id, stop_event):
