@@ -1,11 +1,10 @@
 # Mindframe
 
-MindFrame is an integrated system for treatment developers. It makes it possible to implement psychologically informed chatbots built on large language models (LLMs), capable of high-quality individual and group intervention. The system is designed to be introspectable, verifiable, and adaptable to complex interventions and varied clinical settings.
+Mindframe is an integrated system for treatment developers. It makes it possible to implement psychologically informed chatbots built on large language models (LLMs), capable of high-quality individual and group intervention. The system is designed to be introspectable, verifiable, and adaptable to complex interventions and varied clinical settings.
 
-MindFrame coordinates multiple AI models, orchestrating their outputs into coherent, structured, conversations with clients. The system allows intervention developers to define sessions as directed graphs, with nodes representing different stages of the intervention. Complex interventions can be broken-down into smaller, more manageable components for development, testing and refinement, and the system can track client progress and adjust interventions based on historical data.
+Mindframe coordinates multiple AI models, orchestrating their outputs into coherent, structured, conversations with clients. The system allows intervention developers to define sessions as directed graphs, with nodes representing different stages of the intervention. Complex interventions can be broken-down into smaller, more manageable components for development, testing and refinement, and the system can track client progress and adjust interventions based on historical data.
 
-Using a graph-based representation of interventions, MindFrame allows for more control over the treatment flow, and for services to be more easily validated against guidelines and best pratice, tested for efficacy, and refined to suit the local context. Mindframe is not a 'black box': it is designed to ensure that services are grounded in psychological theory, are evidence-based, and can be properly supervised and audited by human clinicians.
-
+Using a graph-based representation of interventions, MindFrame allows for more control over the treatment flow, and for services to be more easily validated against guidelines and best practice, tested for efficacy, and refined to suit the local context. Mindframe is not a 'black box': it is designed to ensure that services are grounded in psychological theory, are evidence-based, and can be properly supervised and audited by human clinicians.
 
 ---
 
@@ -14,11 +13,11 @@ For developers looking to setup a local instance of mindframe, see: [this page](
 
 ### Key Features
 
-- *Modular Structure*: Allows intervetion developers to break down complex interventions into smaller components, making it easier to test and validate individual parts of an intervention.
+- *Modular Structure*: Allows intervention developers to break down complex interventions into smaller components, making it easier to test and validate individual parts of an intervention.
 
 - *Client Tracking*: A database maintains a history of each client’s progression, including conversation history, and a record of internal (system) judgements, notes, and other session information.
 
-- *Collaboation*: Mindframe uses simple text-based templates to define an intervetion in terms of steps, transitions, judgements, notes, and actions. Each part of the intervention can be revised and reviewed by the intervention developer in consultation with clinicians.
+- *Collaboration*: Mindframe uses simple text-based templates to define an intervetion in terms of steps, transitions, judgements, notes, and actions. Each part of the intervention can be revised and reviewed by the intervention developer in consultation with clinicians.
 
 - *Adaptable*: Interventions can be tailored to particular client groups or local context; retrieval augmented generation allows clinicians and managers to incorporate their own examples, case studies, and local knowledge.
 
@@ -33,7 +32,7 @@ Mindframe is different from other chatbot systems — especially those based on 
 
 Unlike systems which fine-tune language models to produce output similar in tone of style to that of a therapist, mindframe focusses on the structure of the therapy itself. This allows for more control over the therapy flow, and for interventions to be more easily validated and tested.
 
-Segmentation of different tasks allows treatment developers to integrate multiple specialised models trained in different tasks: for example different models may be used to detect transitions in conversation betwee stages of therapy, versus generating realistic text/speech. This helps to reduce the load on any single model, reduces hallucination, and ensures the language model follows the larger structural transitions within and across sessions. The modular nature of the system allows for easy testing and validation of individual intervention components.
+Segmentation of different tasks allows treatment developers to integrate multiple specialised models trained in different tasks: for example different models may be used to detect transitions in conversation between stages of therapy, versus generating realistic text/speech. This helps to reduce the load on any single model, reduces hallucination, and ensures the language model follows the larger structural transitions within and across sessions. The modular nature of the system allows for easy testing and validation of individual intervention components.
 
 
 
@@ -48,11 +47,11 @@ MindFrame organizes therapy sessions around several key primitives:
 
 - *Transitions*: Define pathways between steps and the conditions required to move from one step to the next.
 
-- *Turns* are the basic unit of interaction between the client and the system. A conversation is made up of multiple turns, each of which is associated with a step.
+- *Turns* are the basic unit of interaction between the client and the system and together form a *Conversation*. In regular use a Conversation is simple sequence of Turns, but the system stores Turns as nodes in a tree structure. At any turn in a Conversation a branch can be made, representing alternative paths the conversation could have taken (for example, during simulations using a synthetic client, or when collating multiple alternative human-generated completions). Each Turn is associated with a Step.
 
 - *Judgements* are structured evaluations of the client state based on conversation history and other stored data. Judgements are used to determine the timing of transitions between steps, or to log progress against pre-defined goals.
 
-- *Notes* allow summaries of conversation history to be saved as unstructured text — for example as clinical notes — providing context used in later generation steps, or to help human supervisors track clients' progress through an intervetion.
+- *Notes* allow summaries of conversation history to be saved as unstructured text — for example as clinical notes — providing context used in later generation steps, or to help human supervisors track clients' progress through an intervention.
 
 - *Questions* are prompts that solicit structured input from the client (e.g. mood ratings, or other measures of outcome).
 
