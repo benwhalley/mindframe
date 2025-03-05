@@ -2,6 +2,16 @@
 # TODO
 
 
+- add extra context to all prompts
+    - duration since previous client message
+    - time of day (where participant is)
+    - day of week
+    - location (if available)
+    - weather (if available)
+
+
+- 'summarising' judgements, which can send messages back
+
 
 Encourage Strategic Use of Silence and Pauses
 In human MI practice, silence is a powerful tool. While AI can’t be truly silent, it could be prompted to say something like:
@@ -9,8 +19,6 @@ In human MI practice, silence is a powerful tool. While AI can’t be truly sile
 
 
 
-
-Make some judgement tasks async. Allow them to happen an feed data back in, which can be used in later turns to reduce latency.
 
 
 
