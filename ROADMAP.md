@@ -1,7 +1,26 @@
 # Roadmap for `mindframe` development
 
 
-- magic links to start a new cycle/session - make sure they are safe
+## User engagement/maintenance
+
+Mark special steps as 'Nudges'
+These are not part of the main DAG, but still have a prompt and access to history.
+An intervention can define rules/schedules for when a check-in is needed.
+A check in step could also define preconditions for the check-in to be triggered, via a judgement.
+
+When triggered, a response is made using the check-in prompt.
+The user responds in the normal conversation flow.
+
+
+
+## Improved turn taking and picking the right speaker
+
+- tests for this
+
+
+## Group conversations and group processes?
+
+TBC
 
 
 
@@ -14,6 +33,8 @@ Problems to solve:
 2.  How to give treatment developers good and easy to use control over what gets included in a template: Both through the syntax in templates, and techniques like HyDE which might improve the quality of matching. Is caching also a part of this.
 
 
+## User and data management
+- magic links to start a new cycle/session - make sure they are safe
 
 
 ## Performance metrics
