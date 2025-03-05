@@ -1,5 +1,6 @@
 from django.db.models import Q
 from mindframe.models import Transition
+from django.urls import reverse
 
 
 def mermaid_diagram(obj):
@@ -35,7 +36,9 @@ classDef conditionText fill:none,color:green,stroke:none, font-size:12px;
 
     for step in steps:
         diagram.append(f'{step.slug.replace("-", "_")}["{step.title}"]')
-        diagram.append(f'click {step.slug.replace("-", "_")} "{step.get_absolute_url()}" "Goog"')
+        diagram.append(
+            f'click {step.slug.replace("-", "_")} "{reverse("admin:mindframe_step_change", args=[step.pk])}" "Goog"'
+        )
 
     for transition in transitions:
         from_slug = transition.from_step.slug.replace("-", "_")
