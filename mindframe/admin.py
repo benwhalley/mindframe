@@ -234,7 +234,7 @@ class LLMAdmin(admin.ModelAdmin):
 class TransitionInline(admin.TabularInline):
     model = Transition
     fk_name = "from_step"
-    extra = 1
+    extra = 0
     autocomplete_fields = ("to_step",)
 
     formfield_overrides = {
@@ -251,7 +251,7 @@ class TransitionInline(admin.TabularInline):
 
 class StepJudgementInline(admin.TabularInline):
     model = StepJudgement
-    extra = 1
+    extra = 0
     autocomplete_fields = ("judgement",)
 
 
@@ -263,7 +263,7 @@ class StepAdmin(admin.ModelAdmin):
         "order",
         "slug",
     )
-    # autocomplete_fields = ("intervention",)
+    autocomplete_fields = ("intervention",)
     search_fields = ("title", "intervention__title")
     list_editable = ["order"]
     list_filter = ("intervention",)
@@ -271,17 +271,23 @@ class StepAdmin(admin.ModelAdmin):
         StepJudgementInline,
         TransitionInline,
     ]
-    formfield_overrides = {
-        models.TextField: {
-            "widget": Textarea(
+
+    def formfield_for_dbfield(self, db_field, **kwargs):
+        if db_field.name == "prompt_template":
+            kwargs["widget"] = Textarea(
                 attrs={
                     "rows": 20,
-                    "cols": 100,
-                    "style": "resize: vertical; font-size: 10px; font-family:monospace;",
+                    "style": "width:100%; resize: vertical; font-size: 10px; font-family: monospace;",
                 }
             )
-        },
-    }
+        elif db_field.name == "opening_line":
+            kwargs["widget"] = Textarea(
+                attrs={
+                    "rows": 3,
+                    "style": "width 100%; resize: vertical;",
+                }
+            )
+        return super().formfield_for_dbfield(db_field, **kwargs)
 
 
 @admin.register(Transition)
