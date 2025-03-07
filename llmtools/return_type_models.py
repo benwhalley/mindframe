@@ -1,4 +1,5 @@
 import json
+from collections import OrderedDict, defaultdict
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, create_model
@@ -104,3 +105,21 @@ class IntegerResponse(BaseModel):
         ...,
         description="Valid integers only.",
     )
+
+
+ACTION_LOOKUP = defaultdict(lambda: DefaultResponse)
+ACTION_LOOKUP.update(
+    {
+        "speak": SpokenResponse,
+        "extract": ExtractedResponse,
+        "think": InternalThoughtsResponse,
+        "number": IntegerResponse,
+        "int": IntegerResponse,
+        "pick": selection_response_model,
+        "decide": BooleanResponse,
+        "boolean": BooleanResponse,
+        "bool": BooleanResponse,
+        "poem": PoeticalResponse,
+        "chunked_conversation": ChunkedConversationResponse,
+    }
+)

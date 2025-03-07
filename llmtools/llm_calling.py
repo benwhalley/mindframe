@@ -1,28 +1,18 @@
+from asgiref.sync import sync_to_async
+import asyncio
 import logging
 import re
 import traceback
-from collections import OrderedDict, defaultdict, namedtuple
+from collections import OrderedDict, namedtuple
 from hashlib import sha256
 from types import FunctionType
-from typing import List
+from typing import Any, List
 
-from django.apps import apps
-from django.conf import settings
 from django.template import Context, Template
 from langfuse.decorators import langfuse_context, observe
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from llmtools.return_type_models import (
-    BooleanResponse,
-    ChunkedConversationResponse,
-    DefaultResponse,
-    ExtractedResponse,
-    IntegerResponse,
-    InternalThoughtsResponse,
-    PoeticalResponse,
-    SpokenResponse,
-    selection_response_model,
-)
+from llmtools.return_type_models import ACTION_LOOKUP
 
 langfuse_context.configure(debug=False)
 from decouple import config
@@ -31,22 +21,6 @@ from langfuse.openai import OpenAI  # OpenAI integration with tracing
 logger = logging.getLogger(__name__)
 
 # a lookup dict of return types for different actions specified in prompt templates
-ACTION_LOOKUP = defaultdict(lambda: DefaultResponse)
-ACTION_LOOKUP.update(
-    {
-        "speak": SpokenResponse,
-        "extract": ExtractedResponse,
-        "think": InternalThoughtsResponse,
-        "number": IntegerResponse,
-        "int": IntegerResponse,
-        "pick": selection_response_model,
-        "decide": BooleanResponse,
-        "boolean": BooleanResponse,
-        "bool": BooleanResponse,
-        "poem": PoeticalResponse,
-        "chunked_conversation": ChunkedConversationResponse,
-    }
-)
 
 
 def split_multipart_prompt(text) -> OrderedDict:
@@ -71,11 +45,14 @@ def split_multipart_prompt(text) -> OrderedDict:
     # - all var_names are valid python identifiers
     # - all actions are valid (i.e. can be found in ACTION_LOOKUP)
 
+    # extract [[response]] blocks with regex
     varname_pattern = r"\[\[\s*([\w+\:\|\,\s+]+)\s*\]\]"
     parts = list(filter(bool, map(str.strip, re.split(varname_pattern, text))))
+
     # if we didn't explicitly include a final response variable, add one here
     if len(parts) % 2 == 1:
         parts.append("RESPONSE_")
+
     # iterate over tuples and return an ordered dictionary
     result = OrderedDict(zip(parts[1::2], parts[::2]))
     for text_segment, varname in zip(parts[::2], parts[1::2]):
@@ -256,7 +233,7 @@ class ChatterResult(OrderedDict):
 
 
 @observe(capture_input=False, capture_output=False)
-def chatter(multipart_prompt, model, context={}, cache=True):
+def chatter_(multipart_prompt, model, context={}, cache=True):
     """
     Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next.
 
@@ -379,63 +356,143 @@ def get_embedding(texts, dimensions=1024) -> list:
     return [i.embedding for i in response.data]
 
 
-if False:
-    from pprint import pprint
+# Asyncronos version of chatter_ which allows for parallel processing of segments
+# Segments are identified by the ¡OBLIVIATE marker at the moment
 
-    from llmtools.llm_calling import chatter, parse_prompt
-    from mindframe.models import LLM
 
-    mini = LLM.objects.filter(model_name="gpt-4o-mini").first()
+class ParallelSegmentResult:
+    """Class to hold results from a parallel segment execution"""
 
-    t4 = chatter(
+    def __init__(self, segment_id, completions, dependencies=None):
+        self.segment_id = segment_id
+        self.completions = completions  # Dict of key -> completion
+        self.dependencies = dependencies or set()  # Set of segment_ids this segment depends on
+
+
+class SegmentDependencyGraph:
+    """Analyzes dependencies between segments and determines execution order"""
+
+    def __init__(self, segments: List[str]):
+        self.segments = segments
+        self.dependency_graph = {}  # segment_id -> set of segment_ids it depends on
+        self.segment_vars = {}  # segment_id -> set of variable names defined in this segment
+        self.build_dependency_graph()
+
+    def build_dependency_graph(self):
+        # First pass: identify variables defined in each segment
+        for i, segment in enumerate(self.segments):
+            segment_id = f"segment_{i}"
+            # Extract variable names from prompt segment
+            pprompt = parse_prompt(segment)
+            self.segment_vars[segment_id] = set(pprompt.keys())
+            self.dependency_graph[segment_id] = set()
+
+        # Second pass: identify dependencies between segments
+        for i, segment in enumerate(self.segments):
+            segment_id = f"segment_{i}"
+            # Find all template variables {{ VAR}} in the segment
+            template_vars = set(re.findall(r"\{\{\s*(\w+)\s*\}\}", segment))
+
+            # For each template variable, find which earlier segment defines it
+            for var in template_vars:
+                for j in range(i):
+                    dep_segment_id = f"segment_{j}"
+                    if var in self.segment_vars[dep_segment_id]:
+                        self.dependency_graph[segment_id].add(dep_segment_id)
+
+    def get_execution_plan(self) -> List[List[str]]:
         """
-    Say something funny [[speak:A]]
-    And another thing: [[B]]
-    How funny are you? Pick one of the following: [[pick:C|unfunny, abitfunny, veryfunny]]
-
-    Think about this chat session. What is happening here? [[think:D]]
-    """,
-        model=mini,
-    )
-    t4
-
-    t5 = chatter(
+        Returns a list of batches, where each batch is a list of segment_ids
+        that can be executed in parallel
         """
-    Tell a joke [[speak:A]]
-    Think about this chat session. What is happening here? [[think:D]]
-    Is this a real conversation [[pick:E|yes, no]]
-    """,
-        model=mini,
-    )
-    t5
+        remaining = set(self.dependency_graph.keys())
+        execution_plan = []
 
-    chatter(
-        """
-    Think about mammals: [[think:D]]
-    """,
-        model=mini,
-    )
+        while remaining:
+            # segments with no unprocessed dependencies
+            ready = {
+                seg_id
+                for seg_id in remaining
+                if all(dep not in remaining for dep in self.dependency_graph[seg_id])
+            }
 
-    # examples of segmenting a prompt
+            if not ready and remaining:
+                # Circular dependency detected
+                logging.warning(f"Circular dependency detected in segments: {remaining}")
+                # Fall back to sequential execution for remaining segments
+                execution_plan.extend([[seg_id] for seg_id in remaining])
+                break
 
-    example_prompt = """
-    tell me a joke about apples
-    [[JOKE]]
-    tell me if the {{JOKE}} is funny
-    [[JOKE_EVALUATION]]
+            execution_plan.append(list(ready))
+            remaining -= ready
+
+        return execution_plan
+
+
+async def chatter_async(multipart_prompt: str, model, context={}, cache=True) -> ChatterResult:
     """
+    Parallel version of chatter that processes independent segments concurrently.
 
-    example_prompt2 = """
-    tell me a joke about apples
-    [[JOKE]]
+    For example, if we have
 
-    |||===
+    ```
+    Fav fruit? [[fruit]]
+    !OBLIVIATE
+    Fav color? [[color]]
+    !OBLIVIATE
+    Tell me a story about a {{color}} {{fruit}}
+    [[story]]
+    ```
 
-    tell me if this joke is funny
-    {{JOKE}}
-    [[JOKE_EVALUATION]]
+    `fruit` and `color` are processed in parallel.
+    The final segment is processed after both are complete.
+
     """
+    # Use original chatter for single-segment prompts
+    segments = re.compile(r"¡OBLIVIATE\s*").split(multipart_prompt)
 
-    model = LLM.objects.get(model_name="gpt-4o-mini")
-    print(chatter(example_prompt, model))
-    print(chatter(example_prompt2, model))
+    # Analyze dependencies between segments
+    dependency_graph = SegmentDependencyGraph(segments)
+    execution_plan = dependency_graph.get_execution_plan()
+    print(execution_plan)
+
+    # Final results and accumulated context
+    final_results = ChatterResult()
+    accumulated_context = context.copy()
+
+    # Process each batch in the execution plan sequentially
+    for batch in execution_plan:
+        segment_tasks = []
+
+        # Start tasks for all segments in this batch
+        for segment_id in batch:
+            segment_index = int(segment_id.split("_")[1])
+            segment = segments[segment_index]
+
+            # Use sync_to_async to safely call chatter from async context
+            task = sync_to_async(chatter_)(segment, model, accumulated_context, cache)
+            segment_tasks.append(task)
+
+        # Wait for all segments in this batch to complete
+        batch_results = await asyncio.gather(*segment_tasks)
+
+        # Add results to accumulated context for next batch
+        for i, result in enumerate(batch_results):
+            accumulated_context.update(dict(result))
+            final_results.update(dict(result))
+
+    # Set RESPONSE_ if needed
+    if "RESPONSE_" not in final_results and final_results:
+        last_key = next(reversed(final_results))
+        final_results["RESPONSE_"] = final_results[last_key]
+
+    return final_results
+
+
+def chatter(multipart_prompt: str, model, context={}, cache=True) -> ChatterResult:
+    """Synchronous wrapper for chatter_async"""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(chatter_async(multipart_prompt, model, context, cache))
+    finally:
+        loop.close()
