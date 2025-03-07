@@ -73,5 +73,4 @@ class Migration(migrations.Migration):
                 name="n_turns_must_be_positive_for_turn",
             ),
         ),
-        
     ]
