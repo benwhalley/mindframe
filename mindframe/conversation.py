@@ -103,6 +103,13 @@ def evaluate_judgement(judgement, turn):
     return nt
 
 
+@shared_task
+def evaluate_judgement_task(judgement_pk, turn_pk):
+    judgement = Judgement.objects.get(pk=judgement_pk)
+    turn = Turn.objects.get(pk=turn_pk)
+    return evaluate_judgement(judgement, turn)
+
+
 @observe(capture_input=False, capture_output=False)
 def complete_the_turn(turn) -> Turn:
     """
@@ -175,6 +182,21 @@ def listen(turn, text, speaker) -> Turn:
     return turn.add_child(conversation=turn.conversation, speaker=speaker, text=text)
 
 
+def judgement_applied_n_turns_ago(turn, judgement):
+    """
+    Returns how many turns ago the given judgement was last run in this conversation.
+
+    - If the judgement was never run, return -1.
+    - Otherwise, return the number of turns ago it was last run.
+    """
+    hist = conversation_history(turn)
+    last_note = Note.objects.filter(turn__in=hist).filter(judgement=judgement).last()
+    if last_note:
+        return turn.depth - last_note.turn.depth
+    else:
+        return -1
+
+
 @observe(capture_input=False, capture_output=False)
 def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=None) -> Turn:
     """
@@ -188,18 +210,31 @@ def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=No
         as_speaker = pick_speaker_for_next_response(turn)
 
     if not with_intervention_step:
-        # get turns made by this speaker and the step they are on
+
         spkr_history = conversation_history(turn).filter(speaker=as_speaker)
         speakers_prev_turn = spkr_history.filter(step__isnull=False).last()
         speakers_prev_step = speakers_prev_turn and speakers_prev_turn.step or None
+
         if not speakers_prev_step:
-            if turn.conversation.synthetic_client:
-                speakers_prev_step = turn.conversation.synthetic_client.steps.all().first()
-                logger.info(
-                    f"Using synthetic client intervention's first step: {speakers_prev_step}"
-                )
+            if as_speaker == turn.conversation.synthetic_client:
+                # Use synthetic client's intervention step
+                client_intervention = turn.conversation.synthetic_client.steps.all().first()
+                if client_intervention:
+                    speakers_prev_step = client_intervention
+                    logger.info(f"Using synthetic client intervention step: {speakers_prev_step}")
+                else:
+                    raise NotImplementedError("No Step/intervention found for client response.")
             else:
-                raise NotImplementedError("No Step/intervention found to use for response.")
+                # Use therapist intervention step
+                therapist_intervention = turn.conversation.interventions.filter(
+                    creator__role=RoleChoices.THERAPIST
+                ).first()
+                if therapist_intervention:
+                    speakers_prev_step = therapist_intervention.steps.first()
+                    logger.info(f"Using therapist's intervention step: {speakers_prev_step}")
+                else:
+                    raise NotImplementedError("No Step/intervention found for therapist response.")
+
         with_intervention_step = speakers_prev_step
 
     # prepare an 'empty' turn ready for completion
@@ -214,13 +249,34 @@ def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=No
     new_turn.save()
     logger.info(f"New turn created: {new_turn.uuid}")
 
+    # EVALUATE JUDGEMENTS IN-THIS-TURN
+
+    # TODO: write some test cases to exercise this code
     # run all the judgements to be made every Turn and ignore the Notes they produce
-    judgements_to_make = [
-        i.judgement
+    judgements_to_make_with_turns_ago = [
+        (i, judgement_applied_n_turns_ago(new_turn, i.judgement))
         for i in new_turn.step.stepjudgements.filter(when=StepJudgementFrequencyChoices.TURN)
     ]
-    [evaluate_judgement(j, new_turn) for j in judgements_to_make]
+    # here we filter to make sure judgements are only run when they are due
+    # sometimes that is only every N turns rather than every turn
+    judgements_to_make = [
+        sj
+        for sj, made_n_ago in judgements_to_make_with_turns_ago
+        if (made_n_ago > 0 and made_n_ago > (sj.n_turns and sj.n_turns or -1))
+        or (made_n_ago == -1 and new_turn.depth >= (sj.n_turns and sj.n_turns or -1))
+    ]
 
+    logger.info("Trigger offline Judgements")
+    [
+        evaluate_judgement_task.delay(sj.judgement.pk, new_turn.pk)
+        for sj in judgements_to_make
+        if sj.offline
+    ]
+
+    logger.info("Run online Judgements syncronously")
+    [evaluate_judgement(sj.judgement, new_turn) for sj in judgements_to_make if not sj.offline]
+
+    # TRANSITIONS
     # get the possible transitions, and if there is one possible
     transitions_possible = possible_transitions(new_turn)
     new_turn = apply_step_transition_and_judgements(new_turn, transitions_possible)
@@ -228,8 +284,6 @@ def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=No
     # do the final completion, using all the new context available from Judgements
     new_turn_complete = complete_the_turn(new_turn)
     logger.info(f"Finalized new turn UUID: {new_turn_complete.uuid}")
-
-    run_offline_judgements(new_turn_complete.pk)
 
     # ensure all the langfuse traces are identifiable by the Turn uuid
     langfuse_context.update_current_observation(
@@ -272,20 +326,6 @@ def apply_step_transition_and_judgements(turn, transitions_possible) -> Turn:
         ]
         [evaluate_judgement(j, turn) for j in judgements_to_make]
     return turn
-
-
-@shared_task
-@observe(capture_input=False, capture_output=False)
-def run_offline_judgements(turn_pk):
-    turn = Turn.objects.get(pk=turn_pk)
-    logger.info(f"Running offline judgements for {turn}")
-    judgements_to_make = turn.step.stepjudgements.filter(
-        when=StepJudgementFrequencyChoices.OFFLINE_STEP
-    ).values("judgement")
-    notes = [evaluate_judgement(j, turn) for j in judgements_to_make]
-    logger.info(notes)
-    langfuse_context.update_current_observation(session_id=turn.uuid)
-    langfuse_context.flush()
 
 
 def add_turns(turn, n_turns: int) -> Turn:
@@ -348,6 +388,9 @@ def start_conversation(
     turn = turn.add_child(
         conversation=turn.conversation, speaker=therapist, text=step.opening_line, step=step
     )
+    # if the step does't hard-code an opening line then we generate something
+    if not step.opening_line:
+        turn = complete_the_turn(turn)
 
     return turn
 
@@ -358,7 +401,7 @@ def continue_conversation(from_turn, speaker_interventions, n_turns) -> Turn:
     speaker_interventions is a dictionary of {speaker_username: intervention}
     """
 
-    logger.info(f"Continuing conversation from turn {from_turn.pk}/{from_turn.uuid[:5]}")
+    logger.info(f"Continuing the conversation from turn {from_turn.pk}/{from_turn.uuid[:5]}")
 
     # TODO: maybe update pick_speaker_for_next_response to use this logic instead
     all_speakers = [CustomUser.objects.get(username=k) for k in speaker_interventions.keys()]
@@ -367,6 +410,7 @@ def continue_conversation(from_turn, speaker_interventions, n_turns) -> Turn:
     interventions = cycle(speaker_interventions.values())
 
     for i, speak, inter in zip(range(n_turns), speakers, interventions):
+        logger.info(f"ADDING TURN: {i}, {speak}, {inter}")
         from_turn = respond(
             from_turn, as_speaker=speak, with_intervention_step=inter.steps.all().first()
         )
@@ -375,19 +419,21 @@ def continue_conversation(from_turn, speaker_interventions, n_turns) -> Turn:
 
 
 @shared_task
-def continue_conversation_task(from_turn_id, speaker_interventions, n_turns):
+def continue_conversation_task(from_turn_id, speakers_steps, n_turns):
     """
     Task to call continue_conversation
     speaker_interventions is a dictionary of {speaker_username: intervention_pk}
     """
 
     from_turn = Turn.objects.get(pk=from_turn_id)
-    speaker_interventions = {
-        k: Intervention.objects.get(pk=v) for k, v in speaker_interventions.items()
-    }
 
-    newleaf = continue_conversation(from_turn, speaker_interventions, n_turns)
-    logger.info("Resetting number of scheduled turns")
-    newleaf.conversation.synthetic_turns_scheduled = 0
-    newleaf.conversation.save()
+    speakers = [CustomUser.objects.get(pk=i[0]) for i in speakers_steps]
+    steps = [Step.objects.get(pk=i[1]) for i in speakers_steps]
+
+    for sp, st, i in zip(cycle(speakers), cycle(steps), range(n_turns)):
+        logger.info(f"ADDING TURN: {i}, {sp}, {st}")
+        from_turn = respond(from_turn, as_speaker=sp, with_intervention_step=st)
+        from_turn.conversation.synthetic_turns_scheduled += -1
+        from_turn.conversation.save()
+
     return True

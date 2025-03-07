@@ -18,7 +18,7 @@ from pyparsing import (
 
 # Example input
 example_text = """
-You are an expert in behaviour change. You and the client 
+You are an expert in behaviour change. You and the client
 are working on @problem.summary and @problem.elicited, which is the focus of this session.
 
 // These are some examples which might be relevant:

@@ -33,28 +33,16 @@ class AdditionalTurnsForm(forms.Form):
         widget=forms.NumberInput(attrs={"class": "form-control"}),
     )
 
-    def __init__(self, *args, conversation=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        if conversation:
-            speakers = conversation.speakers()
-            for speaker in speakers:
-                field_name = f"intervention__{speaker.username}"
-                default_intervention = Intervention.objects.filter(
-                    steps__generated_turns__speaker=speaker
-                ).first()
-                self.fields[field_name] = forms.ModelChoiceField(
-                    required=True,
-                    queryset=Intervention.objects.all(),
-                    help_text=f"Select an intervention for {speaker.username}",
-                    initial=default_intervention,
-                )
-            if speakers.count() == 1:
-                self.fields["intervention__additional_speaker"] = forms.ModelChoiceField(
-                    required=True,
-                    queryset=Intervention.objects.all(),
-                    help_text=f"Select an intervention for an additional speaker",
-                    initial=default_intervention,
-                )
+    next_speaker_step = forms.ModelChoiceField(
+        required=True,
+        queryset=Step.objects.all(),
+        help_text=f"Select an intervention/step for the next speaker ",
+    )
+    subsequent_speaker_step = forms.ModelChoiceField(
+        required=True,
+        queryset=Step.objects.all(),
+        help_text=f"Select an intervention/step for the subsequent speaker ",
+    )
 
 
 class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
@@ -74,29 +62,30 @@ class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
         form = self.get_form()
         if form.is_valid():
             n_turns = form.cleaned_data["n_turns"]
-            speaker_interventions = {
-                key.split("__")[-1]: form.cleaned_data[key].pk
-                for key in form.cleaned_data
-                if key.startswith("intervention__")
-            }
 
             # if the user only added 1 turn there is only 1 speaker/user created at
             # this point so we need to create a second to allow conversation to continue
             # `additional_speaker` is the key for the unknown speaker in the AdditionalTurnsForm
-            if speaker_interventions.get("additional_speaker", None):
-                newuser = silly_user()
-                speaker_interventions[newuser.username] = speaker_interventions[
-                    "additional_speaker"
-                ]
-                del speaker_interventions["additional_speaker"]
 
             self.object.conversation.synthetic_turns_scheduled += n_turns
             self.object.conversation.save()
-            # leaf_turn = self.object.get_descendants().last() or self.object
 
+            subsequent_speaker = self.object.speaker
+            next_speaker = (
+                self.object.conversation.speakers().exclude(pk=subsequent_speaker.pk).first()
+                or silly_user()
+            )
+
+            speakers_steps = [
+                (next_speaker.pk, form.cleaned_data["next_speaker_step"].pk),
+                (
+                    subsequent_speaker.pk,
+                    form.cleaned_data["subsequent_speaker_step"].pk,
+                ),
+            ]
             continue_conversation_task.delay(
                 from_turn_id=self.object.pk,
-                speaker_interventions=speaker_interventions,
+                speakers_steps=speakers_steps,
                 n_turns=n_turns,
             )
 
@@ -107,7 +96,7 @@ class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
     def get_form_kwargs(self):
         """Pass the conversation instance to the form dynamically."""
         kwargs = super().get_form_kwargs()
-        kwargs["conversation"] = self.object.conversation
+        # kwargs["conversation"] = self.object.conversation
         return kwargs
 
     def get_context_data(self, **kwargs):

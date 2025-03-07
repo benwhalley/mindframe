@@ -59,10 +59,9 @@ class RoleChoices(models.TextChoices):
 class StepJudgementFrequencyChoices(models.TextChoices):
     """Specifies when/how frequently a judgement should be made during a step."""
 
-    TURN = "turn", "Each turn"
+    TURN = "turn", "Every n turns"
     ENTER = "enter", "When entering the step"
     EXIT = "exit", "When exiting the step"
-    OFFLINE_STEP = "offline", "After each turn asyncronously, probably available for the next turn"
 
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
