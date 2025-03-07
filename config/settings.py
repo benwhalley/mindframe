@@ -215,10 +215,10 @@ if DEBUG:
 AUTHENTICATION_BACKENDS = (
     "rules.permissions.ObjectPermissionBackend",
     "django.contrib.auth.backends.ModelBackend",
-    "magiclink.backends.MagicLinkBackend",
+    # "magiclink.backends.MagicLinkBackend",
 )
 
-LOGIN_URL = "magiclink:login"
+# LOGIN_URL = "magiclink:login"
 
 
 # MAGICLINK_REQUIRE_SAME_IP = False

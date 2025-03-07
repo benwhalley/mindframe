@@ -15,6 +15,7 @@
     version: e9f5a0bacfff31ffd4b244796a4eb0cf0754e1e69c24d1baa05e9ea68692e599
     sem_ver: '1'
     intervention_type: therapy
+    default_speaker: null
     is_default_intervention: true
     default_conversation_model:
     - gpt-4o-mini
@@ -28,6 +29,7 @@
     version: 1b9d60a0df3be24ea2031d84fd61e74ad423622d9f33d675f0bca6d35ebc32d3
     sem_ver: '1'
     intervention_type: therapy
+    default_speaker: null
     is_default_intervention: false
     default_conversation_model:
     - gpt-4o-mini
@@ -35,12 +37,37 @@
     - gpt-4o-mini
     default_chunking_model:
     - gpt-4o
+- model: mindframe.intervention
+  fields:
+    title: Test Intervention
+    slug: test-intervention
+    version: null
+    sem_ver: null
+    intervention_type: therapy
+    default_speaker: null
+    is_default_intervention: false
+    default_conversation_model: null
+    default_judgement_model: null
+    default_chunking_model: null
+- model: mindframe.intervention
+  fields:
+    title: Test Intervention
+    slug: test-intervention-2
+    version: null
+    sem_ver: null
+    intervention_type: therapy
+    default_speaker: null
+    is_default_intervention: false
+    default_conversation_model: null
+    default_judgement_model: null
+    default_chunking_model: null
 - model: mindframe.step
   fields:
     intervention: motivational-interviewing-demo
     title: Focussing
     order: 4
     slug: step-1
+    opening_line: null
     prompt_template: "In this prompt, we use pseudo-xml tags to denote different input:\r\n\r\n\r\nTheory
       and examples are used to provide info on MI\r\n\r\n- <theory>Instructions which
       relate to theory and good practice </theory>\r\n\r\n- <example>Examples of good
@@ -224,21 +251,21 @@
       this is a chat interface, you might need to say a little more than that (e.g.
       \"I see, can you tell me more about that?\"), but not much more.\r\n\r\n</guidance>\r\n\r\nUsing
       the guidance above, say the best thing you can to the client:\r\n\r\n[[speak:response]]"
-    opening_line: null
 - model: mindframe.step
   fields:
     intervention: motivational-interviewing-demo
     title: Evoking
     order: 3
     slug: step-2
-    prompt_template: nah
     opening_line: null
+    prompt_template: nah
 - model: mindframe.step
   fields:
     intervention: motivational-interviewing-demo
     title: Engaging
     order: 2
     slug: step-3-new-version
+    opening_line: ''
     prompt_template: "In this prompt, we use pseudo-xml tags to denote different input:\r\n\r\n\r\nTheory
       and examples are used to provide info on MI\r\n\r\n<theory>Instructions which
       relate to theory and good practice </theory>\r\n\r\n<example>Examples of good
@@ -376,21 +403,21 @@
       again \r\n- does it sound natural? \r\n- is it simple?\r\n- are you asking more
       than 1 question?\r\n- it is too long?\r\n\r\nIf so, do minor edits to your response
       to follow the guidance as well as possible.\r\n\r\n[[speak:response]]"
-    opening_line: ''
 - model: mindframe.step
   fields:
     intervention: motivational-interviewing-demo
     title: Planning
     order: 10
     slug: planning
-    prompt_template: blah
     opening_line: null
+    prompt_template: blah
 - model: mindframe.step
   fields:
     intervention: fake-client-eating
     title: Opening
     order: 1
     slug: opening
+    opening_line: null
     prompt_template: "# Context\r\n\r\nYou are trying to mimic a client undergoing
       motivational interviewing, a counseling approach that helps clients resolve
       ambivalence about behavior change. \r\n\r\nThe client in this dialogue is discussing
@@ -480,13 +507,13 @@
       Don't refer to these instructions in your talk.\r\n\r\nMatch the length and
       tone/style of what you say to what you said earlier in the conversation\r\n\r\nWhat
       does the client say next?\r\n\r\n[[speak:response]]"
-    opening_line: null
 - model: mindframe.step
   fields:
     intervention: fake-client-eating
     title: Ready to start
     order: 2
     slug: ready-to-start
+    opening_line: null
     prompt_template: "# Context\r\n\r\nYou are trying to mimic a client undergoing
       motivational interviewing, a counseling approach that helps clients resolve
       ambivalence about behavior change. \r\n\r\nThe client in this dialogue is discussing
@@ -535,13 +562,15 @@
       brief, don't include any preamble or explanation. Don't refer to these instructions
       in your talk.\r\n\r\nWhat does the client say next?\r\nMatch the length and
       tone/style of what you say to what you said earlier in the conversation\r\n\r\n[[speak:response]]"
-    opening_line: null
 - model: mindframe.step
   fields:
     intervention: motivational-interviewing-demo
     title: Setup and consent
     order: 0
     slug: setup-and-consent
+    opening_line: Hi, welcome to Mindframe. I'm an AI-powered chatbot, build to help
+      people lose weight take more exercise.  Is that something that might be interesting
+      to you?
     prompt_template: "<state>\r\nYou use Motivational Interviewing (MI) to help clients
       with eating nutrition and physical activity.\r\n</state>\r\n\r\n\r\n<theory>\r\n\r\n#
       Principles\r\n\r\n### Core Principles of MI:\r\n\r\n*Collaboration* – You and
@@ -595,9 +624,32 @@
       check your response was\r\n\r\n- simple, containing only 1 idea or question\r\n-
       natural, following on from the conversation before\r\n\r\n\r\nIf needed, adapt
       your response and reply to the client:\r\n\r\n[[speak:response]]"
-    opening_line: Hi, welcome to Mindframe. I'm an AI-powered chatbot, build to help
-      people lose weight take more exercise.  Is that something that might be interesting
-      to you?
+- model: mindframe.step
+  fields:
+    intervention: motivational-interviewing-demo
+    title: 24h checkin
+    order: 1
+    slug: 24h-checkin
+    opening_line: ''
+    prompt_template: "{% turns 'all' n=30 %}\r\n\r\nyou have been having a conversation
+      with a client.\r\nyou haven't heard from them for a while\r\ncheck in and see
+      if they would like to continue the conversation\r\n\r\nbe brief, friendly\r\n\r\n[[speak:response]]"
+- model: mindframe.step
+  fields:
+    intervention: test-intervention
+    title: Test Step
+    order: 1
+    slug: test-step
+    opening_line: null
+    prompt_template: ''
+- model: mindframe.step
+  fields:
+    intervention: test-intervention
+    title: Test Step
+    order: 1
+    slug: test-step
+    opening_line: null
+    prompt_template: ''
 - model: mindframe.transition
   fields:
     from_step:
@@ -788,6 +840,41 @@
       turns 'all' %}\r\n\r\n\r\nIs the client ready to start the intervention?\r\nThey
       can indicate this either by saying they are ready to start, or typing /start.\r\n\r\n[[boolean:ready]]"
     variable_name: mi_setup
+- model: mindframe.nudge
+  pk: 1
+  fields:
+    step_to_use:
+    - motivational-interviewing-demo
+    - 24h-checkin
+    schedule: every day at 6pm
+    for_a_period_of: 3 weeks
+    not_within_n_hours: 380
+    intervention:
+    - motivational-interviewing-demo
+    nudge_during: []
+- model: mindframe.nudge
+  pk: 2
+  fields:
+    step_to_use:
+    - motivational-interviewing-demo
+    - setup-and-consent
+    schedule: daily at 11am, starting in 3 days
+    for_a_period_of: 3 months
+    not_within_n_hours: 24
+    intervention: []
+    nudge_during: []
+- model: mindframe.nudge
+  pk: 3
+  fields:
+    step_to_use:
+    - motivational-interviewing-demo
+    - setup-and-consent
+    schedule: daily at 11am, starting today
+    for_a_period_of: 3 months
+    not_within_n_hours: 24
+    intervention:
+    - test-intervention
+    nudge_during: []
 - model: mindframe.stepjudgement
   fields:
     judgement:
@@ -797,6 +884,8 @@
     - motivational-interviewing-demo
     - engaging
     when: turn
+    n_turns: null
+    offline: false
     once: false
 - model: mindframe.stepjudgement
   fields:
@@ -807,6 +896,8 @@
     - motivational-interviewing-demo
     - focussing
     when: turn
+    n_turns: null
+    offline: false
     once: false
 - model: mindframe.stepjudgement
   fields:
@@ -817,6 +908,8 @@
     - motivational-interviewing-demo
     - engaging
     when: turn
+    n_turns: null
+    offline: false
     once: false
 - model: mindframe.stepjudgement
   fields:
@@ -827,4 +920,6 @@
     - motivational-interviewing-demo
     - setup-and-consent
     when: turn
+    n_turns: null
+    offline: false
     once: false
