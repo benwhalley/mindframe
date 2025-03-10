@@ -5,9 +5,10 @@ import traceback
 from collections import OrderedDict, namedtuple
 from hashlib import sha256
 from types import FunctionType
-from typing import Any, List
+from typing import Any, List, Dict
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import sync_to_async, async_to_sync
+
 from colored import Back, Fore, Style
 from django.template import Context, Template
 from langfuse.decorators import langfuse_context, observe
@@ -470,7 +471,9 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
             segment = segments[segment_index]
 
             # Use sync_to_async to safely call chatter from async context
-            task = sync_to_async(chatter_)(segment, model, accumulated_context, cache)
+            task = sync_to_async(chatter_, thread_sensitive=True)(
+                segment, model, accumulated_context, cache
+            )
             segment_tasks.append(task)
 
         # Wait for all segments in this batch to complete
@@ -491,8 +494,4 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
 
 def chatter(multipart_prompt: str, model, context={}, cache=True) -> ChatterResult:
     """Synchronous wrapper for chatter_async"""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(chatter_async(multipart_prompt, model, context, cache))
-    finally:
-        loop.close()
+    return async_to_sync(chatter_async)(multipart_prompt, model, context, cache)

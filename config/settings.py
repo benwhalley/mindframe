@@ -35,6 +35,11 @@ CSRF_TRUSTED_ORIGINS = config(
 
 DEBUG = config("DEBUG", default=False, cast=bool)
 DDT = config("DDT", default=False, cast=bool)
+DEBUG_TOOLBAR_CONFIG = {
+    "SHOW_TOOLBAR_CALLBACK": lambda request: DDT,  # This disables the toolbar by default
+}
+
+
 SECRET_KEY = config("SECRET_KEY")
 COMPRESS_ENABLED = config("COMPRESS_ENABLED", default=True, cast=bool)
 COMPRESS_OFFLINE = config("COMPRESS_OFFLINE", default=True, cast=bool)
@@ -296,7 +301,6 @@ DEBUG_TOOLBAR_PANELS = [
     "debug_toolbar.panels.redirects.RedirectsPanel",
     "debug_toolbar.panels.profiling.ProfilingPanel",
 ]
-DEBUG_TOOLBAR_CONFIG = {"ROOT_TAG_EXTRA_ATTRS": "hx-preserve"}
 
 LOGIN_REDIRECT_URL = "/"
 HIJACK_LOGIN_REDIRECT_URL = "/"

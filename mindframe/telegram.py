@@ -34,6 +34,7 @@ from mindframe.conversation import listen, respond
 from mindframe.models import Conversation, CustomUser, Intervention, Step, Turn
 from mindframe.settings import TurnTextSourceTypes
 
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
