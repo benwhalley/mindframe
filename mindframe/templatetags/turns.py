@@ -48,7 +48,7 @@ def turns_with_reminder(context, reminder_text, every_n_turns, filter_type="all"
         raise NotImplementedError("Filtering by step is not yet implemented.")
 
     if total_turns:
-        trns = list(trns)[:n]
+        trns = reversed(reversed(list(trns))[:n])
         # query again because otherwise we return a list not a queryset
         trns = Turn.objects.filter(id__in=[turn.id for turn in trns])
 
