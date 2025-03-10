@@ -58,7 +58,7 @@ services:
       - backend
     command:
       [
-        "sh",
+        "bash",
         "-c",
-        "celery --app mindframe worker --pool=solo --loglevel=debug"
+        "celery --app mindframe worker --pool=solo --loglevel=debug & python manage.py setup_tasks & celery --app mindframe beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler & wait"
       ]

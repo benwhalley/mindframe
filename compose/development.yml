@@ -28,8 +28,11 @@ services:
     env_file:
       - ~/.secrets/mindframe.dev.env
     command:
-      - sh
-      - -c
-      - python -m watchfiles --filter python 'celery --app mindframe worker --pool=solo --loglevel=debug'
+      [
+        "bash",
+        "-c",
+        "celery --app mindframe worker --pool=solo --loglevel=debug & celery --app mindframe beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler & wait"
+      ]
+
     volumes:
       - ~/dev/mindframe:/app:rw
