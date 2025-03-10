@@ -1,0 +1,19 @@
+services:
+  postgres:
+    env_file:
+      - ~/.secrets/psychologytools.llemma.net.env
+  web:
+    env_file:
+      - ~/.secrets/psychologytools.mindframe.llemma.net.env
+    labels:
+      caddy: "psychologytools.mindframe.llemma.net"
+      caddy.reverse_proxy: "{{upstreams 8000}}"
+  chat:
+    env_file:
+      - ~/.secrets/psychologytools.mindframe.llemma.net.env
+    labels:
+      caddy: "bot.psychologytools.mindframe.llemma.net"
+      caddy.reverse_proxy: "{{upstreams 8000}}"
+  worker:
+    env_file:
+      - ~/.secrets/psychologytools.mindframe.llemma.net.env
