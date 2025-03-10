@@ -6,7 +6,6 @@ from unittest import mock
 from llmtools.llm_calling import chatter, chatter_
 from mindframe.models import LLM
 
-
 model = LLM.objects.get(model_name="gpt-4o-mini")
 
 dependent_prompt = """

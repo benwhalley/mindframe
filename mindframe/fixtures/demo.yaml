@@ -631,9 +631,11 @@
     order: 1
     slug: 24h-checkin
     opening_line: ''
-    prompt_template: "{% turns 'all' n=30 %}\r\n\r\nyou have been having a conversation
-      with a client.\r\nyou haven't heard from them for a while\r\ncheck in and see
-      if they would like to continue the conversation\r\n\r\nbe brief, friendly\r\n\r\n[[speak:response]]"
+    prompt_template: "you have been having a conversation with a client.\r\nyou haven't
+      heard from them for a while\r\ncheck in and see if they would like to continue
+      the conversation\r\n\r\nYour last clinical note was:\r\n\r\n---\r\n\r\n{{data.nudge_preparation.summary}}\r\n\r\n---\r\n\r\ndrop
+      the client a message\r\nuse the notes if needed\r\nbe brief, friendly, encourging
+      — don't say anything heavy\r\n\r\n[[speak:response]]"
 - model: mindframe.step
   fields:
     intervention: test-intervention
@@ -650,6 +652,21 @@
     slug: test-step
     opening_line: null
     prompt_template: ''
+- model: mindframe.step
+  fields:
+    intervention: motivational-interviewing-demo
+    title: Encourage after pause
+    order: 1
+    slug: encourage-after-pause
+    opening_line: ''
+    prompt_template: "You are a therapist talking to a client.\r\nThey haven't replied
+      to your last message.\r\nContinue the conversation... nudge them to respond
+      in a context-dependent way.\r\nRead what has been said recently and think what
+      the best thing to say is:\r\n\r\nYou may already have given a nudge to the client;
+      if so make sure to say something different this time - don't just repeat yourself.\r\n\r\n{%
+      turns 'all' n=20 %}\r\n\r\nWhat could you say to encourage them to reply without
+      feeling pressured?\r\n\r\n[[think:thinking]]\r\n\r\nHaving thought about how
+      to phrase it, now send a short message:\r\n\r\n[[speak:response]]"
 - model: mindframe.transition
   fields:
     from_step:
@@ -840,41 +857,13 @@
       turns 'all' %}\r\n\r\n\r\nIs the client ready to start the intervention?\r\nThey
       can indicate this either by saying they are ready to start, or typing /start.\r\n\r\n[[boolean:ready]]"
     variable_name: mi_setup
-- model: mindframe.nudge
-  pk: 1
+- model: mindframe.judgement
   fields:
-    step_to_use:
-    - motivational-interviewing-demo
-    - 24h-checkin
-    schedule: every day at 6pm
-    for_a_period_of: 3 weeks
-    not_within_n_hours: 380
-    intervention:
-    - motivational-interviewing-demo
-    nudge_during: []
-- model: mindframe.nudge
-  pk: 2
-  fields:
-    step_to_use:
-    - motivational-interviewing-demo
-    - setup-and-consent
-    schedule: daily at 11am, starting in 3 days
-    for_a_period_of: 3 months
-    not_within_n_hours: 24
-    intervention: []
-    nudge_during: []
-- model: mindframe.nudge
-  pk: 3
-  fields:
-    step_to_use:
-    - motivational-interviewing-demo
-    - setup-and-consent
-    schedule: daily at 11am, starting today
-    for_a_period_of: 3 months
-    not_within_n_hours: 24
-    intervention:
-    - test-intervention
-    nudge_during: []
+    intervention: motivational-interviewing-demo
+    prompt_template: "{% 'turns' %}\r\n\r\nThis is a client-therapist conversation.\r\nPretend
+      you are the therapist.\r\nSummarise the conversation — write a brief clinical
+      note.\r\nCover - the topics, feelings and and plans from the conversation.\r\n\r\n[[think:summary]]"
+    variable_name: nudge_preparation
 - model: mindframe.stepjudgement
   fields:
     judgement:
@@ -923,3 +912,27 @@
     n_turns: null
     offline: false
     once: false
+- model: mindframe.stepjudgement
+  fields:
+    judgement:
+    - motivational-interviewing-demo
+    - nudge_preparation
+    step:
+    - motivational-interviewing-demo
+    - 24h-checkin
+    when: turn
+    n_turns: 1
+    offline: false
+    once: false
+- model: mindframe.nudge
+  pk: 1
+  fields:
+    step_to_use:
+    - motivational-interviewing-demo
+    - encourage-after-pause
+    schedule: every 5 minute
+    for_a_period_of: 10 minutes
+    not_within_n_minutes: 0
+    intervention:
+    - motivational-interviewing-demo
+    nudge_during: []

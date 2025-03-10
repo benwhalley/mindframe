@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+from datetime import timedelta
 from itertools import groupby
 
 import dateparser
@@ -14,8 +15,10 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import F, Q, QuerySet, Subquery, Window
+from django.db.models import F, OuterRef, Q, QuerySet, Subquery, Window
 from django.db.models.functions import RowNumber
+from django.db.models.signals import post_save, pre_save
+from django.dispatch import receiver
 from django.forms.models import model_to_dict
 from django.urls import reverse
 from django.utils import timezone
@@ -233,7 +236,6 @@ class Step(models.Model):
     title = models.CharField(max_length=255)
     order = models.PositiveSmallIntegerField(default=1)
     slug = AutoSlugField(populate_from="title")
-    prompt_template = models.TextField()
     judgements = models.ManyToManyField("Judgement", through="StepJudgement")
 
     opening_line = models.TextField(
@@ -791,6 +793,14 @@ class Turn(NS_Node):
         help_text="The Step used to generate this contribution to the conversation. If null, contributed by a human speaker.",
     )
 
+    nudge = models.ForeignKey(
+        "Nudge",
+        help_text="The scheduled Nudge which generated this turn (if any)",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+
     text = models.TextField(blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True, null=True)
     text_source = models.CharField(
@@ -818,3 +828,183 @@ class Turn(NS_Node):
 
     def __str__(self):
         return f"{self.uuid}"
+
+
+# class ChatInvite(LifecycleModel):
+#     invitor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="invites_sent")
+#     invite_code = models.CharField(max_length=255, unique=True)
+#     valid_until = models.DateTimeField(default=timezone.now+timezone.timedelta(months=1))
+
+#     def telegram_deeplink(self):
+#         from mindframe.settings import TELEGRAM_BOT_NAME
+#         if TELEGRAM_BOT_NAME:
+#             return f"https://t.me/{TELEGRAM_BOT_NAME}?start={self.invite_code}"
+#         else:
+#             return ValueError("TELEGRAM_BOT_NAME not set")
+
+
+class Nudge(LifecycleModel):
+    """
+    A scheduled nudge or check-in with the user.
+
+    Defines repeating rules. Uses a Step to script the interaction.
+    StepJudgements will be run to provide context, and Transitions and
+    conditions may be used to determine the next step (although if no
+    Transitions are specified then the current step would be preserved).
+
+    Scheduled nudges are actioned by calling respond(turn) on a leaf
+    node in a conversation, at the appropriate time.
+    """
+
+    def __str__(self):
+        return f"Nudge using {self.step_to_use}. {self.schedule}, {self.for_a_period_of}"
+
+    intervention = models.ManyToManyField(
+        "Intervention",
+        related_name="nudges",
+        blank=False,
+    )
+    nudge_during = models.ManyToManyField(
+        "Step",
+        blank=True,
+        help_text="Which Steps should this Nudge be applied to. If blank, applies to all Steps",
+        related_name="nudges",
+    )
+
+    step_to_use = models.ForeignKey(
+        "Step",
+        help_text="Which Step to use as a script for the Nudge",
+        on_delete=models.CASCADE,
+        related_name="used_by_nudges",
+    )
+
+    schedule = models.CharField(
+        max_length=1024,
+        null=False,
+        blank=False,
+        default="every week on Friday at 8pm",
+        help_text="A natural language string (in English) defining the pattern of repeats, following the last client-initiated turn. E.g. 'every 30 minutes', 'every tue and thur at 1pm' or 'every weekday at 9am'.",
+    )
+
+    for_a_period_of = models.CharField(
+        max_length=1024,
+        null=False,
+        blank=False,
+        default="3 weeks",
+        help_text="Natural language string defining how long the repeating rule should apply for. Based on the LAST client-initiated turn. E.g. '4 hours', '3 weeks' or '1 year'",
+    )
+
+    not_within_n_minutes = models.PositiveSmallIntegerField(
+        default=60,
+        help_text="If set, the nudge will not be scheduled within this many hours of the last client-initiated turn in the conversation.",
+    )
+
+    def end_date_(self, reference_datetime):
+        parsed_duration = dateparser.parse(
+            "after " + self.for_a_period_of, settings={"RELATIVE_BASE": reference_datetime}
+        )
+
+        if parsed_duration is None:
+            raise ValueError(f"Invalid period: {self.for_a_period_of}")
+
+        end_date = timezone.make_aware(parsed_duration)
+
+        if end_date > reference_datetime:
+            return end_date
+        else:
+            return reference_datetime
+
+    def scheduled_datetimes(self, reference_datetime):
+        earliest_allowed = reference_datetime + timedelta(minutes=self.not_within_n_minutes)
+        end_date = self.end_date_(reference_datetime)
+        r = RecurringEvent(now_date=reference_datetime)
+        r.parse(self.schedule)
+        if not r.get_RFC_rrule():
+            raise Exception(f"Invalid schedule: {self.schedule}")
+
+        rrl = iter(rrule.rrulestr(r.get_RFC_rrule()))
+        while True:
+            try:
+                d = timezone.make_aware(rrl.__next__())
+                if d < earliest_allowed:
+                    continue
+                if d < end_date:
+                    yield d
+                else:
+                    break
+            except StopIteration:
+                break
+
+
+class ScheduledNudgeManager(models.Manager):
+    def due_now(self, reference_datetime=None):
+        """
+        Returns the latest ScheduledNudge per Turn that is due now and not completed.
+        """
+        if not reference_datetime:
+            reference_datetime = timezone.now()
+
+        subquery = (
+            self.filter(
+                turn=OuterRef("turn"),
+                due__lte=reference_datetime,  # Ensure it's actually due
+                completed=False,  # Ensure it's still pending
+            )
+            .order_by("-due")
+            .values("id")[:1]
+        )  # Select the latest due one
+
+        return self.filter(id__in=Subquery(subquery))
+
+
+class ScheduledNudge(LifecycleModel):
+
+    objects = ScheduledNudgeManager()
+
+    turn = models.ForeignKey("Turn", on_delete=models.CASCADE, related_name="nudges")
+    nudge = models.ForeignKey("Nudge", on_delete=models.CASCADE, related_name="scheduled_nudges")
+
+    due = models.DateTimeField(blank=True, null=True)
+    completed = models.BooleanField(default=False)
+    completed_turn = models.ForeignKey(
+        "Turn", on_delete=models.CASCADE, related_name="completed_nudges", null=True, blank=True
+    )
+
+    class Meta:
+        ordering = ["due"]
+
+
+@receiver(post_save, sender=Turn)
+def schedule_nudges_after_turn(sender, instance, created, **kwargs):
+    """
+    When a new Turn is created, check if any nudges should be scheduled
+    and create the corresponding ScheduledNudge objects.
+    """
+    if not created:  # Only act on new Turns, not updates
+        return
+
+    conversation = instance.conversation
+    conver_intervs = conversation.interventions()
+    if not conver_intervs:
+        return  # No interventions, so no nudges apply
+
+    # Find last intervention step
+    last_turn_with_step = conversation.turns.filter(step__isnull=False).last()
+    last_interv_step = last_turn_with_step.step if last_turn_with_step else None
+
+    # Find applicable nudges
+    poss_nudges = Nudge.objects.filter(intervention__in=conver_intervs)
+    if last_interv_step:
+        poss_nudges = poss_nudges.filter(Q(nudge_during=last_interv_step) | Q(nudge_during=None))
+
+    # Create ScheduledNudges for each applicable nudge
+    snlist = []
+    for i in poss_nudges:
+        for j in i.scheduled_datetimes(instance.timestamp):
+            snlist.append(ScheduledNudge(turn=instance, nudge=i, due=j))
+
+    # Delete previous scheduled nudges and bulk insert all new objects
+    ScheduledNudge.objects.filter(completed=False, turn__conversation=conversation).delete()
+    if snlist:
+        logger.info(f"Scheduling {len(snlist)} nudges for turn {instance.uuid}")
+        ScheduledNudge.objects.bulk_create(snlist)

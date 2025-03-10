@@ -242,7 +242,7 @@ def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=No
         uuid=mfuuid(),
         conversation=turn.conversation,
         speaker=as_speaker,
-        text="... thinking ...",
+        text="[...thinking...]",
         step=with_intervention_step,
         text_source=TurnTextSourceTypes.GENERATED,
     )

@@ -65,6 +65,7 @@ To remake the fixtures from current data, select these models and use a docker c
 ```sh
 docker-compose run web \
 	./manage.py dumpdata \
+	mindframe.Nudge \
 	mindframe.Intervention \
 	mindframe.Step \
 	mindframe.StepJudgement \

@@ -10,6 +10,7 @@ from django.forms.models import model_to_dict
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
+from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from ruamel.yaml import YAML
 
@@ -27,6 +28,7 @@ from .models import (
     MemoryChunk,
     Note,
     Nudge,
+    ScheduledNudge,
     Step,
     StepJudgement,
     Transition,
@@ -151,6 +153,7 @@ class ConversationAdmin(admin.ModelAdmin):
     inlines = [TurnInline]
     list_display = ["__str__", "summary", "speakers", "active", "n_turns", "intervention", "uuid"]
     list_prefetch_related = ["intervention", "speakers"]
+    search_fields = ["uuid"]
 
     def n_turns(self, obj):
         return obj.turns.count()
@@ -344,9 +347,9 @@ class JudgementAdmin(admin.ModelAdmin):
         "prompt_template",
         "intervention",
     )
-    # autocomplete_fields = [
-    #     "intervention",
-    # ]
+    autocomplete_fields = [
+        "intervention",
+    ]
     search_fields = ["variable_name", "intervention__title"]
     list_editable = [
         "prompt_template",
@@ -603,3 +606,84 @@ class InterventionAdmin(admin.ModelAdmin):
         css = {
             "all": ("mindframe/css/admin-extra.css",),  # Optional custom admin styles
         }
+
+
+@admin.register(Nudge)
+class NudgeAdmin(admin.ModelAdmin):
+    autocomplete_fields = ["intervention", "nudge_during", "step_to_use"]
+    search_fields = ["intervention__title", "step_to_use__title"]
+    readonly_fields = ["example_dates"]
+
+    def example_dates(self, obj):
+        try:
+            scheduled_datetimes = list(obj.scheduled_datetimes(timezone.now()))
+            if not len(scheduled_datetimes):
+                return format_html("No times scheduled, check the syntax")
+            # todo check length of scheduled_datetimes first and limit display
+            return format_html_join(
+                "\n",
+                "<li>{}</li>",
+                ((dt.strftime("%Y-%m-%d %H:%M"),) for dt in scheduled_datetimes),
+            )
+        except Exception as e:
+            return str(e)
+
+    example_dates.short_description = "Example dates the nudge would be made"
+    example_dates.help_text = (
+        "This shows a preview of the next scheduled nudges assuming the last turn was now."
+    )
+
+
+class DueNowFilter(admin.SimpleListFilter):
+    title = "Due Now"
+    parameter_name = "due_now"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("yes", "Due Now"),
+            ("no", "Not Due Yet"),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return ScheduledNudge.objects.due_now()
+        elif self.value() == "no":
+            return ScheduledNudge.objects.filter(due__gt=timezone.now())
+        return queryset
+
+
+class DueSoonFilter(admin.SimpleListFilter):
+    title = "Due Soon"
+    parameter_name = "due_soon"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("1", "Due next 1 min"),
+            ("5", "Due next 5 mins"),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == "1":
+            return ScheduledNudge.objects.due_now(timezone.now() + timezone.timedelta(minutes=1))
+        elif self.value() == "5":
+            return ScheduledNudge.objects.due_now(timezone.now() + timezone.timedelta(minutes=5))
+        return queryset
+
+
+@admin.register(ScheduledNudge)
+class ScheduledNudgeAdmin(admin.ModelAdmin):
+    autocomplete_fields = [
+        "turn",
+        "nudge",
+    ]
+    list_display = [
+        "turn",
+        "due",
+        "completed",
+        "nudge__step_to_use",
+        "nudge__schedule",
+        "nudge__for_a_period_of",
+    ]
+    list_filter = ["completed", DueNowFilter, DueSoonFilter]
+    date_hierarchy = "due"
+    readonly_fields = ["completed_turn", "completed", "nudge", "turn"]
