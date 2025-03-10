@@ -12,6 +12,7 @@ dependencies = [
   "black",
   "boto3>=1.36.25",
   "celery>=5.4.0",
+  "colored>=2.3.0",
   "colorlog>=6.9.0",
   "crispy-bootstrap5>=2024.10",
   "dateparser>=1.2.1",

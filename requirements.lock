@@ -83,6 +83,8 @@ click-plugins==1.1.1
     # via celery
 click-repl==0.3.0
     # via celery
+colored==2.3.0
+    # via mindframe (pyproject.toml)
 colorlog==6.9.0
     # via mindframe (pyproject.toml)
 crashtest==0.4.1

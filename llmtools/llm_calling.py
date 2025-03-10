@@ -1,4 +1,3 @@
-from asgiref.sync import sync_to_async
 import asyncio
 import logging
 import re
@@ -8,6 +7,8 @@ from hashlib import sha256
 from types import FunctionType
 from typing import Any, List
 
+from asgiref.sync import sync_to_async
+from colored import Back, Fore, Style
 from django.template import Context, Template
 from langfuse.decorators import langfuse_context, observe
 from pydantic import Field
@@ -273,7 +274,6 @@ def chatter_(multipart_prompt, model, context={}, cache=True):
 
     # Split the entire prompt by the segment break marker.
     segments = SEGMENT_SPLIT_RE.split(multipart_prompt)
-    logger.info(segments)
 
     # If no segment break is found, segments will be a list with one element.
     for segment in segments:
@@ -307,7 +307,7 @@ def chatter_(multipart_prompt, model, context={}, cache=True):
                 + "\nAlways use the tools/JSON response.\n\n```json\n"
             )
             rendered_prompt = template.render(Context(merged_context))
-
+            logger.info(f"{Fore.cyan}{rendered_prompt}{Style.reset}")
             # Determine the appropriate return type.
             if isinstance(prompt_part.return_type, FunctionType):
                 rt = prompt_part.return_type(prompt_part.options)
