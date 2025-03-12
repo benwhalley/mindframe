@@ -153,7 +153,7 @@ class ConversationAdmin(admin.ModelAdmin):
     inlines = [TurnInline]
     list_display = ["__str__", "summary", "speakers", "active", "n_turns", "intervention", "uuid"]
     list_prefetch_related = ["intervention", "speakers"]
-    search_fields = ["uuid"]
+    search_fields = ["uuid", "turns__speaker__username", "turns__speaker__last_name"]
 
     def n_turns(self, obj):
         return obj.turns.count()
@@ -368,7 +368,7 @@ class InterventionAdmin(admin.ModelAdmin):
     )
     search_fields = ("title",)
     list_editable = ["is_default_intervention"]
-    readonly_fields = ["slug", "version"]
+    readonly_fields = ["version"]
     autocomplete_fields = [
         "default_conversation_model",
         "default_judgement_model",

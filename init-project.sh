@@ -52,7 +52,7 @@ docker-compose run web sh -c \
     --username=admin \
     --email=ben.whalley@plymouth.ac.uk"
 
-docker compose run web ./manage.py register_telegram_webhook # register telegram webhooks if using
+docker compose run web ./manage.py register_telegram # register telegram webhooks if using
 
 # run the site
 docker-compose up --build web chat worker

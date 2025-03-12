@@ -13,6 +13,7 @@ curl -X GET "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo"
 
 """
 
+import re
 import ipaddress
 import json
 import logging
@@ -32,8 +33,8 @@ from telegram import Bot, Update
 
 from mindframe.conversation import listen, respond
 from mindframe.models import Conversation, CustomUser, Intervention, Step, Turn
-from mindframe.settings import TurnTextSourceTypes
-
+from mindframe.settings import TurnTextSourceTypes, BranchReasons
+from mindframe.tree import create_branch, conversation_history
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -71,7 +72,7 @@ def send_typing_status(chat_id):
 def send_telegram_message(chat_id, text):
     """Send a Telegram message synchronously using requests."""
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {"chat_id": chat_id, "text": text}  # "parse_mode": "MarkdownV2"
+    data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
 
     try:
         response = requests.post(
@@ -115,6 +116,30 @@ def get_or_create_telegram_user(message) -> CustomUser:
     return user
 
 
+def welcome_message(chat_id):
+    send_telegram_message(chat_id, "Hi! This is the mindframe Telegram bot")
+    available = Intervention.objects.all().values_list("slug", flat=True)
+    send_telegram_message(chat_id, f"")
+
+    send_telegram_message(
+        chat_id,
+        f"""You can use this system to start a conversation with any of the available therapist interventions, or role-play with a simulated client.
+
+The available intervention names are: {', '.join(available)}
+
+Type /new intervention_name to start a conversation. E.g. /new {available[0]}
+
+(Type /list to see details of all the available interventions)
+                          """,
+    )
+
+
+def handle_list(chat_id):
+    available = Intervention.objects.all()
+    send_telegram_message(chat_id, "The available interventions are:")
+    send_telegram_message(chat_id, "\n".join([f"{i.title}: `{i.slug}`" for i in available]))
+
+
 def handle_help(message, conversation=None, request=None):
     """
     Reply with a summary of available bot commands.
@@ -140,7 +165,7 @@ def handle_web(message, conversation=None, request=None):
         url = request.build_absolute_uri(
             reverse("conversation_detail", args=[conversation.turns.all().last().uuid])
         )
-        send_telegram_message(message.chat.id, f"[{url}]({url})")
+        send_telegram_message(message.chat.id, f"{url}")
         return JsonResponse({"status": "ok"}, status=200), None
     except Exception as e:
         raise e
@@ -153,6 +178,25 @@ def handle_settings(message, conversation=None, request=None):
     """
     logger.info("Handling /settings command.")
     send_telegram_message(message.chat.id, "No settings available")
+    return JsonResponse({"status": "ok"}, status=200), None
+
+
+def handle_undo(message, conversation, request=None):
+    """ """
+    parts = message.text.strip().split(" ", 1)
+
+    try:
+        from_turn = conversation.turns.get(uuid__startswith=parts[1].strip())
+    except Exception:
+        logger.info("Couldn't find turn by UUID, trying to find by index")
+        back_n = int(parts[1].strip()) if len(parts) > 1 else 1
+        last_turn = conversation.turns.last()
+        from_turn = list(conversation_history(last_turn, to_leaf=False).filter(step__isnull=False))[
+            -back_n
+        ]
+
+    new_turn = create_branch(from_turn, reason=BranchReasons.UNDO)
+    send_telegram_message(message.chat.id, f"Restarting conversation from:\n\n >{new_turn.text}")
     return JsonResponse({"status": "ok"}, status=200), None
 
 
@@ -203,16 +247,14 @@ def start_new_conversation(intervention, conversation, chat_id):
     Initialise a conversation with a therapist user and an opening line
     from the first step of 'intervention'. Returns the new opening bot turn.
     """
-    therapist, _ = User.objects.get_or_create(
-        username="therapist",
-        defaults={"role": "therapist", "email": "therapist@example.com"},
-    )
+    bot_speaker = intervention.get_default_speaker()
+
     first_step = intervention.steps.first()
     opener_text = first_step.opening_line if first_step else "Hello! (No opening line set.)"
 
     bot_turn = Turn.add_root(
         conversation=conversation,
-        speaker=therapist,
+        speaker=bot_speaker,
         text=opener_text,
         text_source=TurnTextSourceTypes.OPENING,
         step=first_step,
@@ -271,7 +313,7 @@ def continue_conversation(message, telegram_user, conversation, intervention):
     logger.info(f"Bot response: {bot_turn.text}")
 
     # Send reply
-    send_telegram_message(message.chat.id, bot_turn.text)
+    send_telegram_message(message.chat.id, f"{bot_turn.text}      [{bot_turn.uuid[:3]}]")
 
 
 def process_message(message, request=None):
@@ -296,6 +338,8 @@ def process_message(message, request=None):
             "/settings": handle_settings,
             "/new": handle_new,
             "/web": handle_web,
+            "/list": handle_list,
+            "/undo": handle_undo,
         }
 
         # Extract potential command
@@ -320,7 +364,7 @@ def process_message(message, request=None):
 
         # If conversation is brand-new or newly replaced, start anew
         if is_new_conv or conversation.turns.count() == 0:
-            start_new_conversation(default_intervention, conversation, message.chat.id)
+            welcome_message(message.chat.id)
         else:
             # Continue existing conversation
             continue_conversation(message, telegram_user, conversation, default_intervention)

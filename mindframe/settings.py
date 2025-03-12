@@ -36,6 +36,7 @@ class BranchReasons(models.TextChoices):
     MAIN = "main", "Not a branch - part of the main trunk of the conversation"
     EXPERT = "expert", "Expert completion/imagined alternative"
     PLAY = "play", "Simulation/reset to create alternative line of conversation"
+    UNDO = "undo", "Undo in role-play"
 
 
 class TurnTextSourceTypes(models.TextChoices):

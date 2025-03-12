@@ -1,6 +1,20 @@
 # Roadmap for `mindframe` development
 
 
+
+
+## Bot interactions
+
+/end
+(kills all scheduled nudges)
+
+
+/info
+/undo -
+
+
+
+
 ## User engagement/maintenance
 
 Mark special steps as 'Nudges'

@@ -112,7 +112,7 @@ class Intervention(LifecycleModel):
         return reverse("admin:mindframe_export", args=[self.id])
 
     title = models.CharField(max_length=255)
-    slug = AutoSlugField(populate_from="title", unique=True, editable=True)
+    slug = AutoSlugField(populate_from="title", unique=True, editable=True, always_update=False)
     version = models.CharField(max_length=64, null=True, editable=False)
     sem_ver = models.CharField(max_length=64, null=True, editable=True)
 
@@ -128,6 +128,17 @@ class Intervention(LifecycleModel):
         blank=True,
         related_name="default_for_interventions",
     )
+
+    def get_default_speaker(self):
+        # todo: make a client user if it's a client intervention
+        if self.default_speaker:
+            return self.default_speaker
+        else:
+            s, _ = CustomUser.objects.get_or_create(
+                username="therapist",
+                defaults={"role": "therapist", "email": "therapist@example.com"},
+            )
+            return s
 
     is_default_intervention = models.BooleanField(default=False)
 
@@ -392,7 +403,7 @@ class CustomUser(AbstractUser):
         # TODO: allow intervention to be passed to influence how transcripts
         # are presented to the mode. Could be either [client]/][therapist] or
         # real names/usernames
-        return f"[{self.role.lower()}] "
+        return f"[{self.username}] "
 
     def natural_key(self):
         return (self.username,)

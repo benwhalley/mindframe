@@ -5,7 +5,6 @@ services:
       context: ../
       dockerfile: Dockerfile
       args:
-        MINDFRAME_COMMIT: main
         BUILDKIT_PROGRESS: plain
     image: "${BASE_IMAGE_NAME:-mindframe:production}"
     networks:
