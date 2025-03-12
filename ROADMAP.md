@@ -23,6 +23,25 @@ The user responds in the normal conversation flow.
 TBC
 
 
+## Interaction with external systems
+
+- start a conversation with context from an external system
+- allows creating a new conversation and posting to it to create notes
+- then can start interacting with the conversation in the normal way, given special prompts
+
+
+
+
+# "Experiments"
+
+create a pool of transcripts
+set parameters for how to select sequences from them
+create simluations for completions of sequences with different models
+text embeddings of the results and export to analyse
+
+
+
+
 
 ## RAG and context enhancement
 
