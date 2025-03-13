@@ -210,12 +210,6 @@ def generate_treant_tree_data(root):
                     </div>
                 </div>
             """,
-            # "text": {
-            #     # These can serve as fallback values.
-            #     "name": f"{node.uuid[:5]}",
-            #     "desc": node.text,
-            # },
-            # "link": {"href": reverse("conversation_detail", args=[node.uuid])},
             "HTMLclass": "turn",
             "children": [traverse(child) for child in node.get_children()],
         }
