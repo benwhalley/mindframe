@@ -16,10 +16,10 @@ from mindframe.models import LLM, Conversation, CustomUser, Judgement, Note, Ste
 from mindframe.settings import (
     DEFAULT_CONVERSATION_MODEL_NAME,
     DEFAULT_JUDGEMENT_MODEL_NAME,
+    InterventionTypes,
     RoleChoices,
     StepJudgementFrequencyChoices,
     TurnTextSourceTypes,
-    InterventionTypes,
     mfuuid,
 )
 from mindframe.silly import silly_user

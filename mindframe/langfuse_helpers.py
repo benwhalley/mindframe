@@ -1,5 +1,6 @@
-from mindframe.models import Turn, Conversation
 from langfuse import Langfuse
+
+from mindframe.models import Conversation, Turn
 
 langfuse = Langfuse()
 

@@ -13,11 +13,11 @@ curl -X GET "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo"
 
 """
 
-import re
 import ipaddress
 import json
 import logging
 import os
+import re
 import threading
 import time
 import traceback
@@ -33,8 +33,8 @@ from telegram import Bot, Update
 
 from mindframe.conversation import listen, respond
 from mindframe.models import Conversation, CustomUser, Intervention, Step, Turn
-from mindframe.settings import TurnTextSourceTypes, BranchReasons
-from mindframe.tree import create_branch, conversation_history
+from mindframe.settings import BranchReasons, TurnTextSourceTypes
+from mindframe.tree import conversation_history, create_branch
 
 logger = logging.getLogger(__name__)
 User = get_user_model()

@@ -5,10 +5,9 @@ import traceback
 from collections import OrderedDict, namedtuple
 from hashlib import sha256
 from types import FunctionType
-from typing import Any, List, Dict
+from typing import Any, Dict, List
 
-from asgiref.sync import sync_to_async, async_to_sync
-
+from asgiref.sync import async_to_sync, sync_to_async
 from colored import Back, Fore, Style
 from django.template import Context, Template
 from langfuse.decorators import langfuse_context, observe

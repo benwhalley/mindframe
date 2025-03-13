@@ -1,7 +1,7 @@
 from django.db.models import Q
 from django.urls import reverse
 
-from mindframe.models import Transition, Step, Intervention
+from mindframe.models import Intervention, Step, Transition
 
 
 def mermaid_diagram(obj: Intervention, highlight: Step = None):

@@ -1,10 +1,10 @@
 from django.urls import path
 
-from mindframe.telegram import telegram_webhook
 import mindframe.views.conversation as cv
-import mindframe.views.intervention as iv
 import mindframe.views.general as gv
 import mindframe.views.hyde as hv
+import mindframe.views.intervention as iv
+from mindframe.telegram import telegram_webhook
 
 urlpatterns = [
     path("interventions/", iv.InterventionListView.as_view(), name="intervention_list"),
