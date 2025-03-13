@@ -223,7 +223,7 @@ AUTHENTICATION_BACKENDS = (
     # "magiclink.backends.MagicLinkBackend",
 )
 
-# LOGIN_URL = "magiclink:login"
+LOGIN_URL = "admin:index"
 
 
 # MAGICLINK_REQUIRE_SAME_IP = False
