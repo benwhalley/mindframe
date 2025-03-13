@@ -1,15 +1,17 @@
 from django.db.models import Q
 from django.urls import reverse
 
-from mindframe.models import Transition
+from mindframe.models import Transition, Step, Intervention
 
 
-def mermaid_diagram(obj):
+def mermaid_diagram(obj: Intervention, highlight: Step = None):
     """
     Renders a Mermaid diagram for the intervention.
     """
     # Generate Mermaid syntax for the diagram
     steps = obj.steps.all()
+    for i in steps:
+        i.highlight = i == highlight
     transitions = Transition.objects.filter(
         Q(from_step__intervention=obj) | Q(to_step__intervention=obj)
     )
@@ -28,6 +30,8 @@ graph TD
 classDef conditions fill:none,color:green,stroke:none, font-size:10px;
 classDef judgement fill:none,color:red,stroke:none, font-size:10px;
 classDef smallText fill:none,color:black,stroke:none, font-size:10px;linkStyle default stroke-width:1px,font-size:10px;
+classDef highlighted fill:#ffeeee,color:red,stroke:red,stroke-width:2px;
+        linkStyle default stroke-width:1px,font-size:10px;
 classDef conditionText fill:none,color:green,stroke:none, font-size:12px;
 
 
@@ -36,10 +40,14 @@ classDef conditionText fill:none,color:green,stroke:none, font-size:12px;
     ]
 
     for step in steps:
-        diagram.append(f'{step.slug.replace("-", "_")}["{step.title}"]')
         diagram.append(
-            f'click {step.slug.replace("-", "_")} "{reverse("admin:mindframe_step_change", args=[step.pk])}" "Goog"'
+            f'{step.slug.replace("-", "_")}["{step.title}{step.highlight and " *" or ""}"]'
         )
+        diagram.append(
+            f'click {step.slug.replace("-", "_")} "{reverse("step_detail", args=[step.pk])}" "Goog"'
+        )
+        if step.highlight:
+            diagram.append(f'class {step.slug.replace("-", "_")} highlighted;')
 
     for transition in transitions:
         from_slug = transition.from_step.slug.replace("-", "_")

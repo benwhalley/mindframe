@@ -12,7 +12,12 @@
                     <li>Default chat model: {{i.default_conversation_model}}</li>
 
                 </ul>
+                <a class="btn btn-sm btn-outline-danger mr-1" href="{% url 'start_gradio_chat' i.slug %}">Start Chat</a>
+
                 <a class="btn btn-sm btn-outline-primary" href="{% url 'admin:mindframe_intervention_change' i.id %}">Edit</a>
+
+
+
             </div>
             <div class="col-7">
                 <div class="mermaid">

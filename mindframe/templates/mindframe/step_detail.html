@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+
+    <div class="row">
+        <div class="col-9">
+            <h4>{{object.intervention.title}}</h4>
+            <h1>Step: {{ object.title }}</h1>
+
+
+            <p>
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'admin:mindframe_step_change' object.id %}">Edit</a>
+
+            </p>
+
+            {% if object.nudges.all.count %}
+            <div class="card mb-3">
+                <div class="card-body">
+            <h5>Used for nudges:</h5>
+            {% for n in object.nudges.all %}
+                <a class="btn btn-sm btn-outline-primary float-end" href="{% url 'admin:mindframe_nudge_change' n.id %}">Edit</a>
+                <li>Nudge during: {% if n.nudge_during.all.count %}
+                    {{n.nudge_during.all}}{%else%}All steps{%endif %}
+                </li>
+                <li>{{n.schedule}}, for {{n.for_a_period_of}}</li>
+            {% endfor %}
+            </div>
+            </div>
+            {% else %}
+                {% if not object.transitions_to.all %}
+                <a class="btn btn-sm btn-outline-success mb-2" href="{% url 'admin:mindframe_nudge_add' %}">Add a nudge for this Step</a>
+                {% endif %}
+            {% endif %}
+
+
+            {% if object.opening_line %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Opening line</h5>
+                    <p>
+                        {{object.opening_line}}
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Prompt template</h5>
+                    <pre class="mt-4" style="white-space:pre-wrap;">
+{{object.prompt_template}}
+                    </pre>
+                </div>
+            </div>
+        </div>
+        <div class="col-3">
+            <div class="mermaid">
+                {{ object.mermaid|safe }}
+            </div>
+
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+
+
+{% endblock %}

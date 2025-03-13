@@ -717,7 +717,16 @@ class Conversation(LifecycleModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        help_text="Default intervention to choose as a partner when creating a new Synthetic conversation turns",
+        help_text="Default intervention to choose as a client when creating a new Synthetic conversation turns",
+        related_name="synthetic_client_conversations",
+    )
+    synthetic_therapist = models.ForeignKey(
+        "Intervention",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Default intervention to choose as a therapist when creating a new Synthetic conversation turns",
+        related_name="synthetic_therapist_conversations",
     )
     synthetic_turns_scheduled = models.PositiveSmallIntegerField(default=0)
 
@@ -744,7 +753,9 @@ class Conversation(LifecycleModel):
         )
 
     def interventions(self):
-        return self.turns.all().values_list("step__intervention", flat=True).distinct()
+        return Intervention.objects.filter(
+            pk__in=self.turns.all().values_list("step__intervention__pk", flat=True)
+        )
 
 
 class Turn(NS_Node):
@@ -879,14 +890,14 @@ class Nudge(LifecycleModel):
         "Step",
         blank=True,
         help_text="Which Steps should this Nudge be applied to. If blank, applies to all Steps",
-        related_name="nudges",
+        related_name="nudges_which_can_apply",
     )
 
     step_to_use = models.ForeignKey(
         "Step",
         help_text="Which Step to use as a script for the Nudge",
         on_delete=models.CASCADE,
-        related_name="used_by_nudges",
+        related_name="nudges",
     )
 
     schedule = models.CharField(

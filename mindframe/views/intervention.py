@@ -15,6 +15,15 @@ from mindframe.graphing import mermaid_diagram
 logger = logging.getLogger(__name__)
 
 
+class StepDetailView(LoginRequiredMixin, DetailView):
+    model = Step
+
+    def get_context_data(self, **kwargs):
+        ct = super().get_context_data(**kwargs)
+        ct["object"].mermaid = mermaid_diagram(ct["object"].intervention, highlight=ct["object"])
+        return ct
+
+
 class InterventionListView(LoginRequiredMixin, ListView):
     model = Intervention
 

@@ -19,6 +19,7 @@ from mindframe.settings import (
     RoleChoices,
     StepJudgementFrequencyChoices,
     TurnTextSourceTypes,
+    InterventionTypes,
     mfuuid,
 )
 from mindframe.silly import silly_user
@@ -198,11 +199,15 @@ def judgement_applied_n_turns_ago(turn, judgement):
 
 
 @observe(capture_input=False, capture_output=False)
-def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=None) -> Turn:
+def respond(
+    turn: Turn,
+    as_speaker: Optional[CustomUser] = None,
+    with_intervention_step: Optional[Step] = None,
+) -> Turn:
     """
     Respond to a particular turn in the conversation. Returns the new completed Turn object.
 
-    If `as_speaker` is not provided, the system will pick the last-but-one speaker in the conversation.
+    If `as_speaker` is not provided, the system will try to automatically identify a speaker and Step to use.
 
     """
 
@@ -210,32 +215,22 @@ def respond(turn: Turn, as_speaker: CustomUser = None, with_intervention_step=No
         as_speaker = pick_speaker_for_next_response(turn)
 
     if not with_intervention_step:
-
         spkr_history = conversation_history(turn).filter(speaker=as_speaker)
         speakers_prev_turn = spkr_history.filter(step__isnull=False).last()
         speakers_prev_step = speakers_prev_turn and speakers_prev_turn.step or None
 
-        if not speakers_prev_step:
-            if as_speaker == turn.conversation.synthetic_client:
-                # Use synthetic client's intervention step
-                client_intervention = turn.conversation.synthetic_client.steps.all().first()
-                if client_intervention:
-                    speakers_prev_step = client_intervention
-                    logger.info(f"Using synthetic client intervention step: {speakers_prev_step}")
+        if speakers_prev_step:
+            with_intervention_step = speakers_prev_step
+        else:
+            try:
+                logger.warning(f"Responding as {as_speaker}")
+                if as_speaker.role == RoleChoices.CLIENT:
+                    syn_ther_steps = turn.conversation.synthetic_client.steps.all()
                 else:
-                    raise NotImplementedError("No Step/intervention found for client response.")
-            else:
-                # Use therapist intervention step
-                therapist_intervention = turn.conversation.interventions.filter(
-                    creator__role=RoleChoices.THERAPIST
-                ).first()
-                if therapist_intervention:
-                    speakers_prev_step = therapist_intervention.steps.first()
-                    logger.info(f"Using therapist's intervention step: {speakers_prev_step}")
-                else:
-                    raise NotImplementedError("No Step/intervention found for therapist response.")
-
-        with_intervention_step = speakers_prev_step
+                    syn_ther_steps = turn.conversation.synthetic_therapist.steps.all()
+                with_intervention_step = syn_ther_steps and syn_ther_steps.first() or None
+            except:
+                raise NotImplementedError("No intervention step found for this turn.")
 
     # prepare an 'empty' turn ready for completion
     new_turn = turn.add_child(

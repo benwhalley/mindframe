@@ -362,6 +362,7 @@ class InterventionAdmin(admin.ModelAdmin):
         "title_version",
         "ver",
         "is_default_intervention",
+        "intervention_type",
         "slug",
         "title",
         "start_session_button",

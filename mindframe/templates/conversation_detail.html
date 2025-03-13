@@ -44,6 +44,8 @@
                         Participants: {{turn.conversation.speakers|join:", "}}
                     </p>
 
+                    <p>Default interventions to use: <code>{{turn.conversation.synthetic_client.slug}}</code> and <code>{{turn.conversation.synthetic_therapist.slug}}</code></p>
+
                     <a href="{% url 'admin:mindframe_conversation_change' object.pk %}">
                          Edit conversation
                     </a>
@@ -177,7 +179,7 @@
         <div class="col-10 mb-2 pr-2">
 
             <span class="mb-2 badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source|capfirst}}{% if turn.step %}:
-                <a class="text-decoration-none" href="{% url 'admin:mindframe_step_change' turn.step.id %}">
+                <a class="text-decoration-none" href="{% url 'step_detail' turn.step.id %}">
                 {{turn.step.title}}
                 </a>
             {% endif %}

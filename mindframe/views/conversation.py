@@ -10,6 +10,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic.detail import DetailView
 from django.views.generic.edit import FormMixin, FormView
 
+from mindframe.settings import InterventionTypes
 from mindframe.conversation import continue_conversation_task, listen
 from mindframe.models import Conversation, CustomUser, Intervention, Step, Turn
 from mindframe.silly import silly_user
@@ -138,11 +139,16 @@ class ImportConversationForm(forms.Form):
         initial="Hi, welcome to the session. Do you have any questions about Mindframe?",
         help_text="Paste conversation transcript, one row per speaker. Splits on line breaks and assumes client/therapist alternate turns.",
     )
-    # therapist = forms.ModelChoiceField(
-    #     required=False,
-    #     queryset=CustomUser.objects.none(),
-    #     help_text="Optionally select an existing therapist user",
-    # )
+    synthetic_client = forms.ModelChoiceField(
+        required=False,
+        queryset=Intervention.objects.filter(intervention_type=InterventionTypes.CLIENT),
+        help_text="Optionally select an existing client intervention",
+    )
+    synthetic_therapist = forms.ModelChoiceField(
+        required=False,
+        queryset=Intervention.objects.filter(intervention_type=InterventionTypes.THERAPY),
+        help_text="Optionally select an existing therapist intervention",
+    )
 
     # client = forms.ModelChoiceField(
     #     queryset=CustomUser.objects.none(),
@@ -180,6 +186,10 @@ class ImportConversationView(LoginRequiredMixin, FormView):
         )
 
         conversation = Conversation.objects.create()
+        conversation.synthetic_client = form.cleaned_data["synthetic_client"]
+        conversation.synthetic_therapist = form.cleaned_data["synthetic_therapist"]
+        conversation.save()
+
         speakers_ = (
             form.cleaned_data["therapist_first"] and [therapist, client] or [client, therapist]
         )

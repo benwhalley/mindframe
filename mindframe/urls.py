@@ -8,6 +8,7 @@ import mindframe.views.hyde as hv
 
 urlpatterns = [
     path("interventions/", iv.InterventionListView.as_view(), name="intervention_list"),
+    path("steps/<int:pk>/", iv.StepDetailView.as_view(), name="step_detail"),
     path("telegram-webhook/", telegram_webhook, name="telegram_webhook"),
     # Other URLs
     path(
