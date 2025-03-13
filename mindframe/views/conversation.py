@@ -10,9 +10,9 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic.detail import DetailView
 from django.views.generic.edit import FormMixin, FormView
 
-from mindframe.settings import InterventionTypes
 from mindframe.conversation import continue_conversation_task, listen
 from mindframe.models import Conversation, CustomUser, Intervention, Step, Turn
+from mindframe.settings import InterventionTypes
 from mindframe.silly import silly_user
 from mindframe.tree import (
     conversation_history,
