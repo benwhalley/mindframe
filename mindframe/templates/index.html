@@ -1,12 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
-    <h1>MindFrame</h1>
+    <h1 class="mb-4">MindFrame</h1>
 
 <!-- admin link -->
-<ul>
-    <li><a href="/admin">Admin</a></li>
-    <li><a href="{% url 'rag_test' %}">RAG and HyDE Comparison</a></li>
-</ul>
+<div class="row">
+    <div class="col-6">
+        <ul>
+            <li>
+                <a href="{% url 'intervention_list' %}">Interventions</a>
+            </li>
+            <hr>
+
+            <li><a href="{% url 'rag_test' %}">RAG/HyDE Search Comparison</a></li>
+            <hr>
+            <li><a href="/admin">Admin</a></li>
+        </ul>
+    </div>
+</div>
 
 
 
