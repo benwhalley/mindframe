@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils.html import escape
 
 from mindframe.helpers import generate_color_palette, get_ordered_queryset
+from mindframe.models import Turn
 from mindframe.settings import BranchReasons
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,6 @@ def conversation_history(node, to_leaf=False):
     If to_leaf is True, then it also includes turns from the current
     node to the default leaf from there.
     """
-    from mindframe.models import Turn
 
     if to_leaf:
         # find the leaf node first, then show history back to that point
@@ -83,7 +83,7 @@ def create_branch(turn, reason=BranchReasons.PLAY):
         conversation=turn.conversation,
         speaker=turn.speaker,
         text=turn.text,
-        text_source=turn.text_source,
+        turn_type=turn.turn_type,
         step=turn.step,
         metadata=None,
         branch=True,
@@ -203,6 +203,8 @@ def generate_treant_tree_data(root):
                     <a href="{reverse('conversation_detail', args=[node.uuid])}"
                         style="color:{step_colors.get(node.step and node.step.pk or None)};"
                        class="node-title">{node.uuid[:4]}
+                       {node.resuming_from and f" (resuming from {node.resuming_from.uuid[:4]})" or ""}
+                       {node.checkpoint and f" [checkpoint]" or ""}
                     </a>
                     <div class="node-description">
                     {node.speaker.username.upper()}:
@@ -229,8 +231,12 @@ def generate_treant_tree_data(root):
     return json.dumps(tree_data, indent=2)
 
 
-if False:
-    from mindframe.models import Turn
-    from mindframe.tree import generate_mermaid_tree
+def is_interrupted(turn: Turn):
 
-    print(generate_mermaid_tree(Turn.objects.get(uuid="7nsthysqh8a8wcxpeh3qr6rdx1").get_root()))
+    checkpoints = (
+        conversation_history(turn).filter(checkpoint=True).filter(interruption__isnull=False)
+    )
+    lcp = checkpoints.last()
+    interupted = lcp and lcp.checkpoint_resolved == False
+    # returns (bool, Optional[Turn])
+    return interupted, interupted and lcp or None

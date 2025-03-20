@@ -47,6 +47,16 @@ class TurnTextSourceTypes(models.TextChoices):
     OPENING = "opening", "Opening"
 
 
+class TurnTypes(models.TextChoices):
+    """Types of Turn object."""
+
+    HUMAN = "human", "Human utterance"
+    BOT = "bot", "Bot utterance"
+    OPENING = "opening", "Fixed opening line"
+    JOIN = "join", "Join"  # joining a conversation
+    # LEFT = "left", "Left" # joining a conversation
+
+
 class RoleChoices(models.TextChoices):
     """Defines various roles in the system such as developers, clients, and supervisors."""
 
@@ -55,6 +65,7 @@ class RoleChoices(models.TextChoices):
     CLIENT = "client", "Client"
     SUPERVISOR = "supervisor", "Supervisor"
     THERAPIST = "therapist", "Therapist"
+    BOT = "bot", "Bot"
 
 
 class StepJudgementFrequencyChoices(models.TextChoices):

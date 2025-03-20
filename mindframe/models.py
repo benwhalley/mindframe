@@ -43,10 +43,9 @@ from mindframe.settings import (
     InterventionTypes,
     RoleChoices,
     StepJudgementFrequencyChoices,
-    TurnTextSourceTypes,
+    TurnTypes,
 )
 from mindframe.shortuuidfield import MFShortUUIDField as ShortUUIDField
-from mindframe.tree import iter_conversation_path
 
 logger = logging.getLogger(__name__)
 langfuse_context.configure(debug=False)
@@ -120,23 +119,29 @@ class Intervention(LifecycleModel):
         choices=InterventionTypes.choices, default=InterventionTypes.THERAPY, max_length=30
     )
 
-    default_speaker = models.ForeignKey(
+    default_bot_user = models.ForeignKey(
         "CustomUser",
-        help_text="The default speaker for this intervention (e.g. if used in a synthetic conversation)",
+        help_text="The default Bot to use as a speaker for this intervention (e.g. if used in a synthetic conversation)",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="default_for_interventions",
     )
 
-    def get_default_speaker(self):
-        # todo: make a client user if it's a client intervention
-        if self.default_speaker:
-            return self.default_speaker
+    def get_bot_speaker(self):
+        if self.default_bot_user:
+            return self.default_bot_user
+        if CustomUser.objects.filter(role=RoleChoices.BOT, intervention=self).count():
+            return CustomUser.objects.filter(role=RoleChoices.BOT, intervention=self).first()
         else:
+            # if can't find a bot user, make one
+            rl_ = self.intervention_type == InterventionTypes.THERAPY and "Therapist" or "Client"
+            uname_ = f"{rl_} ({self.slug})"
             s, _ = CustomUser.objects.get_or_create(
-                username="therapist",
-                defaults={"role": "therapist", "email": "therapist@example.com"},
+                username=uname_,
+                intervention=self,
+                role=RoleChoices.BOT,
+                email=f"{self.slug}{rl_}@example.com",
             )
             return s
 
@@ -233,6 +238,71 @@ class StepJudgement(models.Model):
         unique_together = [("judgement", "step", "when")]
 
 
+class Interruption(LifecycleModel):
+    """
+
+    TODO: this is a work in progress and not all features of interruptions are implemented.
+
+    An interruption is an alternative path through the intervention, triggered by a Judgement
+
+    The interruption can be triggered at any point in the conversation and, if triggered,
+    will switch to different target Step (or sequence of steps). We might also term this
+    sequence of steps an "interruption branch".
+
+    To end an interruption, we define a "resolution" variable, which will be created
+    by a Judgement within the interruption branch. If this is true, the conversation
+    will switch back to the main branch of the intervention.
+
+    To determine which step to return-to, when an Interruption is triggered we mark the
+    current Turn as a checkpoint. When the interruption is resolved, we
+    create a new Turn at the step used in the last checkpoint, and continue as normal.
+
+    """
+
+    intervention = models.ForeignKey(
+        "Intervention",
+        on_delete=models.CASCADE,
+        related_name="interruptions",
+        help_text="The intervention to which this interruption belongs.",
+    )
+    judgement = models.ForeignKey(
+        "Judgement",
+        on_delete=models.CASCADE,
+        related_name="interruptions",
+        null=True,
+        blank=True,
+        help_text="If provided, this Judgement will be evaluated before the trigger. Whatever values it returns can be used in the trigger expression. If null, the trigger will be evaluated directly (using notes from other Judgements previously run).",
+    )
+    target_step = models.ForeignKey(
+        "Step",
+        on_delete=models.CASCADE,
+        related_name="interruptions",
+        help_text="The step to switch to if the interruption is triggered.",
+    )
+
+    trigger = models.TextField(
+        default="interrupt is True",
+        help_text="An expression to decide if the Interruption should be triggered. If using the default value, a Judgement should have returned a value for `interrupt` which is boolean (or coercible to boolean). If interrupt is True, the interruption will be triggered and the conversation will switch to the target step.",
+    )
+    resolution = models.TextField(
+        default="interruption_resolved is True",
+        help_text="In an interruption branch, Judgements should be used to (eventually) return a value which allows us to determine if the interruption should end. This `resolution` field is a condition that, if true, will jump the user back to their last checkpoint.",
+    )
+
+    priority = models.PositiveSmallIntegerField(default=1)
+
+    debounce_turns = models.PositiveSmallIntegerField(
+        default=10,
+        help_text="Prevents the interruption from triggering again within this many turns.",
+    )
+
+    def __str__(self):
+        return f"-> {self.target_step.title} (`{self.judgement.variable_name}`, {self.trigger})"
+
+    class Meta:
+        ordering = ["priority"]
+
+
 class Step(models.Model):
     """
     Step in an intervention, instructions for how to respond
@@ -310,6 +380,7 @@ class Judgement(models.Model):
         return slugify(f"{self.variable_name}")
 
     intervention = models.ForeignKey("mindframe.Intervention", on_delete=models.CASCADE)
+
     prompt_template = models.TextField()
     variable_name = AutoSlugField(
         editable=True,
@@ -399,6 +470,14 @@ class CustomUser(AbstractUser):
         max_length=30, choices=RoleChoices.choices, default=RoleChoices.CLIENT.value
     )
 
+    intervention = models.ForeignKey(
+        "Intervention",
+        blank=True,
+        null=True,
+        help_text="If this is a Bot user, which Intervention does it use?",
+        on_delete=models.SET_NULL,
+    )
+
     def transcript_speaker_label(self, intervention=None):
         # TODO: allow intervention to be passed to influence how transcripts
         # are presented to the mode. Could be either [client]/][therapist] or
@@ -433,7 +512,7 @@ class Note(models.Model):
         related_name="notes",
     )
 
-    judgement = models.ForeignKey(Judgement, on_delete=models.CASCADE, related_name="notes")
+    judgement = models.ForeignKey("Judgement", on_delete=models.CASCADE, related_name="notes")
     timestamp = models.DateTimeField(default=timezone.now)
 
     # for clinical Note type records, save a 'text' key
@@ -710,24 +789,9 @@ class Conversation(LifecycleModel):
     uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, editable=False)
     is_synthetic = models.BooleanField(default=False)
     archived = models.BooleanField(default=False)
-    telegram_conversation_id = models.CharField(max_length=255, blank=True, null=True)
+    # telegram_conversation_id = models.CharField(max_length=255, blank=True, null=True)
+    chat_room_id = models.CharField(max_length=255, blank=True, null=True)
 
-    synthetic_client = models.ForeignKey(
-        "Intervention",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        help_text="Default intervention to choose as a client when creating a new Synthetic conversation turns",
-        related_name="synthetic_client_conversations",
-    )
-    synthetic_therapist = models.ForeignKey(
-        "Intervention",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        help_text="Default intervention to choose as a therapist when creating a new Synthetic conversation turns",
-        related_name="synthetic_therapist_conversations",
-    )
     synthetic_turns_scheduled = models.PositiveSmallIntegerField(default=0)
 
     def get_absolute_url(self):
@@ -740,12 +804,6 @@ class Conversation(LifecycleModel):
 
     def __str__(self):
         return f"Conversation between: {', '.join(self.speakers().values_list('username', flat=True))} ()"
-
-    def previous_turn_of_speaker(self, start_node, speaker):
-        for node in iter_conversation_path(start_node, direction="up"):
-            if node.speaker_id == speaker.id:
-                return node
-        return None
 
     def speakers(self) -> QuerySet["CustomUser"]:
         return CustomUser.objects.filter(
@@ -775,8 +833,33 @@ class Turn(NS_Node):
 
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="turns")
     timestamp = models.DateTimeField(default=timezone.now)
-
     speaker = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="turns")
+    turn_type = models.CharField(choices=TurnTypes.choices)
+
+    checkpoint = models.BooleanField(
+        default=False,
+        help_text="Is this a checkpoint? If true, the conversation will return to this turn when an interruption is resolved.",
+    )
+    interruption = models.ForeignKey(
+        "Interruption",
+        on_delete=models.CASCADE,
+        related_name="checkpoints",
+        null=True,
+        blank=True,
+        help_text="The interruption which this turn is a checkpoint for. If `self.checkpoint` is True but this is null, then this Turn is the resolution of the previous interruption.",
+    )
+    checkpoint_resolved = models.BooleanField(
+        default=False,
+        help_text="Has this interruption been resolved? Did we return to the step in this checkpoint?",
+    )
+    resuming_from = models.ForeignKey(
+        "Turn",
+        on_delete=models.CASCADE,
+        related_name="resumed_at",
+        null=True,
+        blank=True,
+        help_text="The checkpoint Turn from which this Turn is resuming.",
+    )
 
     # in some cases, we will create a hypothetical/counterfactual turn,
     # e.g. to simulate an alternative client or therapist response and
@@ -825,9 +908,6 @@ class Turn(NS_Node):
 
     text = models.TextField(blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True, null=True)
-    text_source = models.CharField(
-        choices=TurnTextSourceTypes.choices, max_length=25, default=TurnTextSourceTypes.HUMAN
-    )
 
     embedding = VectorField(dimensions=1024, null=True, blank=True)
 
@@ -1030,3 +1110,14 @@ def schedule_nudges_after_turn(sender, instance, created, **kwargs):
     if snlist:
         logger.info(f"Scheduling {len(snlist)} nudges for turn {instance.uuid}")
         ScheduledNudge.objects.bulk_create(snlist)
+
+
+class ConversationalStrategy(LifecycleModel):
+    """A small-scale strategy to use in conversation (e.g. question, reflection, etc)"""
+
+    intervention = models.ForeignKey(
+        Intervention, on_delete=models.CASCADE, related_name="strategies"
+    )
+    key = AutoSlugField(populate_from="name")
+    name = models.CharField(max_length=255)
+    text = models.TextField()

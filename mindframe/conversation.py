@@ -3,7 +3,7 @@ import pprint
 import traceback
 from collections import OrderedDict
 from itertools import cycle
-from typing import Optional
+from typing import List, Optional
 
 from celery import shared_task
 from django.db.models import QuerySet
@@ -19,11 +19,11 @@ from mindframe.settings import (
     InterventionTypes,
     RoleChoices,
     StepJudgementFrequencyChoices,
-    TurnTextSourceTypes,
+    TurnTypes,
     mfuuid,
 )
 from mindframe.silly import silly_user
-from mindframe.tree import conversation_history, iter_conversation_path
+from mindframe.tree import conversation_history, is_interrupted, iter_conversation_path
 
 logger = logging.getLogger(__name__)
 
@@ -35,17 +35,11 @@ def pick_speaker_for_next_response(turn: Turn):
     with the client. However, in (future) group conversations between humans
     and multiple bots we might want additional logic here.
     """
-
-    # return the previous-but-one speaker
-    try:
-        hist = conversation_history(turn)
-        prev_speaker = hist.exclude(speaker=turn.speaker).last().speaker
-        return prev_speaker
-    except Exception as e:
-        logger.error("No speaker found to respond with.")
-        logger.error(str(e))
-        logger.error(str(traceback.format_exc()))
-    # TODO:
+    candidates = turn.conversation.speakers().filter(role=RoleChoices.BOT)
+    if candidates.count():
+        return candidates.first()
+    else:
+        raise Exception("No Bot speaker found to use for the response")
     # - implement logic for choosing a speaker in group conversations
     # - pick a therapist?
 
@@ -212,41 +206,67 @@ def respond(
     """
 
     if not as_speaker:
+        # this will be a Bot
         as_speaker = pick_speaker_for_next_response(turn)
 
     if not with_intervention_step:
-        spkr_history = conversation_history(turn).filter(speaker=as_speaker)
-        speakers_prev_turn = spkr_history.filter(step__isnull=False).last()
-        speakers_prev_step = speakers_prev_turn and speakers_prev_turn.step or None
-
-        if speakers_prev_step:
-            with_intervention_step = speakers_prev_step
-        else:
-            try:
-                logger.warning(f"Responding as {as_speaker}")
-                if as_speaker.role == RoleChoices.CLIENT:
-                    syn_ther_steps = turn.conversation.synthetic_client.steps.all()
-                else:
-                    syn_ther_steps = turn.conversation.synthetic_therapist.steps.all()
-                with_intervention_step = syn_ther_steps and syn_ther_steps.first() or None
-            except:
-                raise NotImplementedError("No intervention step found for this turn.")
+        try:
+            spkr_history = conversation_history(turn).filter(speaker=as_speaker)
+            speakers_prev_turn = spkr_history.filter(step__isnull=False).last()
+            speakers_prev_step = speakers_prev_turn and speakers_prev_turn.step or None
+            with_intervention_step = (
+                speakers_prev_step or as_speaker.intervention.steps.all().first()
+            )
+        except Exception:
+            logger.error("Chosen speaker doesn't have an intervention/step to use")
+            raise
 
     # prepare an 'empty' turn ready for completion
     new_turn = turn.add_child(
         uuid=mfuuid(),
         conversation=turn.conversation,
         speaker=as_speaker,
-        text="[...thinking...]",
+        text="...",
         step=with_intervention_step,
-        text_source=TurnTextSourceTypes.GENERATED,
+        turn_type=TurnTypes.BOT,
     )
     new_turn.save()
     logger.info(f"New turn created: {new_turn.uuid}")
 
-    # EVALUATE JUDGEMENTS IN-THIS-TURN
+    # EVALUATE INTERUPTIONS FIRST, BEFORE OTHER JUDGEMENTS
+    # IF ANY INTERRUPTION JUDGMENT TRIGGERS,
+    # - MARK THE CURRENT TURN AS A CHECKPOINT
+    # - SWITCH TO THE TARGET STEP AND RESPOND
+    possible_interruptions = with_intervention_step.intervention.interruptions.all()
+    for i in possible_interruptions:
+        # only do this if we're not already on the target step of the interruption
+        if i.target_step == with_intervention_step:
+            logger.info(
+                "Skipping interruption ({i}) because we are already on the interruption's target step {with_intervention_step}."
+            )
+            continue
 
-    # TODO: write some test cases to exercise this code
+        previous_checkpoint = conversation_history(new_turn).filter(interruption=i).last()
+        if previous_checkpoint and (new_turn.depth - previous_checkpoint.depth) < i.debounce_turns:
+            logger.info(
+                f"Skipping interruption ({i}) because it was already triggered within {i.debounce_turns}"
+            )
+            continue
+        # if there is a judgement to evaluate, do that first, otherwise just evaluate the trigger
+        # based on other judgements in context on this Turn.
+        # TODO: We will probably need scoping rules for the context dictionary here.
+        # E.g. how many turns back we look.
+        if i.judgement:
+            note = evaluate_judgement(i.judgement, new_turn)
+
+        triggered = eval(i.trigger, {}, note.data)
+        if triggered:
+            logger.warning(f"Interruption {i} triggered\n{i.trigger}\n{note.data}")
+            new_turn.interruption = i
+            new_turn.checkpoint = True
+            new_turn.save()
+            return respond(new_turn, as_speaker=as_speaker, with_intervention_step=i.target_step)
+
     # run all the judgements to be made every Turn and ignore the Notes they produce
     judgements_to_make_with_turns_ago = [
         (i, judgement_applied_n_turns_ago(new_turn, i.judgement))
@@ -270,6 +290,33 @@ def respond(
 
     logger.info("Run online Judgements syncronously")
     [evaluate_judgement(sj.judgement, new_turn) for sj in judgements_to_make if not sj.offline]
+
+    # ARE INTERRUPTIONS RESOLVED?
+    # TODO: implement this
+    # - check if we are in an interruption (unresolved checkpoint in the conversation history?)    # - if so, build a context dictionary using the Notes from judgements on this Turn
+    # - evaluate the `resolution` for the interruption marked in the checkpoint using this context
+    # - if the resolution is true, mark the checkpoint as resolved and save
+    # - respond using the same speaker and step as the original checkpoint
+
+    interrupted, checkpoint = is_interrupted(new_turn)
+
+    interruption_ctx = speaker_context(new_turn)
+
+    if interrupted:
+        logger.warning(f"We are still in an interruption: {checkpoint.interruption}")
+        resolved = eval(checkpoint.interruption.resolution, {}, interruption_ctx)
+        if resolved:  # return to where we were before
+            logger.warning(
+                f"The interruption is now resolved\n{checkpoint.interruption.resolution}==True\n responding with Step from checkpoint: {checkpoint.step}"
+            )
+            checkpoint.checkpoint_resolved = True
+            checkpoint.save()
+
+            # reset the Step to use to the step at the checkpoint when the interruption started
+            new_turn.step = checkpoint.step
+            new_turn.resuming_from = checkpoint
+            new_turn.save()
+            # we will now complete the turn as usual below
 
     # TRANSITIONS
     # get the possible transitions, and if there is one possible
@@ -354,38 +401,52 @@ def add_turns_task(turn_pk: int, n_turns: int):
 
 
 def start_conversation(
-    step: Step,
-    therapist: Optional[CustomUser] = None,
-    client: Optional[CustomUser] = None,
-    client_step: Optional[Step] = None,
+    first_speaker: CustomUser = None,
+    first_speaker_step: Optional[Step] = None,
+    additional_speakers: Optional[List[CustomUser]] = list(),
 ) -> Turn:
     """
     Create a new conversation between a therapist and a (real or synthetic) client, starting from specific Intervention Steps.
     """
 
-    # it's a synthetic conversation if we use an intervention for the client
-    synth = bool(client_step)
+    if (not first_speaker) and (not first_speaker_step):
+        raise ValueError("You must provide either a first_speaker or a first_speaker_step")
+
+    if not first_speaker:
+        first_speaker = first_speaker_step.intervention.get_bot_speaker()
+    # it's a synthetic conversation if all the speakers are bots
+    try:
+        if all(
+            [
+                i.role == RoleChoices.BOT
+                for i in [
+                    first_speaker,
+                ]
+                + additional_speakers
+            ]
+        ):
+            synth = True
+    except Exception as e:
+        logger.debug(f"Error checking if all speakers are bots: {e}")
+        synth = False
+
     conversation = Conversation.objects.create(is_synthetic=synth)
-    if not therapist:
-        therapist, new_ = CustomUser.objects.get_or_create(
-            username="Linda", role=RoleChoices.THERAPIST
-        )
 
-    if not client:
-        client = silly_user()
+    turn = Turn.add_root(conversation=conversation, speaker=first_speaker, turn_type=TurnTypes.JOIN)
+    for i in additional_speakers:
+        turn = turn.add_child(conversation=conversation, speaker=i, turn_type=TurnTypes.JOIN)
 
-    turn = Turn.add_root(
-        conversation=conversation,
-        speaker=client,
-        text="/start",
-        text_source=TurnTextSourceTypes.OPENING,
-    )
-    turn = turn.add_child(
-        conversation=turn.conversation, speaker=therapist, text=step.opening_line, step=step
-    )
-    # if the step does't hard-code an opening line then we generate something
-    if not step.opening_line:
-        turn = complete_the_turn(turn)
+    if first_speaker_step:
+        # if the step does't hard-code an opening line then we generate something
+        if first_speaker_step.opening_line:
+            turn = turn.add_child(
+                conversation=conversation,
+                speaker=first_speaker,
+                text=first_speaker_step.opening_line,
+                turn_type=TurnTypes.OPENING,
+            )
+        else:
+            turn = complete_the_turn(turn)
 
     return turn
 
@@ -432,3 +493,30 @@ def continue_conversation_task(from_turn_id, speakers_steps, n_turns):
         from_turn.conversation.save()
 
     return True
+
+
+def begin_conversation(intervention, conversation, room_id):
+    """
+    Initialise a conversation with a Bot user and an opening line
+    from the first step of 'intervention'.
+    Returns the new opening bot turn.
+    """
+    bot_speaker = intervention.get_bot_speaker()
+
+    first_step = intervention.steps.first()
+    opener_text = first_step.opening_line if first_step else "Hello! (No opening line set.)"
+
+    bot_turn = Turn.add_root(
+        conversation=conversation,
+        speaker=bot_speaker,
+        text=opener_text,
+        turn_type=TurnTypes.OPENING,
+        step=first_step,
+    )
+
+    messages = [
+        f"Creating a new conversation using {intervention}.",
+        first_step.opening_line,
+    ]
+    send_telegram_message(room_id, messages)
+    return bot_turn, messages

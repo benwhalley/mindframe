@@ -26,7 +26,7 @@ def main():
     from django.urls import reverse
 
     from mindframe.conversation import listen, respond
-    from mindframe.models import Conversation, RoleChoices, Turn
+    from mindframe.models import CustomUser, RoleChoices, Turn
     from mindframe.tree import conversation_history
 
     def verify_gradio_chat_token(request: gr.Request):
@@ -38,21 +38,22 @@ def main():
 
         token = request.query_params.get("token")
         if not token:
-            return None, "Error: No token provided."
+            return None, None, "Error: No token provided."
 
         try:
             # Unsigned token returns a dictionary with 'session_key' and 'turn_uuid'.
             # max age of link is 1 day
             data = signing.loads(token, salt="gradio-chatbot-auth", max_age=60 * 60 * 24)
             turn_uuid = data.get("turn_uuid")
+            human_user = get_object_or_404(CustomUser, pk=data.get("human_user"))
         except signing.BadSignature as e:
-            return None, f"Error: Invalid token: \n{e}"
+            return None, None, f"Error: Invalid token: \n{e}"
 
         turn = get_object_or_404(Turn, uuid=turn_uuid)
-        return turn, None
+        return turn, human_user, None
 
     def initialize_chat(request: gr.Request):
-        turn, error = verify_gradio_chat_token(request)
+        turn, human_user, error = verify_gradio_chat_token(request)
         if error:
             raise Exception(error)
 
@@ -61,7 +62,7 @@ def main():
         history = []
 
         for turn in turns:
-            role = "assistant" if turn.speaker.role == RoleChoices.THERAPIST else "user"
+            role = "assistant" if turn.speaker.role == RoleChoices.BOT else "user"
             txt = turn.text and turn.text.strip() or None
             logger.info("here!!")
             logger.info(txt)
@@ -84,28 +85,26 @@ def main():
         conversation_link_html = f'<a href="{conversation_detail_url}" target="_self">View Conversation Detail {turn.uuid[:4]}</a>'
         conversation_link_md = gr.Markdown(conversation_link_html)
 
-        return history, turn.uuid, conversation_link_md
+        return history, turn.uuid, conversation_link_md, str(human_user.id)
 
-    def chat_with_bot(turn_id, history, user_input):
+    def chat_with_bot(turn_id, human_user_id, history, user_input):
         logger.info(f"loading {turn_id}")
 
         # Ensure turn_id exists
         turn = get_object_or_404(Turn, uuid=turn_id)
+        human_user = get_object_or_404(CustomUser, id=human_user_id)
 
         hist = conversation_history(turn)
 
-        lastclientturn = hist.filter(speaker__role=RoleChoices.CLIENT).last()
-        if lastclientturn:
-            user = lastclientturn.speaker
-        else:
-            user = turn.speaker
-
-        client_turn = listen(hist.last(), speaker=user, text=user_input)
+        # Create new turn with the human user as speaker
+        client_turn = listen(hist.last(), speaker=human_user, text=user_input)
         bot_turn = respond(client_turn)
 
-        history.append((user_input, bot_turn.text))
+        # Create a new tuple for the history instead of modifying the existing one
+        new_history = list(history)
+        new_history.append((user_input, bot_turn.text))
 
-        return bot_turn.uuid, history, ""
+        return bot_turn.uuid, new_history, ""
 
     # Custom CSS for the markdown window
     custom_css = """
@@ -130,17 +129,20 @@ def main():
                 user_input = gr.Textbox(show_label=False, placeholder="Type your message here...")
 
         turn_id_box = gr.Textbox(visible=False)
+        human_user_box = gr.Textbox(visible=False)
 
         iface.load(
             initialize_chat,
             inputs=None,
-            outputs=[chatbot, turn_id_box, conversation_link_md],
+            outputs=[chatbot, turn_id_box, conversation_link_md, human_user_box],
         )
 
-        def handle_input(turn_id, history, text_input):
+        def handle_input(turn_id, human_user_id, history, text_input):
             try:
                 if text_input.strip():
-                    new_turn_id, history, new_log = chat_with_bot(turn_id, history, text_input)
+                    new_turn_id, history, new_log = chat_with_bot(
+                        turn_id, human_user_id, history, text_input
+                    )
 
                     # Generate updated conversation link
                     conversation_detail_url = settings.WEB_URL + reverse(
@@ -171,7 +173,7 @@ def main():
 
                 return turn_id, history, text_input, conversation_link_md
 
-        inputs = [turn_id_box, chatbot, user_input]
+        inputs = [turn_id_box, human_user_box, chatbot, user_input]
         outputs = [turn_id_box, chatbot, user_input, conversation_link_md]
 
         user_input.submit(handle_input, inputs, outputs)

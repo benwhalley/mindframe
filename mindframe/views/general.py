@@ -38,7 +38,7 @@ def start_gradio_chat(
     elif intervention_slug:
         intervention = get_object_or_404(Intervention, slug=intervention_slug)
         step = intervention.steps.all().first()
-        turn = start_conversation(step)
+        turn = start_conversation(first_speaker_step=step)
         logger.info(f"Starting chat with intervention {intervention} using new turn {turn.uuid}")
     elif step_id:
         step = get_object_or_404(Step, pk=step_id)
@@ -47,6 +47,7 @@ def start_gradio_chat(
     token = signing.dumps(
         {
             "turn_uuid": turn.uuid,
+            "human_user": request.user.pk,
         },
         salt="gradio-chatbot-auth",
     )

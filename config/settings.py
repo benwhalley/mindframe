@@ -53,12 +53,13 @@ DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="admin@example.com")
 
 EMAIL_BACKEND = "djmail.backends.async.EmailBackend"
 DEBUG_EMAIL = config("DEBUG_EMAIL", default=False, cast=bool)
+
 if DEBUG_EMAIL:
     DJMAIL_REAL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 else:
     DJMAIL_REAL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
-logger.info("DJMAIL_REAL_BACKEND is set to", DJMAIL_REAL_BACKEND)
+logger.info(f"DJMAIL_REAL_BACKEND is set to {DJMAIL_REAL_BACKEND}")
 
 
 langfuse_handler = CallbackHandler()
@@ -134,7 +135,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASE_URL = config("DATABASE_URL", default=None)
 DATABASES = {"default": dj_database_url.config(default=DATABASE_URL)}
-logger.info("DATABASE SETTINGS:", str(DATABASE_URL), str(DATABASES))
+logger.info(f"DATABASE SETTINGS:\n{DATABASE_URL}\n\n{DATABASES}")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

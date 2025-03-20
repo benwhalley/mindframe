@@ -139,30 +139,16 @@ class ImportConversationForm(forms.Form):
         initial="Hi, welcome to the session. Do you have any questions about Mindframe?",
         help_text="Paste conversation transcript, one row per speaker. Splits on line breaks and assumes client/therapist alternate turns.",
     )
-    synthetic_client = forms.ModelChoiceField(
+    bot_client = forms.ModelChoiceField(
         required=False,
         queryset=Intervention.objects.filter(intervention_type=InterventionTypes.CLIENT),
         help_text="Optionally select an existing client intervention",
     )
-    synthetic_therapist = forms.ModelChoiceField(
+    bot_therapist = forms.ModelChoiceField(
         required=False,
         queryset=Intervention.objects.filter(intervention_type=InterventionTypes.THERAPY),
         help_text="Optionally select an existing therapist intervention",
     )
-
-    # client = forms.ModelChoiceField(
-    #     queryset=CustomUser.objects.none(),
-    #     required=False,
-    #     help_text="Optionally select an existing client user",
-    # )
-
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     if Intervention.objects.exists():
-    #         self.fields["therapist"].queryset = CustomUser.objects.filter(role="therapist")
-    #         self.fields["therapist"].initial = CustomUser.objects.filter(role="therapist").first()
-
-    #         self.fields["therapist"].queryset = CustomUser.objects.filter(role="client")
 
 
 class ImportConversationView(LoginRequiredMixin, FormView):
@@ -186,8 +172,8 @@ class ImportConversationView(LoginRequiredMixin, FormView):
         )
 
         conversation = Conversation.objects.create()
-        conversation.synthetic_client = form.cleaned_data["synthetic_client"]
-        conversation.synthetic_therapist = form.cleaned_data["synthetic_therapist"]
+        conversation.bot_client = form.cleaned_data["bot_client"]
+        conversation.bot_therapist = form.cleaned_data["bot_therapist"]
         conversation.save()
 
         speakers_ = (

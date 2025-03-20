@@ -32,7 +32,6 @@ uv pip compile --output-file requirements.lock pyproject.toml
 docker-compose build base
 
 
-
 # BEFORE FIRST RUN, DB SETUP AND CONFIGURATION
 
 docker volume create postgres_data

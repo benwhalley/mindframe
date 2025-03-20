@@ -15,13 +15,14 @@ from django.utils.html import format_html, format_html_join
 from ruamel.yaml import YAML
 
 from mindframe.graphing import mermaid_diagram
-from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, BranchReasons, TurnTextSourceTypes
+from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, BranchReasons, TurnTypes
 from mindframe.tree import create_branch
 
 from .models import (
     LLM,
     Conversation,
     CustomUser,
+    Interruption,
     Intervention,
     Judgement,
     Memory,
@@ -106,6 +107,7 @@ class TurnInline(admin.TabularInline):
         "notes_data",
         "branch_button",
     ]
+
     readonly_fields = [
         "timestamp",
         "depth",
@@ -315,8 +317,17 @@ class TurnAdmin(admin.ModelAdmin):
         "speaker__username",
         "speaker__last_name",
         "conversation__uuid",
-        "conversation__telegram_conversation_id",
+        "conversation__chat_room_id",
     )
+    autocomplete_fields = [
+        "resuming_from",
+        "interruption",
+        "speaker",
+        "conversation",
+        "nudge",
+        "step",
+        "branch_author",
+    ]
 
 
 @admin.register(Note)
@@ -567,14 +578,14 @@ class InterventionAdmin(admin.ModelAdmin):
             conversation=conversation,
             speaker=request.user,
             text="",
-            text_source=TurnTextSourceTypes.OPENING,
+            turn_type=TurnTypes.OPENING,
         )
 
         bot_turn = human_starter.add_child(
             conversation=conversation,
             speaker=therapist,
             text=step.opening_line,
-            text_source=TurnTextSourceTypes.OPENING,
+            turn_type=TurnTypes.OPENING,
             step=step,
         )
 
@@ -688,3 +699,18 @@ class ScheduledNudgeAdmin(admin.ModelAdmin):
     list_filter = ["completed", DueNowFilter, DueSoonFilter]
     date_hierarchy = "due"
     readonly_fields = ["completed_turn", "completed", "nudge", "turn"]
+
+
+@admin.register(Interruption)
+class InterruptionAdmin(admin.ModelAdmin):
+    autocomplete_fields = [
+        "intervention",
+        "judgement",
+        "target_step",
+    ]
+    list_display = [
+        "intervention",
+        "target_step",
+        "trigger",
+        "resolution",
+    ]

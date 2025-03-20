@@ -1,7 +1,11 @@
+import logging
+
 from django.db.models import Q
 from django.urls import reverse
 
-from mindframe.models import Intervention, Step, Transition
+from mindframe.models import Interruption, Intervention, Nudge, Step, Transition
+
+logger = logging.getLogger(__name__)
 
 
 def mermaid_diagram(obj: Intervention, highlight: Step = None):
@@ -49,6 +53,41 @@ classDef conditionText fill:none,color:green,stroke:none, font-size:12px;
         if step.highlight:
             diagram.append(f'class {step.slug.replace("-", "_")} highlighted;')
 
+    # group interruptions together
+    has_interruption = Interruption.objects.filter(intervention=obj).count() > 0
+    if has_interruption:
+        diagram.append("subgraph interruptions[Interruptions]")
+        diagram.append("direction TB")
+
+    for interruption in Interruption.objects.filter(intervention=obj):
+        from_slug = interruption.pk
+        to_slug = interruption.target_step.slug.replace("-", "_")
+        trigger = (
+            f"""{interruption.judgement.variable_name}: {interruption.trigger.replace('"', "'")}"""
+        )
+        resolution = f"""{interruption.resolution.replace('"', "'")}"""
+        diagram.append(f'interruption_{from_slug}[" "]')
+        diagram.append(f"style interruption_{from_slug} fill:none,stroke:none")
+        diagram.append(f'interruption_{from_slug} ==> |"{trigger}"| {to_slug}')
+
+        diagram.append(f'interruptionexit_{from_slug}[" "]')
+        diagram.append(f"style interruptionexit_{from_slug} fill:none,stroke:none")
+        diagram.append(f'{to_slug} ==> |"{resolution}"| interruptionexit_{from_slug}')
+
+    if has_interruption:
+        diagram.append("end")
+
+    has_nudge = Nudge.objects.filter(intervention=obj).count() > 0
+    if has_nudge:
+        diagram.append("subgraph nudges[Nudges]")
+        diagram.append("direction TB")
+
+    for nudge in Nudge.objects.filter(intervention=obj):
+        diagram.append(f'{nudge.step_to_use.slug.replace("-", "_")}')
+
+    if has_nudge:
+        diagram.append("end")
+
     for transition in transitions:
         from_slug = transition.from_step.slug.replace("-", "_")
         to_slug = transition.to_step.slug.replace("-", "_")
@@ -73,6 +112,6 @@ classDef conditionText fill:none,color:green,stroke:none, font-size:12px;
             diagram.append(f"{to_slug}_judgements({judgement_str})")
 
     mermaid_code = "\n".join(diagram)
-
+    print(mermaid_code)
     # Render Mermaid container and script
     return mermaid_code

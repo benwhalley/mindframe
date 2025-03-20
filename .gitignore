@@ -16,3 +16,5 @@ sources/AnnoMI-full.csv
 mindframe/telegram-commands.txt
 mindframe/scratch.py
 mindframe/scratch.py
+matrix_crypto_store/*
+matrix_session.json
