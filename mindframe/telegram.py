@@ -31,9 +31,9 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from telegram import Bot, Update
 
-from mindframe.conversation import listen, respond
+from mindframe.conversation import begin_conversation, listen, respond
 from mindframe.models import Conversation, CustomUser, Intervention, Step, Turn
-from mindframe.settings import BranchReasons, TurnTextSourceTypes
+from mindframe.settings import BranchReasons, TurnTypes
 from mindframe.tree import conversation_history, create_branch
 
 logger = logging.getLogger(__name__)
@@ -225,8 +225,8 @@ def handle_new(message, conversation, request=None):
         logger.info(f"conv id {conversation.uuid}")
         del conversation
 
-        new_conversation, is_new = get_conversation(message)
-        start_new_conversation(intervention, new_conversation, message.chat.id)
+        conversation, is_new = get_or_create_conversation(message)
+        begin_conversation(intervention, conversation, message.chat.id)
 
         return JsonResponse({"status": "ok"}, status=200), None
 
@@ -242,27 +242,9 @@ def handle_new(message, conversation, request=None):
         return None, None
 
 
-def start_new_conversation(intervention, conversation, chat_id):
-    """
-    Initialise a conversation with a therapist user and an opening line
-    from the first step of 'intervention'. Returns the new opening bot turn.
-    """
-    bot_speaker = intervention.get_default_speaker()
-
-    first_step = intervention.steps.first()
-    opener_text = first_step.opening_line if first_step else "Hello! (No opening line set.)"
-
-    bot_turn = Turn.add_root(
-        conversation=conversation,
-        speaker=bot_speaker,
-        text=opener_text,
-        text_source=TurnTextSourceTypes.OPENING,
-        step=first_step,
-    )
-
-    send_telegram_message(chat_id, f"Creating a new conversation using {intervention}.")
-    send_telegram_message(chat_id, first_step.opening_line)
-
+def start_new_telegram_conversation(intervention, conversation, chat_id):
+    bot_turn, messages_to_send = start_new_conversation(intervention, conversation, chat_id)
+    send_telegram_message(chat_id, messages_to_send)
     return bot_turn
 
 
@@ -284,7 +266,7 @@ def continue_conversation(message, telegram_user, conversation, intervention):
             conversation=conversation,
             speaker=therapist,
             text=opener_text,
-            text_source=TurnTextSourceTypes.OPENING,
+            turn_type=TurnTypes.OPENING,
             step=first_step,
         )
 
@@ -351,7 +333,7 @@ def process_message(message, request=None):
         )
 
         # Get conversation
-        conversation, is_new_conv = get_conversation(message)
+        conversation, is_new_conv = get_or_create_conversation(message)
 
         # Dispatch command if recognised
         if potential_cmd in commands_map:
@@ -392,9 +374,9 @@ def is_valid_telegram_request(request):
     return valid_ip and valid_header
 
 
-def get_conversation(message):
+def get_or_create_conversation(message):
     logger.info(f"Getting conversation for chat ID {message.chat.id}")
     conversation, new_conv = Conversation.objects.get_or_create(
-        telegram_conversation_id=message.chat.id, archived=False
+        chat_room_id=message.chat.id, archived=False
     )
     return conversation, new_conv

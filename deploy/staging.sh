@@ -23,6 +23,5 @@ docker-compose run web \
     ./manage.py register_telegram && \
     ./manage.py setup_tasks
 
-
 docker-compose logs -f web chat worker
 EOF

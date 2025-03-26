@@ -74,7 +74,7 @@ docker-compose run web \
 	mindframe.LLM \
 	--indent 2 \
 	--natural-foreign --natural-primary  \
-	--format=yaml > ~/dev/mindframe/mindframe/fixtures/demo.yaml
+	--format=json > ~/dev/mindframe/mindframe/fixtures/demo.json
 
 ```
 

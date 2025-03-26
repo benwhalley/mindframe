@@ -358,9 +358,7 @@ class JudgementAdmin(admin.ModelAdmin):
         "prompt_template",
         "intervention",
     )
-    autocomplete_fields = [
-        "intervention",
-    ]
+    autocomplete_fields = ["intervention", "model"]
     search_fields = ["variable_name", "intervention__title"]
     list_editable = [
         "prompt_template",
@@ -705,9 +703,11 @@ class ScheduledNudgeAdmin(admin.ModelAdmin):
 class InterruptionAdmin(admin.ModelAdmin):
     autocomplete_fields = [
         "intervention",
-        "judgement",
+        "trigger_judgement",
+        "resolution_judgement",
         "target_step",
     ]
+    search_fields = ["intervention__title", "target_step__title"]
     list_display = [
         "intervention",
         "target_step",

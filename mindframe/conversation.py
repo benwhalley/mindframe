@@ -86,9 +86,7 @@ def get_model_for_turn(turn, type_="conversation") -> LLM:
 @observe(capture_input=False, capture_output=False)
 def evaluate_judgement(judgement, turn):
     ctx = speaker_context(turn)
-    # TODO: fix this model pick
-
-    model = get_model_for_turn(turn, "judgement")
+    model = judgement.model or get_model_for_turn(turn, "judgement")
     llmres = chatter(
         judgement.prompt_template,
         model=model,
@@ -197,6 +195,7 @@ def respond(
     turn: Turn,
     as_speaker: Optional[CustomUser] = None,
     with_intervention_step: Optional[Step] = None,
+    text: Optional[str] = None,
 ) -> Turn:
     """
     Respond to a particular turn in the conversation. Returns the new completed Turn object.
@@ -226,7 +225,8 @@ def respond(
         uuid=mfuuid(),
         conversation=turn.conversation,
         speaker=as_speaker,
-        text="...",
+        # use fixed, passed-in text if provided
+        text=text or "...",
         step=with_intervention_step,
         turn_type=TurnTypes.BOT,
     )
@@ -256,8 +256,8 @@ def respond(
         # based on other judgements in context on this Turn.
         # TODO: We will probably need scoping rules for the context dictionary here.
         # E.g. how many turns back we look.
-        if i.judgement:
-            note = evaluate_judgement(i.judgement, new_turn)
+        if i.trigger_judgement:
+            note = evaluate_judgement(i.trigger_judgement, new_turn)
 
         triggered = eval(i.trigger, {}, note.data)
         if triggered:
@@ -299,12 +299,22 @@ def respond(
     # - respond using the same speaker and step as the original checkpoint
 
     interrupted, checkpoint = is_interrupted(new_turn)
-
-    interruption_ctx = speaker_context(new_turn)
-
     if interrupted:
         logger.warning(f"We are still in an interruption: {checkpoint.interruption}")
-        resolved = eval(checkpoint.interruption.resolution, {}, interruption_ctx)
+
+        # run any resolution judgements prior to evaluating the resolution expression
+        if checkpoint.interruption.resolution_judgement:
+            note = evaluate_judgement(i.resolution_judgement, new_turn)
+
+        # build a context dictionary using the Notes on this Turn
+        # including the resolution judgement; then evaluate the resolution expression
+        interruption_ctx = speaker_context(new_turn)
+        try:
+            resolved = eval(checkpoint.interruption.resolution, {}, interruption_ctx)
+        except Exception as e:
+            logger.error(f"Error evaluating resolution expression: {e}")
+            resolved = False
+
         if resolved:  # return to where we were before
             logger.warning(
                 f"The interruption is now resolved\n{checkpoint.interruption.resolution}==True\n responding with Step from checkpoint: {checkpoint.step}"
@@ -323,19 +333,21 @@ def respond(
     transitions_possible = possible_transitions(new_turn)
     new_turn = apply_step_transition_and_judgements(new_turn, transitions_possible)
 
+    # if we didn't pass in a specific text to use as the response (e.g. in testing)
     # do the final completion, using all the new context available from Judgements
-    new_turn_complete = complete_the_turn(new_turn)
-    logger.info(f"Finalized new turn UUID: {new_turn_complete.uuid}")
+    if not text:
+        new_turn = complete_the_turn(new_turn)
+        logger.info(f"Finalized new turn UUID: {new_turn.uuid}")
 
     # ensure all the langfuse traces are identifiable by the Turn uuid
     langfuse_context.update_current_observation(
-        name=f"Response in turn: {new_turn_complete.uuid}",  # Use new turn ID
-        session_id=new_turn_complete.uuid,  # Make sure the session ID is correct
-        output=new_turn_complete.text,
+        name=f"Response in turn: {new_turn.uuid}",  # Use new turn ID
+        session_id=new_turn.uuid,  # Make sure the session ID is correct
+        output=new_turn.text,
     )
     langfuse_context.flush()
-
-    return new_turn_complete
+    
+    return new_turn
 
 
 def apply_step_transition_and_judgements(turn, transitions_possible) -> Turn:

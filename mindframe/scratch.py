@@ -16,7 +16,6 @@ from mindframe.models import (
     Transition,
     Turn,
 )
-from mindframe.settings import TurnTextSourceTypes
 from mindframe.templatetags.turns import format_turns
 from mindframe.tree import conversation_history, iter_conversation_path
 
@@ -106,7 +105,7 @@ turn0 = Turn.add_root(
     text="Welcome to the session. How are you feeling today?",
     timestamp=timezone.now(),
     branch=False,
-    text_source=TurnTextSourceTypes.OPENING,
+    turn_type=TurnTypes.OPENING,
     step=cbtwelcome,
 )
 

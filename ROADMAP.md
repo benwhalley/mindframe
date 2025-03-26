@@ -2,8 +2,9 @@
 
 
 
+use chatgpt to ask for similarity judgement between two texts for alignment with high quality original text??
 
-## Bot interactions
+
 
 /end
 (kills all scheduled nudges)

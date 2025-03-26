@@ -6,7 +6,7 @@
 {% load guidance %}
 {% block content %}
 <div class="container mt-5">
-    <h1 class="mb-1 mt-4">Conversation
+    <h1 class="mb-4 mt-4">Conversation
     {% if turn.pk == leaf_node.pk %}
      at node {{turn.uuid|slice:5}}
     {% else %}
@@ -14,8 +14,7 @@
         <a href="{% url 'conversation_detail' leaf_node.uuid %}">{{leaf_node.uuid|  slice:5}}</a>)
     {% endif %}
     </h1>
-    <a class="btn btn-outline-primary mb-3" href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">
-        View Tree</a>
+    
     <hr>
     {% if turn.pk != leaf_node.pk %}
     <div class="alert alert-warning" role="alert">
@@ -39,7 +38,9 @@
                     Conversation details
                 </div>
                 <div class="card-body">
-
+                        
+                    <a class="btn btn-outline-primary mb-3" href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">
+                        View Tree</a>
                     <p>
                         Participants: {{turn.conversation.speakers|join:", "}}
                     </p>
@@ -159,7 +160,7 @@
 
     <style>
         .speech {
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Palatino', 'Hoefler Text', 'Palatino Linotype', 'Book Antiqua', 'Palatino LT STD', 'Georgia', 'serif';
             font-size:14pt;
 
         }
@@ -178,7 +179,7 @@
 
                 <div class="col-10 mb-2 pr-2">
 
-                    <span class="mb-2 badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source|capfirst}}{% if turn.step %}:
+                    <span class="mb-2 badge border border-secondary text-secondary rounded-pill mr-2">{{turn.text_source|capfirst}} {% if turn.step %}:
                         <a class="text-decoration-none" href="{% url 'step_detail' turn.step.id %}">
                         {{turn.step.title}}
                         </a>
@@ -188,19 +189,23 @@
 
                     <div class = "speech">
                         <b>{{turn.speaker.username.upper}}: </b>
+                        {% if turn.text%}
                         {{turn.text}}
+                        {% else %}
+                        {{turn.turn_type.upper}}
+                        {% endif %}
                     </div>
 
                 </div>
 
                 <div class="col-2">
 
-                        <a class='btn btn-xs btn-outline-danger mb-0'
-                        href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch"> Make branch </a>
+                        <a class='btn float-end mb-1 btn-xs btn-outline-danger mb-0'
+                        href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=branch">Branch </a>
 
-                        <a class='btn btn-xs btn-outline-primary'
+                        <a class='btn float-end mb-1 btn-xs btn-outline-primary'
                         href="{% url 'admin:conversation_branch_turn' turn.pk %}?next=gradio">
-                            Chat from #{{turn.uuid|slice:3}}</a>
+                            Chat here</a>
                     </a>
                 </div>
             </div>

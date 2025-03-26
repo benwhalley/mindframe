@@ -24,6 +24,10 @@
         <style>
             .speaker-name { font-weight: bold; }
             .therapist { font-style: italic; }
+            .speech {
+                font-family: 'Palatino', 'Hoefler Text', 'Palatino Linotype', 'Book Antiqua', 'Palatino LT STD', 'Georgia', 'serif';
+                font-size:14pt;
+            }
         </style>
 
     {% for turn in turns %}
@@ -35,7 +39,8 @@
         class="{{turn.speaker.role}}"
         >
         <a id="turn-{{turn.uuid}}"></a>
-        <span class="speaker-name">{{turn.speaker}}</span>: {{turn.text}}
+        <span class="speaker-name">{{turn.speaker}}</span>: 
+        <span class="speech">{{turn.text}}</span>
         <a href="{% url 'conversation_detail' turn.uuid %}#turn-{{turn.uuid}}">
             <i class="bi bi-info-circle"></i>
         </a>
