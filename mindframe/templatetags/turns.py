@@ -23,7 +23,7 @@ def turns(context, filter_type="all", n=None):
 
     if n:
         # reverse first to select N last turns
-        t = list(reversed(list(t))[:n])
+        t = list(reversed(list(t)))[:n]
         # query again because otherwise we return a list not a queryset
         t = Turn.objects.filter(id__in=[turn.id for turn in t])
 
