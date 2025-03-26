@@ -62,9 +62,7 @@ classDef conditionText fill:none,color:green,stroke:none, font-size:12px;
     for interruption in Interruption.objects.filter(intervention=obj):
         from_slug = interruption.pk
         to_slug = interruption.target_step.slug.replace("-", "_")
-        trigger = (
-            f"""{interruption.judgement.variable_name}: {interruption.trigger.replace('"', "'")}"""
-        )
+        trigger = f"""{interruption.trigger_judgement and interruption.trigger_judgement.variable_name or '?'}: {interruption.trigger.replace('"', "'")}"""
         resolution = f"""{interruption.resolution.replace('"', "'")}"""
         diagram.append(f'interruption_{from_slug}[" "]')
         diagram.append(f"style interruption_{from_slug} fill:none,stroke:none")
