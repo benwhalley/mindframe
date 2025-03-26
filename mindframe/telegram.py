@@ -87,6 +87,7 @@ def send_telegram_message(chat_id, text):
 def telegram_webhook(request):
     """Handles incoming Telegram messages."""
 
+    print(request)
     if not is_valid_telegram_request(request):
         logger.warning(f"Rejected request from {request.META.get('REMOTE_ADDR')}")
 
@@ -313,6 +314,11 @@ def process_message(message, request=None):
     try:
         telegram_user = get_or_create_telegram_user(message)
         text_stripped = (message.text or "").strip()
+
+        # TODO: handle audio and video here
+        if not text_stripped:
+            send_telegram_message(message.chat.id, "Sorry, I only understand text at the moment...")
+            return JsonResponse({"status": "ok"}, status=200)
 
         # Build a command map: each handler returns (JsonResponse or None, conversation)
         commands_map = {
