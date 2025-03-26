@@ -22,7 +22,8 @@ def turns(context, filter_type="all", n=None):
         t = turns.filter(session_state__step=session.current_step())
 
     if n:
-        t = list(t)[:n]
+        # reverse first to select N last turns
+        t = list(reversed(list(t))[:n])
         # query again because otherwise we return a list not a queryset
         t = Turn.objects.filter(id__in=[turn.id for turn in t])
 
