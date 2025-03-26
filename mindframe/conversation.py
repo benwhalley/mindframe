@@ -25,6 +25,7 @@ from mindframe.settings import (
 from mindframe.silly import silly_user
 from mindframe.tree import conversation_history, is_interrupted, iter_conversation_path
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -512,6 +513,7 @@ def begin_conversation(intervention, conversation, room_id):
     Initialise a conversation with a Bot user and an opening line
     from the first step of 'intervention'.
     Returns the new opening bot turn.
+    # TODO make agnostic as to bot platform
     """
     bot_speaker = intervention.get_bot_speaker()
 
@@ -530,5 +532,7 @@ def begin_conversation(intervention, conversation, room_id):
         f"Creating a new conversation using {intervention}.",
         first_step.opening_line,
     ]
+    from mindframe.telegram import send_telegram_message
+
     send_telegram_message(room_id, messages)
     return bot_turn, messages

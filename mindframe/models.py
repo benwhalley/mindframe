@@ -329,7 +329,7 @@ class Interruption(LifecycleModel):
     )
 
     def __str__(self):
-        return f"-> {self.target_step.title} (`{self.trigger_judgement.variable_name}`, {self.trigger})"
+        return f"""-> {self.target_step.title} (`{self.trigger_judgement and self.trigger_judgement.variable_name or 'NA'}`, {self.trigger})"""
 
     def natural_key(self):
         return (self.intervention.natural_key(), self.slug)
