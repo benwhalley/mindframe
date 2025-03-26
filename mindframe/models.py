@@ -59,12 +59,19 @@ shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
 # (not necessarily at runtime, for those see below)
 
 
+class InterventionManager(models.Manager):
+    def get_by_natural_key(self, slug):
+        return self.get(slug=slug)
+
+
 class Intervention(LifecycleModel):
     """
     An intervention or treatment: a definition of the conversation content and structure.
 
     Interventions connect Steps, Judgements, Transitions, and related metadata.
     """
+
+    objects = InterventionManager()
 
     def compute_version(self) -> str:
         """Compute a version hash based on all linked objects."""
@@ -189,6 +196,15 @@ class Intervention(LifecycleModel):
         unique_together = ("title", "version", "sem_ver")
 
 
+class StepJudgementManager(models.Manager):
+    def get_by_natural_key(self, intervention_slug, step_slug, judgement_slug):
+        return self.get(
+            step__intervention__slug=intervention_slug,
+            step__slug=step_slug,
+            judgement__slug=judgement_slug,
+        )
+
+
 class StepJudgement(models.Model):
     """
     M2M through model for Steps and Judgements, says _when_ a Judgement should be made
@@ -238,10 +254,13 @@ class StepJudgement(models.Model):
         unique_together = [("judgement", "step", "when")]
 
 
+class InterruptionManager(models.Manager):
+    def get_by_natural_key(self, intervention_slug, slug):
+        return self.get(intervention__slug=intervention_slug, slug=slug)
+
+
 class Interruption(LifecycleModel):
     """
-
-    TODO: this is a work in progress and not all features of interruptions are implemented.
 
     An interruption is an alternative path through the intervention, triggered by a Judgement
 
@@ -259,20 +278,14 @@ class Interruption(LifecycleModel):
 
     """
 
+    slug = models.SlugField(unique=False, editable=True)
     intervention = models.ForeignKey(
         "Intervention",
         on_delete=models.CASCADE,
         related_name="interruptions",
         help_text="The intervention to which this interruption belongs.",
     )
-    judgement = models.ForeignKey(
-        "Judgement",
-        on_delete=models.CASCADE,
-        related_name="interruptions",
-        null=True,
-        blank=True,
-        help_text="If provided, this Judgement will be evaluated before the trigger. Whatever values it returns can be used in the trigger expression. If null, the trigger will be evaluated directly (using notes from other Judgements previously run).",
-    )
+
     target_step = models.ForeignKey(
         "Step",
         on_delete=models.CASCADE,
@@ -280,27 +293,57 @@ class Interruption(LifecycleModel):
         help_text="The step to switch to if the interruption is triggered.",
     )
 
+    trigger_judgement = models.ForeignKey(
+        "Judgement",
+        on_delete=models.CASCADE,
+        related_name="interruptions",
+        null=True,
+        blank=True,
+        help_text="If provided, this Judgement will be evaluated before the trigger. Whatever values it returns can be used in the trigger expression. If null, the trigger will be evaluated directly (using notes from other Judgements previously run).",
+    )
     trigger = models.TextField(
         default="interrupt is True",
         help_text="An expression to decide if the Interruption should be triggered. If using the default value, a Judgement should have returned a value for `interrupt` which is boolean (or coercible to boolean). If interrupt is True, the interruption will be triggered and the conversation will switch to the target step.",
     )
+    resolution_judgement = models.ForeignKey(
+        "Judgement",
+        on_delete=models.CASCADE,
+        related_name="interruption_resolutions",
+        null=True,
+        blank=True,
+        help_text="If provided, this Judgement will be evaluated in every turn (so keep it simple). Whatever values it returns can be used in the resolution expression. If null, the resolution will be evaluated directly (using notes from other Judgements previously run).",
+    )
     resolution = models.TextField(
-        default="interruption_resolved is True",
+        default="n_turns_step > 10 or interruption_resolved is True",
         help_text="In an interruption branch, Judgements should be used to (eventually) return a value which allows us to determine if the interruption should end. This `resolution` field is a condition that, if true, will jump the user back to their last checkpoint.",
     )
 
-    priority = models.PositiveSmallIntegerField(default=1)
+    priority = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="The priority of the interruption. Interruptions with a _lower_ priority number will be evaluated earlier. If priorities are tied, the order of the interruptions is determined by the slug field (alphabetical order)",
+    )
 
     debounce_turns = models.PositiveSmallIntegerField(
         default=10,
-        help_text="Prevents the interruption from triggering again within this many turns.",
+        help_text="Prevents the interruption from triggering again within this many turns. Think carefully about this value. Consider what information is provided to the judgement which triggers the interruption. If the interruption is triggered by a judgement which includes the whole conversation history, you may need to increase this value to avoid repeatedly triggering the same interruption. For example, if the interruption is triggered by a judgement which assesses risk in the last 10 utterances, and directs the user to a risk assessment sequence, you may want to set this to 10 or more.",
     )
 
     def __str__(self):
-        return f"-> {self.target_step.title} (`{self.judgement.variable_name}`, {self.trigger})"
+        return f"-> {self.target_step.title} (`{self.trigger_judgement.variable_name}`, {self.trigger})"
+
+    def natural_key(self):
+        return (self.intervention.natural_key(), self.slug)
+
+    objects = InterruptionManager()
 
     class Meta:
-        ordering = ["priority"]
+        unique_together = ("intervention", "slug")
+        ordering = ["priority", "slug"]
+
+
+class StepManager(models.Manager):
+    def get_by_natural_key(self, intervention_slug, step_slug):
+        return self.get(intervention__slug=intervention_slug, slug=step_slug)
 
 
 class Step(models.Model):
@@ -312,6 +355,7 @@ class Step(models.Model):
 
     """
 
+    objects = StepManager()
     intervention = models.ForeignKey(Intervention, on_delete=models.CASCADE, related_name="steps")
 
     title = models.CharField(max_length=255)
@@ -387,6 +431,14 @@ class Judgement(models.Model):
         unique_with="intervention",
         max_length=255,
     )
+    model = models.ForeignKey(
+        "LLM",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="used_for_judgements",
+        help_text="If provided, this LLM will be used to evaluate this Judgement. If not provided, the intervention's default judgement model will be used.",
+    )
 
     def __str__(self) -> str:
         return f"<{self.variable_name}> ({self.intervention.title} {self.intervention.sem_ver})"
@@ -449,9 +501,6 @@ class LLM(models.Model):
 
     def natural_key(self):
         return (self.model_name,)
-
-    def get_by_natural_key(self, model_name):
-        return self.get(model_name=model_name)
 
     class Meta:
         unique_together = [("model_name",)]
