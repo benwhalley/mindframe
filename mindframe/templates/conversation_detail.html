@@ -14,7 +14,7 @@
         <a href="{% url 'conversation_detail' leaf_node.uuid %}">{{leaf_node.uuid|  slice:5}}</a>)
     {% endif %}
     </h1>
-    
+
     <hr>
     {% if turn.pk != leaf_node.pk %}
     <div class="alert alert-warning" role="alert">
@@ -38,7 +38,7 @@
                     Conversation details
                 </div>
                 <div class="card-body">
-                        
+
                     <a class="btn btn-outline-primary mb-3" href="{% url 'conversation_mermaid' uuid=object.uuid %}#node-{{turn.uuid}}">
                         View Tree</a>
                     <p>

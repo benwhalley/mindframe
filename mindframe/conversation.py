@@ -346,7 +346,7 @@ def respond(
         output=new_turn.text,
     )
     langfuse_context.flush()
-    
+
     return new_turn
 
 

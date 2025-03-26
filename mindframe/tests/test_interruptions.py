@@ -19,7 +19,7 @@ from mindframe.silly import silly_user
 
 class InterruptionTestCase(TransactionTestCase):
     fixtures = ["mindframe/fixtures/demo.json"]
-    
+
     def setUp(self):
         """Set up test data for interruption tests."""
         # Create test intervention
@@ -29,7 +29,6 @@ class InterruptionTestCase(TransactionTestCase):
             self.intervention.interruptions.all().count() > 0
         ), "No interruptions found for demo intervention"
 
-        
         # Create test users
         self.client_user, _ = CustomUser.objects.get_or_create(
             username="test_client",
@@ -41,7 +40,6 @@ class InterruptionTestCase(TransactionTestCase):
             intervention=self.intervention,
         )
 
-       
     # def test_interruption_triggered_by_judgement(self):
     #     """Test that an interruption is triggered when a judgement returns True."""
     #     # Create a note that will trigger the interruption
@@ -168,38 +166,35 @@ class InterruptionTestCase(TransactionTestCase):
         system_turn = start_conversation(first_speaker=self.therapist_user)
 
         client_turn = listen(
-            system_turn, 
-            text="Hi, yes I'm here to talk about my eating habits.", 
-            speaker=self.client_user
+            system_turn,
+            text="Hi, yes I'm here to talk about my eating habits.",
+            speaker=self.client_user,
         )
 
-        
-
         # System responds (should trigger interruption)
-        system_turn = respond(client_turn, 
-                              as_speaker=self.therapist_user, 
-                              text="checking if we need to interrupt...")
+        system_turn = respond(
+            client_turn, as_speaker=self.therapist_user, text="checking if we need to interrupt..."
+        )
 
         # Verify risk interruption was not triggered
         self.assertFalse(system_turn.checkpoint)
-        
-        
+
         client_turn = listen(
-            system_turn, 
-            text="I don't care about my eating. I want to commit suicide.", 
-            speaker=self.client_user
+            system_turn,
+            text="I don't care about my eating. I want to commit suicide.",
+            speaker=self.client_user,
         )
-        
-        
-        system_turn = respond(client_turn, 
-                              as_speaker=self.therapist_user, 
-                              text="we probbaly should talk about this...")
-        
-        
+
+        system_turn = respond(
+            client_turn,
+            as_speaker=self.therapist_user,
+            text="we probbaly should talk about this...",
+        )
+
         # Verify risk interruption WAS triggered
         isinter, chpt = is_interrupted(system_turn)
         self.assertTrue(isinter)
-        interruption  = self.intervention.interruptions.first()
+        interruption = self.intervention.interruptions.first()
         self.assertEqual(chpt.interruption, interruption)
 
         # self.assertEqual(system_turn.step, engaging_step)
