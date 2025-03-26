@@ -260,7 +260,12 @@ def respond(
         if i.trigger_judgement:
             note = evaluate_judgement(i.trigger_judgement, new_turn)
 
-        triggered = eval(i.trigger, {}, note.data)
+        try:
+            triggered = eval(i.trigger, {}, note.data)
+        except Exception as e:
+            logger.error(f"Error evaluating trigger expression: {e}")
+            triggered = False
+            
         if triggered:
             logger.warning(f"Interruption {i} triggered\n{i.trigger}\n{note.data}")
             new_turn.interruption = i
