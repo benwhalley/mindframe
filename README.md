@@ -18,7 +18,7 @@ For developers looking to setup a local instance of mindframe, see: [this page](
 
 - *Client Tracking*: A database maintains a history of each client’s progression, including conversation history, and a record of internal (system) judgements, notes, and other session information.
 
-- *Collaboation*: Mindframe uses simple text-based templates to define an intervetion in terms of steps, transitions, judgements, notes, and actions. Each part of the intervention can be revised and reviewed by the intervention developer in consultation with clinicians.
+- *Collaboation*: Mindframe uses simple text-based templates to define an intervention in terms of steps, transitions, judgements, notes, and actions. Each part of the intervention can be revised and reviewed by the intervention developer in consultation with clinicians.
 
 - *Adaptable*: Interventions can be tailored to particular client groups or local context; retrieval augmented generation allows clinicians and managers to incorporate their own examples, case studies, and local knowledge.
 
@@ -52,9 +52,13 @@ MindFrame organizes therapy sessions around several key primitives:
 
 - *Judgements* are structured evaluations of the client state based on conversation history and other stored data. Judgements are used to determine the timing of transitions between steps, or to log progress against pre-defined goals.
 
+- *Interruptions* can occur basded on predefined criteria: for example, if a client is expressing dissatisfaction, distress or disclosing information that requires a risk assessment. Interruptions take the client out of the normal flow of the intervention.
+
+- *Nudges* are timetabled reminders to clients to re-engage with the intervention after a pause. Nudges can be scheduled flexibly, and can be responsive to individual clients' context (they use Steps to write personalised reminders to individual clients).
+
 - *Notes* allow summaries of conversation history to be saved as unstructured text — for example as clinical notes — providing context used in later generation steps, or to help human supervisors track clients' progress through an intervetion.
 
-- *Questions* are prompts that solicit structured input from the client (e.g. mood ratings, or other measures of outcome).
+- *Questions* are prompts that solicit structured input from the client (e.g. mood ratings, or other numerical measures of outcome).
 
 - *Examples* are short excepts from good or bad therapeutic practice, stored for semantic search and retrieval during conversations. Steps are templated in a way that allows treatment developers to dynamically insert relevant examples into the LLM prompt, leveraging the power of recent AI models to use 'few-shot' learning to generate high-quality responses.
 
