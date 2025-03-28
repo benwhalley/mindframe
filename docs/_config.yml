@@ -1,2 +1,6 @@
 title: mindframe
-theme: minima
+theme: just-the-docs
+repository: benwhalley/mindframe
+exclude:
+  - docs/fit/
+  - prompting-examples/

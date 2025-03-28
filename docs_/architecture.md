@@ -133,7 +133,9 @@ For example:
 You are a therapist working with a client.
 This is your recent conversation.
 
-{{turns 30}}
+{% raw %}
+{% turns 'all' n=30 %}
+{% endraw %}
 
 Think about what is happening in this conversation.
 Consider all the possible meanings in the context of CBT principles.
@@ -543,9 +545,13 @@ Each time the client says something in the chat or the system responds, we need 
 
 Turns can later be accessed in templates using the follwing django/jinja syntax, or by extension tags:
 
+
+{% raw %}
+
 `{{turns }}` -- this would (by default) include all the turns in the current session.
 
-`{% turns 3 %}` -- this shows last 3 turns in the session - i.e. equivalent to `session.turns()[-3:]`
+`\{% turns 3 %}` -- this shows last 3 turns in the session - i.e. equivalent to `session.turns()[-3:]`
+
 
 
 The output format for turns would default to:
@@ -558,11 +564,15 @@ The output format for turns would default to:
 
 So the output of `{% turns 3 %}` would look like:
 
+{% endraw %}
+
 ```
 CLIENT: I'm not sleeping well at the moment
 THERAPIST: I'm sorry to hear that. What's been happening?
 CLIENT: I'm just really stressed out
 ```
+
+{% raw %}
 
 `step`, `session` and `cycle` objects will be available in the context, and each of these object types has a `turns()` method, so could be used with the turns tag to constrain which turns are included:
 
@@ -574,17 +584,25 @@ CLIENT: I'm just really stressed out
 
 `{% turns step.previous %}` - turns from previous step (`previous` is an attribute on step).
 
+{% endraw %}
 
 
 #### Using RAG on turns
 
 We could also use RAG to search for previous turns which match a particular pattern, e.g. to find all turns where the client expresses a negative emotion, or where discussion was about alcohol use, to ensure it's possible to do callbacks and reflections effectively.
 
+{% raw %}
+
 `{% turns cycle -1 filter="alcohol_use" method="similarity" %}`
 
 In future the lookups could use other variables available to templates, e.g. the `primary_problem`
 
 `{% turns 'step' -1 filter=meta.primary_problem method="hyde" %}`
+
+
+
+
+
 
 In this example, we would use hyde to generate "client/therapist talk abotu {filter}" and then do semantic search based on that.
 
@@ -784,3 +802,5 @@ graph TD;
   A -->|"disrepancy==partial + step.turns > 30"| B;
   B -->|step.minutes > 5 + step.turns > 5| C[end-intervention.step];
 ```
+
+{% endraw %}

@@ -18,6 +18,9 @@ return:
         response: "Only answer 'yes' if you are confident in your classification."
 ---
 
+
+{% raw %}
+
 # Context
 
 You are: {{system.personas.supervisor}}
@@ -88,3 +91,6 @@ Respond in JSON in this format only:
   print(yaml.dump(schema_dict, default_flow_style=False))
 
 -->
+
+
+{% endraw %}

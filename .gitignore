@@ -19,3 +19,5 @@ mindframe/scratch.py
 matrix_crypto_store/*
 matrix_session.json
 mindframe/__example_matrix_logs
+docs/_site
+mindframe_db.dump
