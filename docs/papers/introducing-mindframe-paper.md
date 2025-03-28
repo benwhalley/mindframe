@@ -10,10 +10,10 @@
 Psychotherapy poses unique hurdles to large-scale AI training. Expectations of client-therapist confidentiality and strict data-sharing regulations hamper the collection of real-world therapy transcripts, limiting the volume of robust, ethically sourced training data [@Luxton2014]. Variability in therapeutic styles and the lack of explicit labels for quality of fidelity in many existing dataset---critical for supervised learning---further complicate model development. In contrast to the problem-solving tasks which have dominated the attention of AI research in recent years, developing generative models for theraputic interventions raises complex questions about how to define quality or evaluate model outputs [@Shatte2019]. Furthermore, inadequately curated datasets might lead to harm by inadvertently reproducing biases or outdated practices [@srinivasan2024comprehensive]. It is important that the training and evaluation of therapeutic models is done in a way which is transparent, accountable and responsive to local clinical needs. We should avoid a 'black box' approach that would hamper future research and development of clinical techniques and approaches.
 
 
-Grodniewicz and Hohol (2023) consider the challenges of defining therapy sufficiently well to replicate it with AI and identify three key concerns: 
+Grodniewicz and Hohol (2023) consider the challenges of defining therapy sufficiently well to replicate it with AI and identify three key concerns:
 Firstly, that developing effective AI-based psychotherapy might require a deeper understanding of what makes human-delivered psychotherapy effective. Second, psychotherapy may _require_ a therapeutic relationship between the therapist and the client, and this may be inherently difficult to replicate in an AI system. And thirdly, that the task of conducting psychotherapy may be too complex a problem for what they term "narrow AI".
 
-<!-- Woodnutt et al. (2023) found that ChatGPT was able to provide a plan of care that incorporated some principles of dialectical behavioral therapy, but the output had significant errors and limitations, and therefore the potential for harm was possible. 
+<!-- Woodnutt et al. (2023) found that ChatGPT was able to provide a plan of care that incorporated some principles of dialectical behavioral therapy, but the output had significant errors and limitations, and therefore the potential for harm was possible.
 https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jpm.12965
 Could artificial intelligence write mental health nursing care plans? -->
 
@@ -24,15 +24,15 @@ Argue that AIs are tools not agents and not equal partners in the therapeutic di
  -->
 
 
-Models like DeepSeek R1 (Deepseek) suggest a way around some of these constraints, and motivate a "prompting-first, training later" approach to bootstrap the development of specialist therapeutic AI models. This new class of model was (likely) developed by using an existing LLM generating of structured reasoning sequences and and responses to prompts. Models are trained and refined with reinforcement signals that prioritise completions which include both reasoning and response. The result is a model that tends to generate both reasoning and response, and where the ouput is of higher quality than a model which is only trained to generate responses. A similar approach could be used to develop a therapist AI which prioritises adherence to evidence-based frameworks, which is a core goal of current work on therapeutic AI models [@Pereira2019]. 
+Models like DeepSeek R1 (Deepseek) suggest a way around some of these constraints, and motivate a "prompting-first, training later" approach to bootstrap the development of specialist therapeutic AI models. This new class of model was (likely) developed by using an existing LLM generating of structured reasoning sequences and and responses to prompts. Models are trained and refined with reinforcement signals that prioritise completions which include both reasoning and response. The result is a model that tends to generate both reasoning and response, and where the ouput is of higher quality than a model which is only trained to generate responses. A similar approach could be used to develop a therapist AI which prioritises adherence to evidence-based frameworks, which is a core goal of current work on therapeutic AI models [@Pereira2019].
 
-Rather than training models to simulate therapist responses in an archive of therapy sessions which is often variable or poor quality, we propose a "prompting-first, training later" approach to bootstrap the training and iterative-refinement of specialist, psychologically-informed LLMs. 
+Rather than training models to simulate therapist responses in an archive of therapy sessions which is often variable or poor quality, we propose a "prompting-first, training later" approach to bootstrap the training and iterative-refinement of specialist, psychologically-informed LLMs.
 
 The mindframe project is an open-source system to enable clinicians and treatment developers to implement therapeutic chatbots which are informed and constrained by established clinical guidelines. Mindframe provides clinically-oriented building blocks to create a prompting-based chatbot which can be used to deliver clinical services, or as a platform for research into the development of new therapeutic approaches.
 
 In operation, mindframe uses a graph-based prompting engine to generate chains of clinical reasoning and approoriate responses to service users. Responsible clinicians can monitor and guide the system's behaviour for individual clients, and iteratively refine the model's output to specific or local clinical needs. Over time, and once the model is well-calibrated, the internal reasoning chains generated by mindframe can be used to train a specialist therapist model, reducing costs and potentially enabling different interaction modes (e.g. real time chat).
 
-This paper outlines the motivation for a prompting-first approach, and motivates the use of a system like mindframe to develop, share and improve psychologically informed AI-delivered interventions. 
+This paper outlines the motivation for a prompting-first approach, and motivates the use of a system like mindframe to develop, share and improve psychologically informed AI-delivered interventions.
 
 
 -----------
@@ -64,7 +64,7 @@ In this paper we outline the steps necessary to produce a therapeutic equivalent
 To generate the corpus of CCTs required to train a Deepseek-style therapist model,
 it is necessary to represent the structure and desired outputs of a therapeutic approach in a way that can be used to prompt a foundation model (by foundation model we mean a large, non-specialist language model like ChatGPT-4o or Claude Sonnet; by therapist-model we mean a fine-tuned/RHLF'd version of the foundation model which has been trained to generate CCTs and responses).
 
-These prompts explicitly instruct the foundation model to generate a _structured_ response, including an internal "chains of thought" that remains hidden from the service user. 
+These prompts explicitly instruct the foundation model to generate a _structured_ response, including an internal "chains of thought" that remains hidden from the service user.
 
 This requires an explicit model of the therapeutic process intended — for example,, describing the goals and structure of a treatment session, or the broader principles of a specific therapeutic approach and the trajectory across a number of sessions.
 
@@ -317,4 +317,3 @@ showing promise in complex domains like psychotherapy, where context, empathy, a
 
 https://www.tandfonline.com/doi/full/10.1080/09515089.2024.2397004#abstract
 We suggest that psychotherapy is a fundamentally dialogical activity, because it crucially involves work on the self and one’s self-narrative. This brings us to our central question: is it possible for CAs to engage in a productive therapeutic dialogue, given their limitations as epistemic agents? We will discuss several of those limitations, show how these undermine the possibility of engaging in a therapeutic dialogue, and illustrate those limitations through discussions of the cases of grief and abuse.
-
