@@ -40,7 +40,10 @@ DEBUG_TOOLBAR_CONFIG = {
 }
 
 
-SECRET_KEY = config("SECRET_KEY")
+if DEBUG:
+    SECRET_KEY = config("SECRET_KEY", "1234")
+else:
+    config("SECRET_KEY")
 COMPRESS_ENABLED = config("COMPRESS_ENABLED", default=True, cast=bool)
 COMPRESS_OFFLINE = config("COMPRESS_OFFLINE", default=True, cast=bool)
 
