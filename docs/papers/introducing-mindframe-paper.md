@@ -5,14 +5,37 @@
 
 
 
-# The Promise of DeepSeek R1 for the Development of High-Quality Therapy AI
+# Prompting-first, training later: bootstrapping the development of psychologically informed AI models for clinical practice.
 
-Recent advances in artificial intelligence have highlighted the necessity of moving beyond next-word prediction and toward systems that can dynamically engage in structured reasoning, a principle that underpins novel approaches such as DeepSeek R1.
-By embedding self-improving mechanisms via reinforcement learning, these models can refine their decision-making processes without relying solely on pattern matching, and without the need for extremely-large naturalistic datasets or extended human supervision.
+Psychotherapy poses unique hurdles to large-scale AI training. Expectations of client-therapist confidentiality and strict data-sharing regulations hamper the collection of real-world therapy transcripts, limiting the volume of robust, ethically sourced training data [@Luxton2014]. Variability in therapeutic styles and the lack of explicit labels for quality of fidelity in many existing dataset---critical for supervised learning---further complicate model development. In contrast to the problem-solving tasks which have dominated the attention of AI research in recent years, developing generative models for theraputic interventions raises complex questions about how to define quality or evaluate model outputs [@Shatte2019]. Furthermore, inadequately curated datasets might lead to harm by inadvertently reproducing biases or outdated practices [@srinivasan2024comprehensive]. It is important that the training and evaluation of therapeutic models is done in a way which is transparent, accountable and responsive to local clinical needs. We should avoid a 'black box' approach that would hamper future research and development of clinical techniques and approaches.
 
-Psychotherapy poses unique hurdles to large-scale AI training. Confidentiality norms and strict data-sharing regulations hamper the collection of real-world therapy transcripts, limiting the volume of robust, ethically sourced training data [@Luxton2014]. Variability in therapeutic styles and the lack of explicit labels---critical for supervised learning---further complicate model development, raising questions about how to define "success" in a realm where outcomes hinge on subjective interpersonal dynamics [@Shatte2019]. Furthermore, inadequately curated datasets might lead to harm by inadvertently reproducing biases or outdated practices [@srinivasan2024comprehensive], an outcome antithetical to the principles of safe clinical care.
 
-Models like DeepSeek R1 (Deepseek) suggest a way around these constraints, through the internal generation of structured reasoning sequences which are trained and refined with reinforcement signals that prioritise adherence to evidence-based frameworks [@Pereira2019]. Rather than replicating an -- often inconsistent -- archive of therapy sessions, this approach could foster explicit alignment with established clinical guidelines, offering an interpretable and scalable pathway to AI-assisted mental health interventions.  By bridging the gap between fluid language-generation and carefully orchestrated therapeutic reasoning, models adopting DeepSeek's approach represent a paradigm shift: from superficially imitating a corpus of imperfect therapeutic encounters, to internalising and applying core psychological principles responsibly and transparently.
+Grodniewicz and Hohol (2023) consider the challenges of defining therapy sufficiently well to replicate it with AI and identify three key concerns: 
+Firstly, that developing effective AI-based psychotherapy might require a deeper understanding of what makes human-delivered psychotherapy effective. Second, psychotherapy may _require_ a therapeutic relationship between the therapist and the client, and this may be inherently difficult to replicate in an AI system. And thirdly, that the task of conducting psychotherapy may be too complex a problem for what they term "narrow AI".
+
+<!-- Woodnutt et al. (2023) found that ChatGPT was able to provide a plan of care that incorporated some principles of dialectical behavioral therapy, but the output had significant errors and limitations, and therefore the potential for harm was possible. 
+https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jpm.12965
+Could artificial intelligence write mental health nursing care plans? -->
+
+
+
+<!-- https://www.tandfonline.com/doi/full/10.1080/15265161.2022.2048739
+Argue that AIs are tools not agents and not equal partners in the therapeutic dialogue
+ -->
+
+
+Models like DeepSeek R1 (Deepseek) suggest a way around some of these constraints, and motivate a "prompting-first, training later" approach to bootstrap the development of specialist therapeutic AI models. This new class of model was (likely) developed by using an existing LLM generating of structured reasoning sequences and and responses to prompts. Models are trained and refined with reinforcement signals that prioritise completions which include both reasoning and response. The result is a model that tends to generate both reasoning and response, and where the ouput is of higher quality than a model which is only trained to generate responses. A similar approach could be used to develop a therapist AI which prioritises adherence to evidence-based frameworks, which is a core goal of current work on therapeutic AI models [@Pereira2019]. 
+
+Rather than training models to simulate therapist responses in an archive of therapy sessions which is often variable or poor quality, we propose a "prompting-first, training later" approach to bootstrap the training and iterative-refinement of specialist, psychologically-informed LLMs. 
+
+The mindframe project is an open-source system to enable clinicians and treatment developers to implement therapeutic chatbots which are informed and constrained by established clinical guidelines. Mindframe provides clinically-oriented building blocks to create a prompting-based chatbot which can be used to deliver clinical services, or as a platform for research into the development of new therapeutic approaches.
+
+In operation, mindframe uses a graph-based prompting engine to generate chains of clinical reasoning and approoriate responses to service users. Responsible clinicians can monitor and guide the system's behaviour for individual clients, and iteratively refine the model's output to specific or local clinical needs. Over time, and once the model is well-calibrated, the internal reasoning chains generated by mindframe can be used to train a specialist therapist model, reducing costs and potentially enabling different interaction modes (e.g. real time chat).
+
+This paper outlines the motivation for a prompting-first approach, and motivates the use of a system like mindframe to develop, share and improve psychologically informed AI-delivered interventions. 
+
+
+-----------
 
 Replicating DeepSeek’s approach for a therapist AI, requires a corpus of therapy sessions in which both the therapeutic reasoning _and_ interactions with clients are connected, and which contains annotations to incentivise models to reproduce both the therapuetic reasoning and client facing output (via RLHF/RLAIF).
 
@@ -36,17 +59,17 @@ Prerequisites for This Approach to Work
 In this paper we outline the steps necessary to produce a therapeutic equivalent of Deepseek R1, and report initial results from an open-source CCT-prompting system, [Mindframe](http://github.com/benwhalley/mindframe).
 
 
+### Prompting first
 
-### A prompting-based system with hidden chain of thought reasoning
+To generate the corpus of CCTs required to train a Deepseek-style therapist model,
+it is necessary to represent the structure and desired outputs of a therapeutic approach in a way that can be used to prompt a foundation model (by foundation model we mean a large, non-specialist language model like ChatGPT-4o or Claude Sonnet; by therapist-model we mean a fine-tuned/RHLF'd version of the foundation model which has been trained to generate CCTs and responses).
 
-To generate the corpus of CCTs required to train a Deepseek-style therapist,
-it is necessary to represent the structure and desired outputs of a therapeutic appraoch in a way that can be used to prompt a foundation model.
-These prompts explicitly instruct the model to generate a _structured_ response, including an internal CoT reasoning component that remains hidden from the user.
+These prompts explicitly instruct the foundation model to generate a _structured_ response, including an internal "chains of thought" that remains hidden from the service user. 
+
 This requires an explicit model of the therapeutic process intended — for example,, describing the goals and structure of a treatment session, or the broader principles of a specific therapeutic approach and the trajectory across a number of sessions.
 
 Describing this broader structure in a single prompt is unlikely to be sucessful.
-Studies on chain-of-thought prompting indicate that iterative, stepwise reasoning helps models maintain internal consistency and produce more accurate, context-sensitive outputs [@Wei2022chain]. By contrast, a single prompt encourages models to rely on static or memorised patterns, which would be incompatible with the complexity and personalised nature of mental health interventions [@Shatte2019].
-
+Studies on chain-of-thought prompting indicate that iterative, stepwise reasoning helps models maintain internal consistency and produce more accurate, context-sensitive outputs [@Wei2022chain]. By contrast, a single prompt encourages models to rely on static or memorised patterns, which would be incompatible with the complexity and personalised nature of mental health interventions [@Shatte2019]. This is reflected in early results of LLM-based chatbots (XX, YY).
 
 >Brown et al. (2020). “Language Models are Few-Shot Learners.”
 >[https://arxiv.org/abs/2005.14165]
@@ -63,18 +86,39 @@ Studies on chain-of-thought prompting indicate that iterative, stepwise reasonin
 
 
 
-This allows the model to follow established therapeutic paradigms, such as Motivational Interviewing (MI), Cognitive Behavioral Therapy (CBT), or Acceptance and Commitment Therapy (ACT), without overwhelming the client with unnecessary meta-commentary.
-
+Producing responses to the service user may require MANY prompts to the foundation model (or a variety of LLMs and other classifiers). Coordinating these prompts is a challenge, but could allow the model to follow established therapeutic paradigms without deviation or loss of coherence. Importantly, separating the clinical reasoning and response generation allows the model to be guided by therapeutic guidelines and principles, but without overwhelming the client with unnecessary meta-commentary.
 
 Each interaction follows a structured format:
+
 1. **User Input**: The user submits a query, concern, or problem statement.
 2. **Hidden Chain of Thought**: The model generates a structured internal reasoning sequence based on psychological principles.
-3. **Final User-Facing Response**: A concise, empathetic response is presented to the user, ensuring clarity and accessibility.
+3. **Final User-Facing Response**: A concise, clinically-appropriate response is generated based on the hidden clinical reasoning, and presented to the user.
 
-By systematically collecting these interactions, we construct a dataset in which high-quality therapist responses are paired with explicit reasoning sequences. This dataset serves as the foundation for subsequent model refinement.
+As a conseuqence of this structured approach, several additional activities are possible:
+
+- Clinical review, oversight: By providing summaries of both itneractions and the clinical reasoning, supervisors will be able to monitor the model's behaviour.
+- Clinical feedback and guidance: After review, human supervisors could provide feedback and guidance to the model, shaping future behaviour for individual service users.
 
 
-### Constructing a Training Dataset for Model Fine-Tuning
+By systematically collecting both interactions with service user and hidden clinical reasoning, we construct a dataset in which high-quality therapist responses are paired with explicit reasoning sequences. This dataset serves as the foundation for subsequent model refinement.
+
+
+
+
+Hwang et al 2024
+https://www.sciencedirect.com/science/article/abs/pii/S0165178123006054?via%3Dihub
+Shows that ChatGPT was able to generate appropriate psychodynamic formulations based on a case history from the psychoanalytic literature.
+This means it could be used to generate formulations on the fly and this could be used to guide subsequent responses (i.e. this is an example of gpt creating an important component of a chain of thought prompting which would be used to generate a response)
+
+
+
+
+
+
+
+
+### Training later...
+
 The dataset generated in the prompting stage contains three critical components: (1) user queries, (2) therapist CoT reasoning, and (3) final user-facing responses. Additionally, human evaluators or heuristic-based scoring mechanisms assess response quality. The resulting dataset enables fine-tuning a foundational large language model, embedding structured reasoning directly into its architecture rather than relying solely on prompting.
 
 Supervised fine-tuning (SFT) on this dataset ensures that the model learns to generate its own CoT reasoning while preserving the clarity and structure of therapeutic interactions. The training objective is to align model-generated reasoning with expert therapist reasoning patterns, allowing the AI to internalize decision-making heuristics.
@@ -84,12 +128,11 @@ Fine-tuning alone is insufficient to ensure that the model produces high-quality
 
 **Designing Reward Signals:**
 1. **Adherence to Therapeutic Frameworks** – The model is rewarded for responses that follow structured psychological principles, such as the appropriate use of open-ended questions, affirmations, and reflections.
-2. **Empathy and Emotional Appropriateness** – A secondary NLP classifier scores responses for warmth, compassion, and sensitivity.
+2. **Empathy and Emotional Appropriateness** – A secondary classifier scores responses for warmth, compassion, and sensitivity.
 3. **Logical Coherence in Chain of Thought Reasoning** – The model’s internal reasoning is evaluated for consistency and structured problem-solving.
 4. **User Engagement and Outcome Metrics** – Where possible, longitudinal data is used to assess whether the AI-driven responses correlate with positive behavioral changes or continued user engagement.
 5. **Human Preference Rankings** – Therapist evaluators rank multiple AI-generated responses, creating a dataset to train a reward model that optimizes for human-like therapeutic quality.
 
-The optimization process employs **Group Relative Policy Optimization (GRPO)**, a reinforcement learning algorithm that improves model outputs by selecting responses that maximize alignment with predefined reward functions. Instead of direct reinforcement learning from human feedback (RLHF), GRPO enables the model to learn through a structured reward comparison process, iteratively refining its policy based on therapist-preferred responses.
 
 
 
@@ -265,3 +308,13 @@ This multi-stage approach—beginning with a structured prompting system, transi
 
 
 showing promise in complex domains like psychotherapy, where context, empathy, and ethical considerations are paramount [@Levine2022]. Early attempts at integrating AI into mental health interventions underscore both the potential and the pitfalls: small-scale deployments of conversational agents have demonstrated feasibility in delivering cognitive-behavioural strategies to young adults, but their efficacy still depends heavily on transparent, evidence-based reasoning [@Fitzpatrick2017].
+
+
+
+<!-- The optimization process employs **Group Relative Policy Optimization (GRPO)**, a reinforcement learning algorithm that improves model outputs by selecting responses that maximize alignment with predefined reward functions. Instead of direct reinforcement learning from human feedback (RLHF), GRPO enables the model to learn through a structured reward comparison process, iteratively refining its policy based on therapist-preferred responses. -->
+
+
+
+https://www.tandfonline.com/doi/full/10.1080/09515089.2024.2397004#abstract
+We suggest that psychotherapy is a fundamentally dialogical activity, because it crucially involves work on the self and one’s self-narrative. This brings us to our central question: is it possible for CAs to engage in a productive therapeutic dialogue, given their limitations as epistemic agents? We will discuss several of those limitations, show how these undermine the possibility of engaging in a therapeutic dialogue, and illustrate those limitations through discussions of the cases of grief and abuse.
+
