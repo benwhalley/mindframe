@@ -264,7 +264,7 @@ PLATFORMS
 
 DEPENDENCIES
   github-pages
-  just-the-docs
+  just-the-docs (= 0.10.1)
 
 BUNDLED WITH
    1.17.2
