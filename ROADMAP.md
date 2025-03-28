@@ -1,6 +1,24 @@
 # Roadmap for `mindframe` development
 
 
+DataPoint/DataPackage/Observation/Note
+Allow arbitrary dumps of key=val data to be posted to a conversation or turn
+from externally?
+
+
+ComputedData
+Allow summarisation or computations on existing notes, and these to be available in prompt context or dashboards
+Plugin architecture for the code components of this? E.g. a function on the data
+
+
+InterventionDashboard
+Define what metrics to show in the dashboard for an intervention, persumably across conversations.
+Use a plugin architecture for this, so that new metrics can be added easily?
+Also new display functions?
+
+
+
+
 
 use chatgpt to ask for similarity judgement between two texts for alignment with high quality original text??
 
