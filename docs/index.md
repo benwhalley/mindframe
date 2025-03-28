@@ -1,4 +1,7 @@
-# MindFrame
+---
+layout: default
+title: About Mindframe
+---
 
 Mindframe is an integrated system for treatment developers and service managers. It makes it possible to implement psychologically informed chatbots built on large language models (LLMs), capable of high-quality individual and group intervention. The system is designed to be introspectable, verifiable, and adaptable to complex interventions and varied clinical settings.
 
