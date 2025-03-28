@@ -173,7 +173,9 @@ class InterruptionTestCase(TransactionTestCase):
 
         # System responds (should trigger interruption)
         system_turn = respond(
-            client_turn, as_speaker=self.therapist_user, text="checking if we need to interrupt..."
+            client_turn,
+            as_speaker=self.therapist_user,
+            text="checking if we need to interrupt...",
         )
 
         # Verify risk interruption was not triggered

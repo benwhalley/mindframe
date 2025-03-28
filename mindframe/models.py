@@ -123,7 +123,9 @@ class Intervention(LifecycleModel):
     sem_ver = models.CharField(max_length=64, null=True, editable=True)
 
     intervention_type = models.CharField(
-        choices=InterventionTypes.choices, default=InterventionTypes.THERAPY, max_length=30
+        choices=InterventionTypes.choices,
+        default=InterventionTypes.THERAPY,
+        max_length=30,
     )
 
     default_bot_user = models.ForeignKey(
@@ -222,7 +224,9 @@ class StepJudgement(models.Model):
     )
 
     n_turns = models.PositiveSmallIntegerField(
-        blank=True, null=True, help_text="If run by-turn, run the Judgement every N turns"
+        blank=True,
+        null=True,
+        help_text="If run by-turn, run the Judgement every N turns",
     )
     offline = models.BooleanField(
         default=False, help_text="Run this Judgement offline, outside the reply loop"
@@ -404,7 +408,11 @@ class Transition(models.Model):
             raise ValidationError("from_step and to_step must belong to the same intervention.")
 
     def natural_key(self):
-        return (self.from_step.natural_key(), self.to_step.natural_key(), self.conditions)
+        return (
+            self.from_step.natural_key(),
+            self.to_step.natural_key(),
+            self.conditions,
+        )
 
     class Meta:
         unique_together = [("from_step", "to_step", "conditions")]
@@ -529,7 +537,7 @@ class CustomUser(AbstractUser):
 
     def transcript_speaker_label(self, intervention=None):
         # TODO: allow intervention to be passed to influence how transcripts
-        # are presented to the mode. Could be either [client]/][therapist] or
+        # are presented to the mode. Could be either [client]/[therapist] or
         # real names/usernames
         return f"[{self.username}] "
 
@@ -642,7 +650,9 @@ class MemoryChunkQuerySet(models.QuerySet):
         qs_mems = list(set(self.values_list("memory", flat=True)))
         memory_chunks = MemoryChunk.objects.filter(memory_id__in=qs_mems).annotate(
             rank=Window(
-                expression=RowNumber(), partition_by=F("memory_id"), order_by=F("start").asc()
+                expression=RowNumber(),
+                partition_by=F("memory_id"),
+                order_by=F("start").asc(),
             )
         )
 
@@ -1052,7 +1062,8 @@ class Nudge(LifecycleModel):
 
     def end_date_(self, reference_datetime):
         parsed_duration = dateparser.parse(
-            "after " + self.for_a_period_of, settings={"RELATIVE_BASE": reference_datetime}
+            "after " + self.for_a_period_of,
+            settings={"RELATIVE_BASE": reference_datetime},
         )
 
         if parsed_duration is None:
@@ -1118,7 +1129,11 @@ class ScheduledNudge(LifecycleModel):
     due = models.DateTimeField(blank=True, null=True)
     completed = models.BooleanField(default=False)
     completed_turn = models.ForeignKey(
-        "Turn", on_delete=models.CASCADE, related_name="completed_nudges", null=True, blank=True
+        "Turn",
+        on_delete=models.CASCADE,
+        related_name="completed_nudges",
+        null=True,
+        blank=True,
     )
 
     class Meta:

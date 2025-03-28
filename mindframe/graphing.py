@@ -75,17 +75,6 @@ classDef conditionText fill:none,color:green,stroke:none, font-size:12px;
     if has_interruption:
         diagram.append("end")
 
-    has_nudge = Nudge.objects.filter(intervention=obj).count() > 0
-    if has_nudge:
-        diagram.append("subgraph nudges[Nudges]")
-        diagram.append("direction TB")
-
-    for nudge in Nudge.objects.filter(intervention=obj):
-        diagram.append(f'{nudge.step_to_use.slug.replace("-", "_")}')
-
-    if has_nudge:
-        diagram.append("end")
-
     for transition in transitions:
         from_slug = transition.from_step.slug.replace("-", "_")
         to_slug = transition.to_step.slug.replace("-", "_")
@@ -108,6 +97,17 @@ classDef conditionText fill:none,color:green,stroke:none, font-size:12px;
             diagram.append(f"{to_slug}_judgements -.-> {to_slug}")
             diagram.append(f"class {to_slug}_judgements judgement;")
             diagram.append(f"{to_slug}_judgements({judgement_str})")
+
+    has_nudge = Nudge.objects.filter(intervention=obj).count() > 0
+    if has_nudge:
+        diagram.append("subgraph nudges[Nudges]")
+        diagram.append("direction TB")
+
+    for nudge in Nudge.objects.filter(intervention=obj):
+        diagram.append(f'{nudge.step_to_use.slug.replace("-", "_")}')
+
+    if has_nudge:
+        diagram.append("end")
 
     mermaid_code = "\n".join(diagram)
     print(mermaid_code)

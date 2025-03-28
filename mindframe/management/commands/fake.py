@@ -32,10 +32,15 @@ class Command(BaseCommand):
             help="Slugs of the interventions (two for a new conversation).",
         )
         parser.add_argument(
-            "--turns", type=int, required=True, help="Number of turns to complete in total."
+            "--turns",
+            type=int,
+            required=True,
+            help="Number of turns to complete in total.",
         )
         parser.add_argument(
-            "--continue", action="store_true", help="Continue an existing SyntheticConversation."
+            "--continue",
+            action="store_true",
+            help="Continue an existing SyntheticConversation.",
         )
 
     def handle(self, *args, **options):

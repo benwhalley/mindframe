@@ -223,7 +223,10 @@ def generate_treant_tree_data(root):
             "nodeAlign": "TOP",
             "connectors": {"type": "curve"},
             "collapsable": True,
-            "animation": {"nodeAnimation": "easeOutBounce", "connectorsAnimation": "bounce"},
+            "animation": {
+                "nodeAnimation": "easeOutBounce",
+                "connectorsAnimation": "bounce",
+            },
         },
         "nodeStructure": traverse(root),
     }

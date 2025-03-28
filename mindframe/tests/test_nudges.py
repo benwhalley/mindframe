@@ -48,7 +48,9 @@ class NudgeTestCase(TransactionTestCase):  # Instead of TestCase
     def test_nudge_expired_if_end_date_passed(self):
         """Test that a nudge is not due if it has expired."""
         n = Nudge.objects.create(
-            schedule="daily at 11am", step_to_use=Step.objects.first(), for_a_period_of="1 day"
+            schedule="daily at 11am",
+            step_to_use=Step.objects.first(),
+            for_a_period_of="1 day",
         )
         end_date = n.end_date_(timezone.now() - timedelta(days=2))
         self.assertFalse(n.due_now(end_date))
@@ -70,7 +72,9 @@ class NudgeTestCase(TransactionTestCase):  # Instead of TestCase
     def test_nudge_does_not_repeat_too_soon(self):
         """Test that nudges are not due too soon after the last turn."""
         n = Nudge.objects.create(
-            schedule="every 10 minutes", step_to_use=Step.objects.first(), for_a_period_of="1 day"
+            schedule="every 10 minutes",
+            step_to_use=Step.objects.first(),
+            for_a_period_of="1 day",
         )
         self.turn.timestamp = timezone.now() - timedelta(seconds=30)  # Less than NUDGE_WINDOW
         self.assertFalse(n.due_for_turn(self.turn))
@@ -78,7 +82,9 @@ class NudgeTestCase(TransactionTestCase):  # Instead of TestCase
     def test_end_date_calculation(self):
         """Test end date calculation from a reference datetime."""
         n = Nudge.objects.create(
-            schedule="every day at 8am", step_to_use=Step.objects.first(), for_a_period_of="1 week"
+            schedule="every day at 8am",
+            step_to_use=Step.objects.first(),
+            for_a_period_of="1 week",
         )
         ref_time = timezone.now()
         end_date = n.end_date_(ref_time)
@@ -88,7 +94,9 @@ class NudgeTestCase(TransactionTestCase):  # Instead of TestCase
     def test_invalid_schedule_raises_exception(self):
         """Test that an invalid schedule string raises an exception."""
         n = Nudge(
-            schedule="invalid schedule", step_to_use=Step.objects.first(), for_a_period_of="1 week"
+            schedule="invalid schedule",
+            step_to_use=Step.objects.first(),
+            for_a_period_of="1 week",
         )
         with self.assertRaises(Exception):
             list(n.scheduled_datetimes(timezone.now()))

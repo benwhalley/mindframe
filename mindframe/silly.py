@@ -15,7 +15,18 @@ first_names = [
     "Monty",
     "Silas",
 ]
-last_name_prefixes = ["Whit", "Ash", "Haw", "Mor", "Cran", "Fair", "Thor", "Mar", "Beau", "Elder"]
+last_name_prefixes = [
+    "Whit",
+    "Ash",
+    "Haw",
+    "Mor",
+    "Cran",
+    "Fair",
+    "Thor",
+    "Mar",
+    "Beau",
+    "Elder",
+]
 last_name_suffixes = [
     "sworth",
     "field",

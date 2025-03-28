@@ -4,7 +4,14 @@ import os
 from rest_framework import serializers
 from ruamel.yaml import YAML
 
-from mindframe.models import Example, Intervention, Judgement, Step, StepJudgement, Transition
+from mindframe.models import (
+    Example,
+    Intervention,
+    Judgement,
+    Step,
+    StepJudgement,
+    Transition,
+)
 
 yaml = YAML()
 # yaml.default_flow_style = False  # Use block style
@@ -38,7 +45,11 @@ class TransitionSerializer(serializers.ModelSerializer):
 class JudgementSerializer(serializers.ModelSerializer):
     class Meta:
         model = Judgement
-        fields = ["title", "variable_name", "prompt_template"]  # Specify fields manually
+        fields = [
+            "title",
+            "variable_name",
+            "prompt_template",
+        ]  # Specify fields manually
 
 
 class StepJudgementSerializer(serializers.ModelSerializer):
@@ -77,7 +88,13 @@ class InterventionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Intervention
-        fields = ["title", "short_title", "sem_ver", "steps", "examples"]  # Specify fields manually
+        fields = [
+            "title",
+            "short_title",
+            "sem_ver",
+            "steps",
+            "examples",
+        ]  # Specify fields manually
 
 
 def intervention_serial(intervention_id):

@@ -15,7 +15,15 @@ from django.views.generic.detail import DetailView
 from django.views.generic.edit import FormMixin, FormView
 
 from mindframe.conversation import add_turns_task
-from mindframe.models import LLM, Conversation, CustomUser, Intervention, Memory, Note, Turn
+from mindframe.models import (
+    LLM,
+    Conversation,
+    CustomUser,
+    Intervention,
+    Memory,
+    Note,
+    Turn,
+)
 from mindframe.silly import silly_name
 from mindframe.tree import conversation_history
 

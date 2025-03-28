@@ -12,7 +12,16 @@ from langfuse.decorators import langfuse_context, observe
 
 from llmtools.llm_calling import chatter
 from mindframe.helpers import get_ordered_queryset, make_data_variable
-from mindframe.models import LLM, Conversation, CustomUser, Judgement, Note, Step, Transition, Turn
+from mindframe.models import (
+    LLM,
+    Conversation,
+    CustomUser,
+    Judgement,
+    Note,
+    Step,
+    Transition,
+    Turn,
+)
 from mindframe.settings import (
     DEFAULT_CONVERSATION_MODEL_NAME,
     DEFAULT_JUDGEMENT_MODEL_NAME,
@@ -265,7 +274,7 @@ def respond(
         except Exception as e:
             logger.error(f"Error evaluating trigger expression: {e}")
             triggered = False
-            
+
         if triggered:
             logger.warning(f"Interruption {i} triggered\n{i.trigger}\n{note.data}")
             new_turn.interruption = i
@@ -486,7 +495,9 @@ def continue_conversation(from_turn, speaker_interventions, n_turns) -> Turn:
     for i, speak, inter in zip(range(n_turns), speakers, interventions):
         logger.info(f"ADDING TURN: {i}, {speak}, {inter}")
         from_turn = respond(
-            from_turn, as_speaker=speak, with_intervention_step=inter.steps.all().first()
+            from_turn,
+            as_speaker=speak,
+            with_intervention_step=inter.steps.all().first(),
         )
 
     return from_turn

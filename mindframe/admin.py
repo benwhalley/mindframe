@@ -40,7 +40,8 @@ yaml = YAML()
 yaml.default_flow_style = False  # Use block style
 yaml.width = 4096  # Avoid wrapping long lines into multiple lines
 yaml.representer.add_representer(
-    str, lambda dumper, data: dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+    str,
+    lambda dumper, data: dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|"),
 )
 
 shortuuid.set_alphabet(MINDFRAME_SHORTUUID_ALPHABET)
@@ -153,7 +154,15 @@ class ConversationAdmin(admin.ModelAdmin):
     save_on_top = True
     list_filter = (IsSyntheticFilter, "archived")
     inlines = [TurnInline]
-    list_display = ["__str__", "summary", "speakers", "active", "n_turns", "intervention", "uuid"]
+    list_display = [
+        "__str__",
+        "summary",
+        "speakers",
+        "active",
+        "n_turns",
+        "intervention",
+        "uuid",
+    ]
     list_prefetch_related = ["intervention", "speakers"]
     search_fields = ["uuid", "turns__speaker__username", "turns__speaker__last_name"]
 
@@ -163,7 +172,10 @@ class ConversationAdmin(admin.ModelAdmin):
     def speakers(self, obj):
         return ",".join(
             set(
-                filter(bool, obj.turns.all().values_list("speaker__username", flat=True).distinct())
+                filter(
+                    bool,
+                    obj.turns.all().values_list("speaker__username", flat=True).distinct(),
+                )
             )
         )
 
@@ -412,7 +424,10 @@ class InterventionAdmin(admin.ModelAdmin):
         return render(
             request,
             "admin/intervention_mermaid.html",
-            {"intervention": intervention, "mermaid_code": self.mermaid_diagram(intervention)},
+            {
+                "intervention": intervention,
+                "mermaid_code": self.mermaid_diagram(intervention),
+            },
         )
 
     def get_urls(self):

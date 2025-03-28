@@ -10,7 +10,14 @@ from django.db import transaction
 from rest_framework import serializers
 from ruamel.yaml import YAML
 
-from mindframe.models import Example, Intervention, Judgement, Step, StepJudgement, Transition
+from mindframe.models import (
+    Example,
+    Intervention,
+    Judgement,
+    Step,
+    StepJudgement,
+    Transition,
+)
 
 yaml = YAML()
 

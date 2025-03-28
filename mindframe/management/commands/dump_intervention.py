@@ -5,7 +5,15 @@ from django.core.management.base import BaseCommand
 from django.core.serializers import serialize
 from django.db import transaction
 
-from mindframe.models import LLM, Example, Intervention, Judgement, Step, StepJudgement, Transition
+from mindframe.models import (
+    LLM,
+    Example,
+    Intervention,
+    Judgement,
+    Step,
+    StepJudgement,
+    Transition,
+)
 
 
 class Command(BaseCommand):
