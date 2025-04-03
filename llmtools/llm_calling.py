@@ -1,3 +1,4 @@
+import hashlib
 import asyncio
 import logging
 import re
@@ -6,7 +7,9 @@ from collections import OrderedDict, namedtuple
 from hashlib import sha256
 from types import FunctionType
 from typing import Any, Dict, List
-
+import io
+import requests
+from pydub import AudioSegment
 from asgiref.sync import async_to_sync, sync_to_async
 from colored import Back, Fore, Style
 from django.template import Context, Template
@@ -494,3 +497,80 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
 def chatter(multipart_prompt: str, model, context={}, cache=True) -> ChatterResult:
     """Synchronous wrapper for chatter_async"""
     return async_to_sync(chatter_async)(multipart_prompt, model, context, cache)
+
+
+from moviepy import VideoFileClip
+
+
+def convert_audio(input_bytes, to="mp3"):
+    input_audio = AudioSegment.from_file(io.BytesIO(input_bytes))
+    output_buffer = io.BytesIO()
+    input_audio.export(output_buffer, format=to)
+    output_buffer.seek(0)
+    return output_buffer
+
+
+def get_source_bytes_(source: str) -> bytes:
+    # Check if audio_source is a URL or file
+    if source.startswith("http://") or source.startswith("https://"):
+        response = requests.get(source)
+        if response.status_code == 200:
+            content = response.content
+        else:
+            logger.error(f"Failed to download audio from URL: {source}")
+            return ""
+    else:
+        # Assume it is a file path
+        with open(audio_source, "rb") as file:
+            content = file.read()
+
+    return content
+
+
+def whisper_transcribe_audio_(audio_input, language: str = "en") -> str:
+    client = OpenAI(api_key=config("LITELLM_API_KEY"), base_url=config("LITELLM_ENDPOINT"))
+
+    # Check if audio_input is a byte stream or file path
+    if isinstance(audio_input, bytes):
+        audio_file = io.BytesIO(audio_input)
+        # Whisper requires a filename
+        audio_file.name = f"{hashlib.sha256(audio_input).hexdigest()}.mp3"
+    elif isinstance(audio_input, str):
+        audio_file = open(audio_input, "rb")
+    else:
+        raise ValueError("Invalid audio input: must be bytes or file path.")
+
+    try:
+        response = client.audio.transcriptions.create(
+            file=audio_file, model="whisper", language=language
+        )
+        return response.text
+    finally:
+        if hasattr(audio_file, "close"):
+            audio_file.close()
+
+
+def transcribe_audio(source: str, language: str = "en") -> str:
+    """
+    Transcribe audio or video using Whisper from Azure OpenAI.
+
+    Args:
+        source (str): Path to the audio/video file or URL of the media.
+        language (str): Language code for transcription (default: English).
+
+    Returns:
+        str: Transcribed text from the audio or video.
+    """
+    try:
+        content = get_source_bytes_(source)
+        audio_bytes = convert_audio(content, to="mp3")
+
+    except Exception as e:
+        logger.error(f"Error converting source to audio: {e}")
+        return ""
+
+    try:
+        return whisper_transcribe_audio_(audio_bytes.read(), language)
+    except Exception as e:
+        logger.error(f"Error during transcription: {e}")
+        return ""

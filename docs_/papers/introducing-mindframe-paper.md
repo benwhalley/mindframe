@@ -1,6 +1,16 @@
 
 
 
+Adaptive Forgetting
+
+Context management
+
+3 way conversations client/therapist
+- who is client/therapist/bot? does the bot need to respond to everyone or just the client?
+
+
+
+
 
 
 
