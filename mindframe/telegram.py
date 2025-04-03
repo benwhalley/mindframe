@@ -71,6 +71,34 @@ class TelegramBotClient(WebhookBotClient):
             logger.error(f"Failed to set up Telegram webhook: {e}")
             return False
 
+    def get_webhook_info(self) -> Dict[str, Any]:
+
+        get_info_url = f"https://api.telegram.org/bot{self.bot_secret_token}/getWebhookInfo"
+        response = requests.get(get_info_url)
+        try:
+            return json.loads(response.content)
+        except Exception as e:
+            logger.error(f"Failed to get webhook info: {e}")
+            return {"error": str(e)}
+
+    def delete_webhook(self) -> bool:
+        """
+        Delete the webhook for this client on Telegram.
+        Returns True if successful, False otherwise.
+        """
+
+        try:
+            url = f"https://api.telegram.org/bot{self.bot_secret_token}/deleteWebhook"
+            data = {"url": self.webhook_url, "secret_token": self.webhook_validation_token}
+            response = requests.post(url, data=data, timeout=10)
+            response.raise_for_status()
+            logger.info(response)
+            logger.info("Telegram webhook deleted successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete Telegram webhook: {e}")
+            return False
+
     def validate_request(self, request) -> bool:
         """
         Validate that an incoming request is authentic and from Telegram.
