@@ -137,3 +137,12 @@ This is potentially slower than needed, because not all Judgements are going to 
 We should be able to queue the Judgements and only run the ones that are needed. We should also be able to make transition evaluation async? Perhaps we can set all the Judgements to run in parallel and then check for transitions as they complete and become available?
 
 We could use celery/redis to queue tasks. More complex is thinking about the
+
+
+
+
+
+
+# Localisation
+
+Localising datetimes: e.g. currently set to London/Europe, but if we had Swedish users then timezones would be out for nudges etc.
