@@ -1,388 +1,428 @@
 """
-
-# delete
-curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/deleteWebhook"
-
-# detup
-curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
-     -d "url=$TELEGRAM_WEBHOOK_URL" \
-     -d "secret_token=$TELEGRAM_WEBHOOK_VALIDATION_TOKEN"
-
-# get webhook status
-curl -X GET "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo"
-
+TODO: Design decision about whether to capture system messages like response to /help etc
 """
-
+import traceback
+import html
 import ipaddress
 import json
 import logging
-import os
-import re
-import threading
-import time
-import traceback
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
-from decouple import Csv, config
-from django.contrib.auth import get_user_model
-from django.http import JsonResponse
+from decouple import config
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
-from django.views.decorators.csrf import csrf_exempt
 from telegram import Bot, Update
 
-from mindframe.conversation import begin_conversation, listen, respond
-from mindframe.models import Conversation, CustomUser, Intervention, Step, Turn
+from mindframe.bot import (
+    InboundMessage,
+    MediaContent,
+    MediaType,
+    ReactionContent,
+    WebhookBotClient,
+)
+from mindframe.conversation import listen, respond
+from mindframe.models import Conversation, CustomUser, Intervention, Turn
 from mindframe.settings import BranchReasons, TurnTypes
 from mindframe.tree import conversation_history, create_branch
 
 logger = logging.getLogger(__name__)
-User = get_user_model()
 
+# Configuration constants
 TELEGRAM_WEBHOOK_VALIDATION_TOKEN = config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN", None)
 TELEGRAM_IP_RANGES = [ipaddress.ip_network(ip) for ip in ["149.154.160.0/20", "91.108.4.0/22"]]
 TELEGRAM_BOT_TOKEN = config("TELEGRAM_BOT_TOKEN", default=None)
 
-bot = TELEGRAM_BOT_TOKEN and Bot(token=TELEGRAM_BOT_TOKEN) or None
+
+# TELEGRAM_BOT_TOKEN="7868408035:AAH6NxjV556QnesLYe_qt976Uby2cpnIXkI"
+# TELEGRAM_WEBHOOK_VALIDATION_TOKEN="cd7e8d19e80a49f3b083e237557d8f84"
+# TELEGRAM_WEBHOOK_URL="https://test.mindframe.llemma.net/telegram-webhook/"
+# TELEGRAM_BOT_NAME=MindFramerBot
 
 
-if not (TELEGRAM_WEBHOOK_VALIDATION_TOKEN and TELEGRAM_BOT_TOKEN):
-    logger.warning("No telegram bot configured")
 
-
-def send_typing_status_continuous(chat_id, stop_event):
-    """Continuously send 'typing' status to Telegram until stop_event is set."""
-    while not stop_event.is_set():
-        send_typing_status(chat_id)
-        time.sleep(5.5)  # Send 'typing' every 4 seconds (before the 5s expiry)
-
-
-def send_typing_status(chat_id):
-    """Send 'typing' status to Telegram."""
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendChatAction"
-    data = {"chat_id": chat_id, "action": "typing"}
-
-    try:
-        logger.info("Sending 'typing' status.")
-        requests.post(url, data=data, timeout=5)
-    except requests.RequestException as e:
-        logger.warning(f"Failed to send 'typing' status: {e}")
-
-
-def send_telegram_message(chat_id, text):
-    """Send a Telegram message synchronously using requests."""
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
-
-    try:
-        response = requests.post(
-            url, data=data, timeout=10
-        )  # Set a timeout to avoid hanging connections
-        response.raise_for_status()  # Raise an error for HTTP failures
-    except requests.RequestException as e:
-        logger.error(f"Failed to send Telegram message: {e}")
-
-
-@csrf_exempt
-def telegram_webhook(request):
-    """Handles incoming Telegram messages."""
-
-    print(request)
-    if not is_valid_telegram_request(request):
-        logger.warning(f"Rejected request from {request.META.get('REMOTE_ADDR')}")
-
-    if request.method != "POST":
-        return JsonResponse({"error": "Invalid method"}, status=405)
-    try:
-        update = Update.de_json(json.loads(request.body), bot)
-        if update.message:
-            return process_message(update.message, request)
-    except Exception as e:
-        logger.error(f"Telegram webhook error: {e}")
-        raise e
-
-    return JsonResponse({"status": "ok"})
-
-
-def get_or_create_telegram_user(message) -> CustomUser:
-    # TODO: manage updates to user metadata like name and update our user
-    user_data = message.from_user
-    user, created = User.objects.get_or_create(
-        username=f"telegram_user_{user_data.id}",
-        defaults={
-            "first_name": user_data.first_name or "",
-            "last_name": user_data.last_name or "",
-        },
-    )
-    return user
-
-
-def welcome_message(chat_id):
-    send_telegram_message(chat_id, "Hi! This is the mindframe Telegram bot")
-    available = Intervention.objects.all().values_list("slug", flat=True)
-    send_telegram_message(chat_id, f"")
-
-    send_telegram_message(
-        chat_id,
-        f"""You can use this system to start a conversation with any of the available therapist interventions, or role-play with a simulated client.
-
-The available intervention names are: {', '.join(available)}
-
-Type /new intervention_name to start a conversation. E.g. /new {available[0]}
-
-(Type /list to see details of all the available interventions)
-                          """,
-    )
-
-
-def handle_list(chat_id):
-    available = Intervention.objects.all()
-    send_telegram_message(chat_id, "The available interventions are:")
-    send_telegram_message(chat_id, "\n".join([f"{i.title}: `{i.slug}`" for i in available]))
-
-
-def handle_help(message, conversation=None, request=None):
+class TelegramBotClient(WebhookBotClient):
     """
-    Reply with a summary of available bot commands.
-    Returns (JsonResponse, message) so the caller can decide how to proceed.
+    Telegram implementation of the WebhookBotClient.
     """
-    logger.info("Handling /help command.")
-    send_telegram_message(
-        message.chat.id,
-        "Commands:\n"
-        "/new <intervention_slug> - start a new conversation\n"
-        "/help - show this message\n"
-        "/settings - show settings",
-    )
-    return JsonResponse({"status": "ok"}, status=200), None
 
+    def __init__(self, **kwargs):
+        """Initialize the Telegram bot client"""
+        super().__init__(**kwargs)
 
-def handle_web(message, conversation=None, request=None):
-    """
-    Reply with a link to the web page for this conversation
-    """
-    try:
-        logger.info("Handling /web command.")
-        url = request.build_absolute_uri(
-            reverse("conversation_detail", args=[conversation.turns.all().last().uuid])
+    def setup_webhook(self) -> bool:
+        """
+        Setup the webhook for this client on Telegram.
+        Returns True if successful, False otherwise.
+        """
+        if not self.webhook_validation_token:
+            raise Exception("Must set a validation token for telegram webhooks")
+
+        try:
+            url = f"https://api.telegram.org/bot{self.bot_secret_token}/setWebhook"
+            data = {"url": self.webhook_url, "secret_token": self.webhook_validation_token}
+            response = requests.post(url, data=data, timeout=10)
+            response.raise_for_status()
+            logger.info(response)
+            logger.info("Telegram webhook set up successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set up Telegram webhook: {e}")
+            return False
+
+    def validate_request(self, request) -> bool:
+        """
+        Validate that an incoming request is authentic and from Telegram.
+        """
+        # Validate IP address
+        client_ip = request.META.get("HTTP_X_FORWARDED_FOR") or request.META.get("REMOTE_ADDR")
+        ip = ipaddress.ip_address(client_ip)
+        valid_ip = any(ip in net for net in TELEGRAM_IP_RANGES)
+
+        # Validate token in header
+        if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != self.webhook_validation_token:
+            valid_header = False
+        else:
+            valid_header = True
+
+        logger.info(
+            f"Telegram request validation - Valid IP: {valid_ip}, valid header: {valid_header}"
         )
-        send_telegram_message(message.chat.id, f"{url}")
-        return JsonResponse({"status": "ok"}, status=200), None
-    except Exception as e:
-        raise e
+        return valid_ip and valid_header
 
+    def parse_message(self, request) -> InboundMessage:
+        """
+        Parse the incoming message from Telegram's format into a standard InboundMessage.
+        """
+        try:
+            # Parse the raw update from Telegram
+            update = Update.de_json(json.loads(request.body))
 
-def handle_settings(message, conversation=None, request=None):
-    """
-    Reply with any available settings (currently none).
-    Returns (JsonResponse, conversation).
-    """
-    logger.info("Handling /settings command.")
-    send_telegram_message(message.chat.id, "No settings available")
-    return JsonResponse({"status": "ok"}, status=200), None
+            if not update.message:
+                raise ValueError("No message found in update")
 
+            message = update.message
+            user_data = message.from_user
 
-def handle_undo(message, conversation, request=None):
-    """ """
-    parts = message.text.strip().split(" ", 1)
+            # Extract media information if present
+            media_list = []
 
-    try:
-        from_turn = conversation.turns.get(uuid__startswith=parts[1].strip())
-    except Exception:
-        logger.info("Couldn't find turn by UUID, trying to find by index")
-        back_n = int(parts[1].strip()) if len(parts) > 1 else 1
-        last_turn = conversation.turns.last()
-        from_turn = list(conversation_history(last_turn, to_leaf=False).filter(step__isnull=False))[
-            -back_n
-        ]
+            # Check for photo
+            if message.photo:
+                raise NotImplementedError("Photos not handled yet")
+                # Get largest photo (last in array)
+                photo = message.photo[-1]
+                media_list.append(
+                    MediaContent(
+                        type=MediaType.IMAGE,
+                        url="",  # Telegram doesn't provide direct URLs
+                        file_id=photo.file_id,
+                        file_size=photo.file_size,
+                        caption=message.caption,
+                    )
+                )
 
-    new_turn = create_branch(from_turn, reason=BranchReasons.UNDO)
-    send_telegram_message(message.chat.id, f"Restarting conversation from:\n\n >{new_turn.text}")
-    return JsonResponse({"status": "ok"}, status=200), None
+            # Check for document
+            if message.document:
+                raise NotImplementedError("Documnets not handled yet")
+                media_list.append(
+                    MediaContent(
+                        type=MediaType.DOCUMENT,
+                        url="",
+                        file_id=message.document.file_id,
+                        mime_type=message.document.mime_type,
+                        file_size=message.document.file_size,
+                        file_name=message.document.file_name,
+                    )
+                )
 
+            # Check for audio
+            if message.audio:
+                media_list.append(
+                    MediaContent(
+                        type=MediaType.AUDIO,
+                        url="",
+                        file_id=message.audio.file_id,
+                        mime_type=message.audio.mime_type,
+                        file_size=message.audio.file_size,
+                        duration=message.audio.duration,
+                        file_name=message.audio.file_name,
+                    )
+                )
 
-def handle_new(message, conversation, request=None):
-    """
-    Attempt to start a new conversation with the specified intervention slug.
-    If successful, returns (None, new_conversation).
-    If fails, returns (JsonResponse, old_conversation).
-    """
-    logger.info("Handling /new command.")
-    try:
-        parts = message.text.strip().split(" ", 1)
-        slug = parts[1].strip() if len(parts) > 1 else None
-        if not slug:
-            raise ValueError("No intervention slug provided")
+            # Check for video notes
+            if message.video_note:
+                media_list.append(
+                    MediaContent(
+                        type=MediaType.VIDEO,
+                        url="",
+                        file_id=message.video_note.file_id,
+                        file_size=message.video_note.file_size,
+                        duration=message.video_note.duration,
+                    )
+                )
 
-        intervention = get_object_or_404(Intervention, slug=slug)
+            # Check for voice
+            if message.voice:
+                media_list.append(
+                    MediaContent(
+                        type=MediaType.VOICE,
+                        url="",
+                        file_id=message.voice.file_id,
+                        mime_type=message.voice.mime_type,
+                        file_size=message.voice.file_size,
+                        duration=message.voice.duration,
+                    )
+                )
 
-        # Archive old conversation and notify user
-        conversation.archived = True
-        conversation.save(update_fields=["archived"])  # Ensures DB commit
-        send_telegram_message(
-            message.chat.id,
-            "Starting a new conversation (forgetting everything we talked about so far).",
-        )
-        logger.info(f"conv id {conversation.uuid}")
-        del conversation
+            # Create the standardized message
+            inbound_message = InboundMessage(
+                platform="telegram",
+                platform_user_id=str(user_data.id),
+                chat_id=str(message.chat.id),
+                message_id=str(message.message_id),
+                text=message.text or message.caption or "",
+                reply_to_message_id=(
+                    str(message.reply_to_message.message_id) if message.reply_to_message else None
+                ),
+                timestamp=message.date.timestamp() if message.date else None,
+                media=media_list,
+                reaction=None,  # Telegram reactions need more processing
+                raw_data=update.to_dict(),  # Store the full update for reference
+            )
 
-        conversation, is_new = get_or_create_conversation(message)
-        begin_conversation(intervention, conversation, message.chat.id)
+            return inbound_message
 
-        return JsonResponse({"status": "ok"}, status=200), None
+        except Exception as e:
+            logger.error(f"Error parsing Telegram message: {e}")
+            raise ValueError(f"Failed to parse Telegram message: {e}")
+    
+    def audio_to_text(self, message):
+        pass
+    
+    def get_or_create_user(self, message: InboundMessage) -> CustomUser:
+        """
+        Get or create a user based on the Telegram user ID.
+        """
+        user_id = message.platform_user_id
+        raw_data = message.raw_data
 
-    except Exception as e:
-        logger.error(traceback.format_exc())
-        available = ", ".join(Intervention.objects.all().values_list("slug", flat=True))
-        send_telegram_message(
-            message.chat.id,
-            f"Couldn't find matching intervention, ignoring /new command.\n"
-            f"(Available interventions: {available})",
-        )
-        # Return a JsonResponse and the old conversation
-        return None, None
+        # Extract user info from raw data
+        from_user = raw_data.get("message", {}).get("from", {})
+        first_name = from_user.get("first_name", "")
+        last_name = from_user.get("last_name", "")
 
-
-def start_new_telegram_conversation(intervention, conversation, chat_id):
-    bot_turn, messages_to_send = start_new_conversation(intervention, conversation, chat_id)
-    send_telegram_message(chat_id, messages_to_send)
-    return bot_turn
-
-
-def continue_conversation(message, telegram_user, conversation, intervention):
-    """
-    Save the user's turn and generate a bot response in the ongoing conversation.
-    """
-    last_turn = conversation.turns.last()
-
-    # If no prior turns exist, create a default opening
-    if not last_turn:
-        therapist, _ = User.objects.get_or_create(
-            username="therapist",
-            defaults={"role": "therapist", "email": "therapist@example.com"},
-        )
-        first_step = intervention.steps.first()
-        opener_text = first_step.opening_line if first_step else "Hello! (No opening line set.)"
-        last_turn = Turn.add_root(
-            conversation=conversation,
-            speaker=therapist,
-            text=opener_text,
-            turn_type=TurnTypes.OPENING,
-            step=first_step,
+        # Create or get the user
+        user, created = CustomUser.objects.get_or_create(
+            username=f"telegram_user_{user_id}",
+            defaults={
+                "first_name": first_name,
+                "last_name": last_name,
+            },
         )
 
-    # Record the user's turn
-    client_turn = listen(last_turn, speaker=telegram_user, text=message.text)
-    client_turn.save()
+        # Update user info if it changed
+        # TODO: make this cover more fields
+        if not created and (user.first_name != first_name or user.last_name != last_name):
+            user.first_name = first_name
+            user.last_name = last_name
+            user.save(update_fields=["first_name", "last_name"])
 
-    # Generate bot response
-    last_turn = conversation.turns.last()
-    logger.info(f"Responding to this: {last_turn.text}")
+        return user
 
-    # continuously send 'typing' status messages while generating response
-    # using a thread (because typing status expires after 5 seconds)
-    stop_event = threading.Event()
-    typing_thread = threading.Thread(
-        target=send_typing_status_continuous, args=(message.chat.id, stop_event)
-    )
-    typing_thread.start()
-    try:
-        bot_turn = respond(last_turn)  # This could take time
-    finally:
-        stop_event.set()  # Stop sending 'typing' once `respond` completes
-        typing_thread.join()
+    def get_or_create_conversation(self, message: InboundMessage) -> Tuple[Any, bool]:
+        """
+        Get or create a conversation for this chat.
+        """
+        conversation, is_new = Conversation.objects.get_or_create(
+            chat_room_id=message.chat_id, archived=False
+        )
+        return conversation, is_new
 
-    bot_turn.save()
-    logger.info(f"Bot response: {bot_turn.text}")
+    def format_message(self, text: str) -> str:
+        """
+        Format a message for Telegram (handles HTML formatting).
+        """
+        # Telegram supports HTML by default
+        # TODO: might want to add more sophisticated formatting here
+        return html.escape(text)
 
-    # Send reply
-    send_telegram_message(message.chat.id, f"{bot_turn.text}      [{bot_turn.uuid[:3]}]")
+    def send_message(self, chat_id: str, text: str) -> bool:
+        """
+        Send a message to Telegram.
+        """
+        logger.info(f"Attempting to send text to telegram chat {chat_id}: \n{text}\n")
+        text = self.format_message(text)
+        
+        if text.strip() == "":
+            logger.warning("Message text is empty. Not sending.")
+            return False
+        
+        try:
+            url = f"https://api.telegram.org/bot{self.bot_secret_token}/sendMessage"
+            data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+            response = requests.post(url, data=data, timeout=10)
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send Telegram message: {e}")
+            logger.error(str(response.content))
+            logger.error(traceback.format_exc())
+            return False
 
+    def send_typing_indicator(self, chat_id: str) -> bool:
+        """
+        Send a typing indicator to Telegram.
+        """
+        try:
+            url = f"https://api.telegram.org/bot{self.bot_secret_token}/sendChatAction"
+            data = {"chat_id": chat_id, "action": "typing"}
 
-def process_message(message, request=None):
-    """
-    Main entry point for handling incoming messages.
-    1) Identify the user and conversation
-    2) Use a dictionary-based command dispatch where each handler returns:
-        (JsonResponse or None, conversation)
-    3) If the handler returned a JsonResponse, we return it immediately.
-    4) Otherwise, we continue or start a conversation as appropriate.
-    """
-    logger.info("Processing message.")
-    logger.info(message)
+            response = requests.post(url, data=data, timeout=5)
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to send typing indicator: {e}")
+            return False
 
-    try:
-        telegram_user = get_or_create_telegram_user(message)
-        text_stripped = (message.text or "").strip()
-
-        # TODO: handle audio and video here
-        if not text_stripped:
-            send_telegram_message(message.chat.id, "Sorry, I only understand text at the moment...")
-            return JsonResponse({"status": "ok"}, status=200)
-
-        # Build a command map: each handler returns (JsonResponse or None, conversation)
-        commands_map = {
-            "/help": handle_help,
-            "/settings": handle_settings,
-            "/new": handle_new,
-            "/web": handle_web,
-            "/list": handle_list,
-            "/undo": handle_undo,
+    def handle_command(
+        self, message: InboundMessage, conversation
+    ) -> Tuple[Optional[HttpResponse], Optional[str]]:
+        """
+        Handle Telegram-specific commands.
+        """
+        # Command handler mapping
+        command_handlers = {
+            "help": self.handle_help_command,
+            "new": self.handle_new_command,
+            "settings": self.handle_settings_command,
+            "web": self.handle_web_command,
+            "list": self.handle_list_command,
+            "undo": self.handle_undo_command,
         }
 
-        # Extract potential command
-        potential_cmd = text_stripped.split()[0].lower() if text_stripped.startswith("/") else None
+        if message.command in command_handlers:
+            return command_handlers[message.command](message.command_args, message, conversation)
 
-        # Fetch default intervention
-        default_intervention = (
-            Intervention.objects.filter(is_default_intervention=True).order_by("?").first()
+        # If command not recognized, return a message about unknown command
+        return None, f"Unknown command: /{message.command}. Type /help for available commands."
+
+    def handle_help_command(
+        self, args: List[str], message: InboundMessage, conversation
+    ) -> Tuple[Optional[HttpResponse], str]:
+        """
+        Help command implementation for Telegram.
+        """
+        help_text = (
+            "Commands:\n"
+            "/new <INTERVENTION> - start a new conversation\n"
+            "/help - show this message\n"
+            "/settings - show settings\n"
+            "/web - show web page link for this conversation\n"
+            "/list - list available interventions\n"
+            "/undo [n] - undo last n turns or a specific turn by UUID"
         )
+        return None, help_text
 
-        # Get conversation
-        conversation, is_new_conv = get_or_create_conversation(message)
+    def handle_new_command(
+        self, args: List[str], message: InboundMessage, conversation
+    ) -> Tuple[Optional[HttpResponse], Optional[str]]:
+        """
+        Start a new conversation with the specified intervention.
+        """
+        if not args:
+            return (
+                None,
+                "Please specify an intervention slug. Use /list to see available interventions.",
+            )
 
-        # Dispatch command if recognised
-        if potential_cmd in commands_map:
-            response, message = commands_map[potential_cmd](message, conversation, request)
-            if response is not None:
-                # If the command returned a response, return it now
-                return response
-            if message is not None:
-                send_telegram_message(message.chat.id, message)
+        slug = args[0].strip()
 
-        # If conversation is brand-new or newly replaced, start anew
-        if is_new_conv or conversation.turns.count() == 0:
-            welcome_message(message.chat.id)
+        try:
+            # Get the intervention
+            intervention = get_object_or_404(Intervention, slug=slug)
+
+            # Archive old conversation and create a new one
+            conversation.archived = True
+            conversation.save()
+
+            # Notify user
+            self.send_message(
+                message.chat_id,
+                "Starting a new conversation (forgetting everything we talked about so far).",
+            )
+
+            # Create new conversation
+            new_conversation, _ = self.get_or_create_conversation(message)
+
+            # Begin the conversation with the intervention
+            conversation_started_ = self._initialise_new_conversation(
+                new_conversation, intervention, self.get_or_create_user(message), message.chat_id
+            )
+
+            return JsonResponse({"status": "ok"}, status=200), None
+
+        except Exception as e:
+            logger.error(f"Error starting new conversation: {e}")
+            available = ", ".join(Intervention.objects.all().values_list("slug", flat=True))
+            return (
+                None,
+                f"Error starting intervention. Available interventions: {available}",
+            )
+
+    def handle_settings_command(
+        self, args: List[str], message: InboundMessage, conversation
+    ) -> Tuple[Optional[HttpResponse], str]:
+        """
+        Settings command implementation for Telegram.
+        """
+        # For now, just return a message that no settings are available
+        return None, "No settings available at this time."
+
+    # METHODS TO ACTUALLY HANDLE USER INPUT
+    def process_webhook(self, request) -> HttpResponse:
+
+        try:
+            message = self.parse_message(request)
+            user = self.get_or_create_user(message)
+            conversation, is_new = self.get_or_create_conversation(message)
+
+            if message.command:
+                response, reply_text = self.handle_command(message, conversation)
+                if response is not None:
+                    return response
+                if reply_text is not None:
+                    self.send_message(message.chat_id, reply_text)
+                    return HttpResponse("OK", status=200)
+
+            else:  # Process normal message flow
+                self.process_webhook_message(message)
+        except Exception as e:
+            logger.error(f"Error processing inbound request: {e}\n{request}")
+            logger.error(traceback.format_exc())
+        return HttpResponse("OK", status=200)
+
+    def process_webhook_message(self, message: InboundMessage):
+        """Process a normal message from a webhook client
+
+        TODO: handle reactions
+        """
+
+        user = self.get_or_create_user(message)
+        conversation, is_new = self.get_or_create_conversation(message)
+
+        if is_new:
+            # Send welcome message for new conversations
+            self.send_message(message.chat_id, "Welcome to the bot!")
         else:
             # Continue existing conversation
-            continue_conversation(message, telegram_user, conversation, default_intervention)
+            self.continue_webhook_conversation(user, conversation, message)
 
-        return JsonResponse({"status": "ok"}, status=200)
-
-    except Exception:
-        logger.error(traceback.format_exc())
-        return JsonResponse({"status": "error"}, status=200)
-
-
-def is_valid_telegram_request(request):
-    """Check if the request originates from a valid Telegram IP."""
-
-    client_ip = request.META.get("HTTP_X_FORWARDED_FOR")
-    ip = ipaddress.ip_address(client_ip)
-    valid_ip = any(ip in net for net in TELEGRAM_IP_RANGES)
-    valid_ip = True
-
-    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != TELEGRAM_WEBHOOK_VALIDATION_TOKEN:
-        valid_header = False
-    else:
-        valid_header = True
-    logger.info(f"Valid IP: {valid_ip}, valid header: {valid_header}")
-    return valid_ip and valid_header
-
-
-def get_or_create_conversation(message):
-    logger.info(f"Getting conversation for chat ID {message.chat.id}")
-    conversation, new_conv = Conversation.objects.get_or_create(
-        chat_room_id=message.chat.id, archived=False
-    )
-    return conversation, new_conv
+    def continue_webhook_conversation(self, user, conversation, message: InboundMessage):
+        """Continue an existing conversation for a webhook client"""
+        self.send_typing_indicator(message.chat_id)
+        turn_to_respond_to = conversation.turns.all().last()
+        user_turn = listen(turn_to_respond_to, message.text, user)
+        bot_turn = respond(user_turn)
+        self.send_message(message.chat_id, bot_turn.text)

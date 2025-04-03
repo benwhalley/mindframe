@@ -126,7 +126,9 @@ daphne==4.1.2
 dateparser==1.2.1
     # via mindframe (pyproject.toml)
 decorator==5.2.0
-    # via ipython
+    # via
+    #   ipython
+    #   moviepy
 distlib==0.3.9
     # via virtualenv
 distro==1.9.0
@@ -263,6 +265,10 @@ idna==3.10
     #   requests
     #   twisted
     #   yarl
+imageio==2.37.0
+    # via moviepy
+imageio-ffmpeg==0.6.0
+    # via moviepy
 importlib-metadata==8.6.1
     # via keyring
 incremental==24.7.2
@@ -348,6 +354,8 @@ more-itertools==10.6.0
     #   haystack-ai
     #   jaraco-classes
     #   jaraco-functools
+moviepy==2.1.2
+    # via mindframe (pyproject.toml)
 msgpack==1.1.0
     # via cachecontrol
 multidict==6.1.0
@@ -364,7 +372,9 @@ numpy==1.26.4
     # via
     #   gradio
     #   haystack-ai
+    #   imageio
     #   langchain
+    #   moviepy
     #   pandas
     #   pgvector
 openai==1.63.2
@@ -412,8 +422,11 @@ pgvector==0.3.6
     #   pgvector-haystack
 pgvector-haystack==2.0.0
     # via mindframe (pyproject.toml)
-pillow==11.1.0
-    # via gradio
+pillow==10.4.0
+    # via
+    #   gradio
+    #   imageio
+    #   moviepy
 pkginfo==1.12.1.2
     # via poetry
 platformdirs==4.3.6
@@ -435,6 +448,8 @@ poetry-plugin-export==1.9.0
     # via mindframe (pyproject.toml)
 posthog==3.11.0
     # via haystack-ai
+proglog==0.1.11
+    # via moviepy
 prompt-toolkit==3.0.50
     # via
     #   click-repl
@@ -508,6 +523,8 @@ python-dateutil==2.9.0.post0
     #   python-crontab
 python-decouple==3.8
     # via mindframe (pyproject.toml)
+python-dotenv==1.1.0
+    # via moviepy
 python-magic==0.4.27
     # via mindframe (pyproject.toml)
 python-multipart==0.0.20
@@ -646,6 +663,7 @@ tqdm==4.67.1
     #   huggingface-hub
     #   nltk
     #   openai
+    #   proglog
 traitlets==5.14.3
     # via
     #   ipython

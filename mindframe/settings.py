@@ -64,7 +64,8 @@ class RoleChoices(models.TextChoices):
     INTERVENTION_DEVELOPER = "intervention_developer", "Intervention Developer"
     CLIENT = "client", "Client"
     SUPERVISOR = "supervisor", "Supervisor"
-    THERAPIST = "therapist", "Therapist"
+    # deprecated
+    # THERAPIST = "therapist", "Therapist"
     BOT = "bot", "Bot"
 
 

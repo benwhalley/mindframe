@@ -152,8 +152,9 @@ class NoteInline(admin.TabularInline):
 @admin.register(Conversation)
 class ConversationAdmin(admin.ModelAdmin):
     save_on_top = True
-    list_filter = (IsSyntheticFilter, "archived")
+    list_filter = (IsSyntheticFilter, "archived", "turns__step__intervention")
     inlines = [TurnInline]
+    readonly_fields = ["uuid"]
     list_display = [
         "__str__",
         "summary",

@@ -1,0 +1,4 @@
+<div class="message {% if turn.speaker.role == 'client' %}user{% else %}bot{% endif %}">
+    {{ turn.text }}
+    <!-- {{turn.speaker.role}} -->
+</div>

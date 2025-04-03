@@ -16,6 +16,7 @@ from mindframe.models import (
     LLM,
     Conversation,
     CustomUser,
+    Intervention,
     Judgement,
     Note,
     Step,
@@ -25,7 +26,6 @@ from mindframe.models import (
 from mindframe.settings import (
     DEFAULT_CONVERSATION_MODEL_NAME,
     DEFAULT_JUDGEMENT_MODEL_NAME,
-    InterventionTypes,
     RoleChoices,
     StepJudgementFrequencyChoices,
     TurnTypes,
@@ -33,7 +33,6 @@ from mindframe.settings import (
 )
 from mindframe.silly import silly_user
 from mindframe.tree import conversation_history, is_interrupted, iter_conversation_path
-
 
 logger = logging.getLogger(__name__)
 
@@ -431,6 +430,7 @@ def start_conversation(
     first_speaker: CustomUser = None,
     first_speaker_step: Optional[Step] = None,
     additional_speakers: Optional[List[CustomUser]] = list(),
+    synthetic: bool = False,
 ) -> Turn:
     """
     Create a new conversation between a therapist and a (real or synthetic) client, starting from specific Intervention Steps.
@@ -457,22 +457,22 @@ def start_conversation(
         logger.debug(f"Error checking if all speakers are bots: {e}")
         synth = False
 
-    conversation = Conversation.objects.create(is_synthetic=synth)
+    conversation = Conversation.objects.create(is_synthetic=synthetic)
 
     turn = Turn.add_root(conversation=conversation, speaker=first_speaker, turn_type=TurnTypes.JOIN)
     for i in additional_speakers:
         turn = turn.add_child(conversation=conversation, speaker=i, turn_type=TurnTypes.JOIN)
 
     if first_speaker_step:
-        # if the step does't hard-code an opening line then we generate something
-        if first_speaker_step.opening_line:
-            turn = turn.add_child(
-                conversation=conversation,
-                speaker=first_speaker,
-                text=first_speaker_step.opening_line,
-                turn_type=TurnTypes.OPENING,
-            )
-        else:
+        turn = turn.add_child(
+            conversation=conversation,
+            speaker=first_speaker,
+            text=first_speaker_step.opening_line,
+            turn_type=TurnTypes.OPENING,
+            step=first_speaker_step,
+        )
+        # if the step doesn't hard-code an opening line then we generate something
+        if not turn.text:
             turn = complete_the_turn(turn)
 
     return turn
@@ -524,31 +524,28 @@ def continue_conversation_task(from_turn_id, speakers_steps, n_turns):
     return True
 
 
-def begin_conversation(intervention, conversation, room_id):
-    """
-    Initialise a conversation with a Bot user and an opening line
-    from the first step of 'intervention'.
-    Returns the new opening bot turn.
-    # TODO make agnostic as to bot platform
-    """
-    bot_speaker = intervention.get_bot_speaker()
-
-    first_step = intervention.steps.first()
+def initialise_new_conversation(
+    conversation: Conversation, intervention: Intervention, user: CustomUser
+) -> Turn:
+    """Helper method to initialise a new conversation with an intervention."""
+    # Get the first step
+    # TODO: make this more robust and force order to be unique???
+    first_step = intervention.steps.all().order_by("order", "-pk").first()
     opener_text = first_step.opening_line if first_step else "Hello! (No opening line set.)"
-
-    bot_turn = Turn.add_root(
+    print(f"Opening line: {opener_text}")
+    # Create the opening turn
+    joiningturn = Turn.add_root(
         conversation=conversation,
-        speaker=bot_speaker,
+        speaker=user,
+        turn_type=TurnTypes.JOIN,
+        step=first_step,
+    )
+    bot_turn = joiningturn.add_child(
+        conversation=conversation,
+        speaker=intervention.get_bot_speaker(),
         text=opener_text,
         turn_type=TurnTypes.OPENING,
         step=first_step,
     )
 
-    messages = [
-        f"Creating a new conversation using {intervention}.",
-        first_step.opening_line,
-    ]
-    from mindframe.telegram import send_telegram_message
-
-    send_telegram_message(room_id, messages)
-    return bot_turn, messages
+    return bot_turn

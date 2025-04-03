@@ -41,6 +41,7 @@ dependencies = [
   "langchain>=0.3.19",
   "langfuse>=2.59.3",
   "matrix-nio[e2e]>=0.24.0",
+  "moviepy>=2.1.2",
   "nltk>=3.9.1",
   "pandoc>=2.4",
   "pgvector>=0.3.6",

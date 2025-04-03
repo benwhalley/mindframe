@@ -853,6 +853,9 @@ class Conversation(LifecycleModel):
 
     synthetic_turns_scheduled = models.PositiveSmallIntegerField(default=0)
 
+    def last_turn_added(self):
+        return self.turns.all().order_by("-timestamp").first()
+
     def get_absolute_url(self):
         return settings.WEB_URL + reverse(
             "conversation_transcript",

@@ -1,0 +1,18 @@
+<!-- add spinner to this and disable form when in-flight -->
+<div id="reply">
+    <form hx-post="{% url 'chat-reply' conversation.uuid %}"
+          hx-target="#reply"
+          hx-swap="outerHTML"
+          class="d-flex"
+          hx-encoding="multipart/form-data">
+          {% csrf_token %}
+        <input type="text" name="message" id="message-input" class="form-control me-2" placeholder="Type a message" autocomplete="off" required>
+        <button type="submit" class="btn btn-primary">Send</button>
+
+        <div id="spinner"
+            class="htmx-indicator spinner-border text-primary position-absolute end-0" role="status" style="display: none; width: 1.5rem; height: 1.5rem;" hx-indicator="true">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </form>
+
+</div>

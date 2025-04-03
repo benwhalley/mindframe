@@ -1,0 +1,10 @@
+{% for turn in new_messages %}
+{% include 'chat_turn.html' with turn=turn %}
+
+{% if forloop.last %}
+<div id="new-messages" hx-get="{% url 'chat-new-messages' turn.uuid %}"
+     hx-trigger="every 2s"
+     hx-swap="replace">
+</div>
+{% endif %}
+{% endfor %}
