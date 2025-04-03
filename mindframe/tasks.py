@@ -8,10 +8,19 @@ from django.utils import timezone
 
 from mindframe.conversation import respond
 from mindframe.models import ScheduledNudge
-from mindframe.telegram import send_telegram_message
+from decouple import config
+from mindframe.telegram import TelegramBotClient
+
 from mindframe.tree import conversation_history
 
 logger = logging.getLogger(__name__)
+
+tgmb = TelegramBotClient(
+    bot_name="MindframerBot",
+    bot_secret_token=config("TELEGRAM_BOT_TOKEN", None),
+    webhook_url=config("TELEGRAM_WEBHOOK_URL", None),
+    webhook_validation_token=config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN", None),
+)
 
 
 @shared_task
@@ -30,8 +39,11 @@ def execute_nudges():
             newturn.nudge = sn.nudge
             newturn.save()
 
-            if newturn.conversation.telegram_conversation_id:
-                send_telegram_message(newturn.conversation.telegram_conversation_id, newturn.text)
+            if newturn.conversation.chat_room_id:
+                logger.info(
+                    f"Sending message to Telegram chat: {newturn.conversation.chat_room_id}"
+                )
+                tgmb.send_message(newturn.conversation.chat_room_id, newturn.text)
 
             sn.completed = True
             sn.completed_turn = newturn
