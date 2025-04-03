@@ -55,11 +55,11 @@ def pick_speaker_for_next_response(turn: Turn):
 
 def transition_permitted(transition, turn) -> bool:
     # Test whether the conditions for a Transition are met at this Turn
-
-    ctx_data = speaker_context(turn).get("data")
+    ctx_data = speaker_context(turn)
+    # flatten out the data dict into context to make it easier to access
+    ctx_data.update(ctx_data.get("data"))
     logger.info(f"Checking transition {transition} with context data: {ctx_data}")
     clean_conditions = [cond.strip() for cond in transition.conditions.splitlines() if cond.strip()]
-
     condition_evals = []
     for cond in clean_conditions:
         logger.info(f"Evaluating condition '{cond}'")
