@@ -8,6 +8,19 @@ from mindframe.models import LLM
 
 model = LLM.objects.get(model_name="gpt-4o-mini")
 
+
+thinkofnumber = chatter(
+    """
+think of a number between 1 and 10 [[number:A]]
+
+think of another number between 10 and 20 [[int:B]]
+""",
+    model=model,
+)
+assert int(thinkofnumber.outputs.A) in range(1, 11), "Number should be between 1 and 10"
+assert int(thinkofnumber.outputs.B) in range(10, 21), "Number should be between 10 and 20"
+
+
 dependent_prompt = """
 --
 Fav season [[season]]

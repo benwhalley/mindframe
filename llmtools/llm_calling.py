@@ -8,7 +8,7 @@ from collections import OrderedDict, namedtuple
 from hashlib import sha256
 from types import FunctionType
 from typing import Any, Dict, List
-
+from box import Box
 import requests
 from asgiref.sync import async_to_sync, sync_to_async
 from colored import Back, Fore, Style
@@ -236,6 +236,10 @@ class ChatterResult(OrderedDict):
     def response(self):
         # return the RESPONSE_ or last item in the dict
         return self["RESPONSE_"] or next(reversed(self.items()))[1]
+
+    @property
+    def outputs(self):
+        return Box(self)
 
 
 @observe(capture_input=False, capture_output=False)
