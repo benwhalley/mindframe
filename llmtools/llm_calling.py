@@ -187,6 +187,7 @@ def structured_chat(prompt, llm, return_type, max_retries=3, extra_body={}):
     except Exception as e:
         full_traceback = traceback.format_exc()
         logger.warning(f"Error calling LLM: {e}\n{full_traceback}")
+        res, com = None, None
 
     return res, com
 
