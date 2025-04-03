@@ -1,8 +1,7 @@
 from django.test import TransactionTestCase
 from django.utils import timezone
 
-from mindframe.conversation import listen, start_conversation, respond
-from mindframe.tree import conversation_history, is_interrupted
+from mindframe.conversation import listen, respond, start_conversation
 from mindframe.models import (
     Conversation,
     CustomUser,
@@ -15,6 +14,7 @@ from mindframe.models import (
 )
 from mindframe.settings import RoleChoices, TurnTypes
 from mindframe.silly import silly_user
+from mindframe.tree import conversation_history, is_interrupted
 
 
 class InterruptionTestCase(TransactionTestCase):
