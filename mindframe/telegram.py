@@ -1,6 +1,7 @@
 """
 TODO: Design decision about whether to capture system messages like response to /help etc
 """
+
 import traceback
 import html
 import ipaddress
@@ -39,7 +40,6 @@ TELEGRAM_BOT_TOKEN = config("TELEGRAM_BOT_TOKEN", default=None)
 # TELEGRAM_WEBHOOK_VALIDATION_TOKEN="cd7e8d19e80a49f3b083e237557d8f84"
 # TELEGRAM_WEBHOOK_URL="https://test.mindframe.llemma.net/telegram-webhook/"
 # TELEGRAM_BOT_NAME=MindFramerBot
-
 
 
 class TelegramBotClient(WebhookBotClient):
@@ -197,10 +197,10 @@ class TelegramBotClient(WebhookBotClient):
         except Exception as e:
             logger.error(f"Error parsing Telegram message: {e}")
             raise ValueError(f"Failed to parse Telegram message: {e}")
-    
+
     def audio_to_text(self, message):
         pass
-    
+
     def get_or_create_user(self, message: InboundMessage) -> CustomUser:
         """
         Get or create a user based on the Telegram user ID.
@@ -254,11 +254,11 @@ class TelegramBotClient(WebhookBotClient):
         """
         logger.info(f"Attempting to send text to telegram chat {chat_id}: \n{text}\n")
         text = self.format_message(text)
-        
+
         if text.strip() == "":
             logger.warning("Message text is empty. Not sending.")
             return False
-        
+
         try:
             url = f"https://api.telegram.org/bot{self.bot_secret_token}/sendMessage"
             data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
