@@ -355,7 +355,7 @@ def respond(
 
     # ensure all the langfuse traces are identifiable by the Turn uuid
     langfuse_context.update_current_observation(
-        name=f"Response in turn: {new_turn.uuid}",  # Use new turn ID
+        name=f"{new_turn.step.intervention.title}. Response in turn: {new_turn.uuid}",  # Use new turn ID
         session_id=new_turn.uuid,  # Make sure the session ID is correct
         output=new_turn.text,
     )

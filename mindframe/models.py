@@ -877,6 +877,10 @@ class Conversation(LifecycleModel):
             pk__in=self.turns.all().values_list("step__intervention__pk", flat=True)
         )
 
+    class Meta:
+        # order by timestamp of the last turn added
+        ordering = ["-turns__timestamp"]
+
 
 class Turn(NS_Node):
     """
