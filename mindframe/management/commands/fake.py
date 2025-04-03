@@ -78,11 +78,11 @@ class Command(BaseCommand):
 
             # Create new client and therapist users
             client_user = silly_user()
-            client_user.role = RoleChoices.CLIENT
+            client_user.role = RoleChoices.BOT
             client_user.save()
 
             bot_user = silly_user()
-            bot_user.role = RoleChoices.THERAPIST
+            bot_user.role = RoleChoices.BOT
             bot_user.save()
 
             self.stdout.write(
