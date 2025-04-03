@@ -300,7 +300,7 @@ def chatter_(multipart_prompt, model, context={}, cache=True):
             prompt_parts.append(prompt_part.text)
             # Build the prompt for this completion from the parts within this segment.
             try:
-                segment_prompt = "\n\n--\n\n".join(filter(bool, prompt_parts))
+                segment_prompt = "\n\n--\n\n".join(filter(bool, map(str, prompt_parts)))
             except Exception as e:
                 logger.error(f"Error building segment prompt: {prompt_parts}\n{e}")
 
