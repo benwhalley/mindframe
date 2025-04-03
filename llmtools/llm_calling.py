@@ -1,5 +1,6 @@
-import hashlib
 import asyncio
+import hashlib
+import io
 import logging
 import re
 import traceback
@@ -7,14 +8,14 @@ from collections import OrderedDict, namedtuple
 from hashlib import sha256
 from types import FunctionType
 from typing import Any, Dict, List
-import io
+
 import requests
-from pydub import AudioSegment
 from asgiref.sync import async_to_sync, sync_to_async
 from colored import Back, Fore, Style
 from django.template import Context, Template
 from langfuse.decorators import langfuse_context, observe
 from pydantic import Field
+from pydub import AudioSegment
 
 from llmtools.return_type_models import ACTION_LOOKUP
 

@@ -2,11 +2,11 @@
 TODO: Design decision about whether to capture system messages like response to /help etc
 """
 
-import traceback
 import html
 import ipaddress
 import json
 import logging
+import traceback
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests

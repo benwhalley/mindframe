@@ -10,10 +10,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from django.http import HttpResponse
 from django.urls import reverse
 
-from mindframe.conversation import initialise_new_conversation, conversation_history
-from mindframe.tree import create_branch
+from mindframe.conversation import conversation_history, initialise_new_conversation
 from mindframe.models import Intervention
 from mindframe.settings import BranchReasons
+from mindframe.tree import create_branch
 
 logger = logging.getLogger(__name__)
 
