@@ -1,0 +1,9 @@
+{
+  "name": "Mindframe",
+  "description": "Mindframe",
+  "info": "https://github.com/crisward/dokku-require?tab=readme-ov-file",
+  "dokku":{
+    "predeploy": "python manage.py migrate",
+    "postdeploy": "echo 'Deployed!'"
+  }
+}
