@@ -342,7 +342,6 @@ class TurnAdmin(admin.ModelAdmin):
         "interruption",
         "speaker",
         "conversation",
-        "nudge",
         "step",
         "branch_author",
     ]
