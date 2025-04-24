@@ -1,0 +1,19 @@
+# setup postgres and redis for local development
+services:
+  redis:
+    container_name: redis
+    image: redis:alpine
+    ports: ["6379:6379"]
+  postgres:
+    container_name: postgres
+    environment:
+      - POSTGRES_PASSWORD=pgpassword
+      - POSTGRES_USER=postgres
+    image: pgvector/pgvector:pg17
+    ports: ["5432:5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./create-database.sh:/usr/bin/create-database.sh
+
+volumes:
+  postgres_data:

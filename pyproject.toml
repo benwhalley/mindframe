@@ -36,6 +36,7 @@ dependencies = [
   "djmail>=2.0.0",
   "gradio>=5.17.0",
   "haystack-ai>=2.10.3",
+  "honcho>=2.0.0",
   "instructor>=1.7.2",
   "ipython>=8.32.0",
   "langchain>=0.3.19",
