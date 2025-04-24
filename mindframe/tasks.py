@@ -36,8 +36,6 @@ def execute_nudges():
             turn = conversation_history(sn.turn, to_leaf=True).last()
 
             newturn = respond(turn, with_intervention_step=sn.nudge.step_to_use)
-            newturn.nudge = sn.nudge
-            newturn.save()
 
             if newturn.conversation.chat_room_id:
                 logger.info(

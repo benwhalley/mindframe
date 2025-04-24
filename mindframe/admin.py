@@ -705,10 +705,11 @@ class DueSoonFilter(admin.SimpleListFilter):
 class ScheduledNudgeAdmin(admin.ModelAdmin):
     autocomplete_fields = [
         "turn",
+        "completed_turn",
         "nudge",
     ]
     list_display = [
-        "turn",
+        # "turn",
         "due",
         "completed",
         "nudge__step_to_use",
@@ -717,7 +718,12 @@ class ScheduledNudgeAdmin(admin.ModelAdmin):
     ]
     list_filter = ["completed", DueNowFilter, DueSoonFilter]
     date_hierarchy = "due"
-    readonly_fields = ["completed_turn", "completed", "nudge", "turn"]
+    # readonly_fields = [
+    #     # "completed_turn",
+    #     "completed",
+    #     "nudge",
+    #     # "turn",
+    # ]
 
 
 @admin.register(Interruption)
