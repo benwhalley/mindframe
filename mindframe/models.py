@@ -976,7 +976,7 @@ class Turn(NS_Node):
     @property
     def nudge(self):
         return self.nudges.filter(due=self.timestamp).first()
-    
+
     text = models.TextField(blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True, null=True)
 
@@ -1135,7 +1135,12 @@ class ScheduledNudge(LifecycleModel):
 
     objects = ScheduledNudgeManager()
 
-    turn = models.ForeignKey("Turn", on_delete=models.CASCADE, related_name="nudges", help_text="Nudges scheduled following this turn")
+    turn = models.ForeignKey(
+        "Turn",
+        on_delete=models.CASCADE,
+        related_name="nudges",
+        help_text="Nudges scheduled following this turn",
+    )
     nudge = models.ForeignKey("Nudge", on_delete=models.CASCADE, related_name="scheduled_nudges")
 
     due = models.DateTimeField(blank=True, null=True)

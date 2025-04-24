@@ -222,7 +222,9 @@ def respond(
             spkr_history = (
                 conversation_history(turn)
                 .filter(speaker=as_speaker)
-                .exclude(nudges__completed_turn__isnull=False)  # Exclude turns linked to a completed nudge
+                .exclude(
+                    nudges__completed_turn__isnull=False
+                )  # Exclude turns linked to a completed nudge
             )
             speakers_prev_turn = spkr_history.filter(step__isnull=False).last()
             speakers_prev_step = speakers_prev_turn and speakers_prev_turn.step or None
