@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-APP_TYPE="${DOKKU_APP_TYPE:-django}"
+APP_TYPE="${MINDFRAME_APP_TYPE:-django}"
 
 case "$APP_TYPE" in
   "chat")
@@ -13,7 +13,7 @@ case "$APP_TYPE" in
     exec daphne -b 0.0.0.0 -p "$PORT" --verbosity 3 config.asgi:application
     ;;
   *)
-    echo "Unknown DOKKU_APP_TYPE: $APP_TYPE"
+    echo "Unknown MINDFRAME_APP_TYPE: $APP_TYPE"
     exit 1
     ;;
 esac
