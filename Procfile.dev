@@ -1,4 +1,4 @@
-web: uv run python manage.py runserver_plus 0.0.0.0:$WEB_PORT
-chat: python chatbot.py
+web: uv run python manage.py runserver_plus 0.0.0.0:8000
+chat: PORT=8001 python chatbot.py
 worker: celery --app mindframe worker --pool=solo --loglevel=debug
 scheduler: celery --app mindframe beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
