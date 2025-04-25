@@ -2,7 +2,7 @@
 name = "mindframe"
 version = "0.2.2"
 description = "A Python package for the `mindframe` project"
-requires-python = ">=3.12"
+requires-python = "==3.12.7"
 authors = [
     {name = "Ben Whalley", email = "ben.whalley@plymouth.ac.uk"}
 ]
@@ -47,8 +47,7 @@ dependencies = [
   "pgvector>=0.3.6",
   "pgvector-haystack>=2.0.0",
   "poetry-plugin-export>=1.9.0",
-  'psycopg2 ~=2.9; sys_platform == "linux"',
-  'psycopg2-binary ~=2.9; sys_platform == "darwin"',
+  "psycopg2-binary ~=2.9",
   "pydantic>=2.10.6",
   "python-box>=7.3.2",
   "python-decouple>=3.8",

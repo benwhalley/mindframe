@@ -1,9 +1,5 @@
-python3-dev
-libpq-dev
-build-essential
 ffmpeg
 pandoc
 postgresql-client
-curl
 nano
 curl
