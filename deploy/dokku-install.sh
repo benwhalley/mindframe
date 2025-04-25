@@ -6,6 +6,7 @@ sudo apt-get install
 
 
 # update docker stuff to avoid dokku install failing
+# this is necessary on my ubuntu azure images, but may not always be needed
 # sudo apt-get install ca-certificates curl gnupg
 # sudo install -m 0755 -d /etc/apt/keyrings
 # curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -24,7 +25,7 @@ sudo DOKKU_TAG=v0.35.18 bash bootstrap.sh
 
 
 # usually your key is already available under the current user's `~/.ssh/authorized_keys` file
-cat ~/.ssh/authorized_keys | dokku ssh-keys:add admin
+cat ~/.ssh/authorized_keys | sudo dokku ssh-keys:add admin
 
 # you can use any domain you already have access to
 # this domain should have an A record or CNAME pointing at your server's IP
@@ -41,7 +42,6 @@ sudo dokku plugin:install https://github.com/dokku/dokku-redis.git --name redis
 
 sudo dokku plugin:install https://github.com/dokku/dokku-letsencrypt.git
 sudo dokku letsencrypt:cron-job --add # <- To enable auto-renew
-dokku letsencrypt:set email ben.whalley@plymouth.ac.uk
 
 
 sudo dokku plugin:install https://github.com/dokku/dokku-maintenance.git maintenance
@@ -51,6 +51,7 @@ sudo dokku plugin:install https://github.com/dokku-community/dokku-apt
 sudo dokku plugin:install https://github.com/crisward/dokku-require.git require
 
 
+# dokku plugin:install https://github.com/dokku/dokku.git proxy 0.35.18
 
 
 
