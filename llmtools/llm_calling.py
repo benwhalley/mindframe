@@ -8,9 +8,10 @@ from collections import OrderedDict, namedtuple
 from hashlib import sha256
 from types import FunctionType
 from typing import Any, Dict, List
-from box import Box
+
 import requests
 from asgiref.sync import async_to_sync, sync_to_async
+from box import Box
 from colored import Back, Fore, Style
 from django.template import Context, Template
 from langfuse.decorators import langfuse_context, observe

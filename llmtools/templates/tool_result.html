@@ -12,7 +12,7 @@
 
         <div class="col-md-6 mt-3">
 
-            <form method="POST">
+            <form method="POST" type="multipart/form-data" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{ form|crispy }}
                 <button type="submit" class="btn btn-primary">Submit</button>
@@ -24,8 +24,12 @@
             <!-- bootstrap card -->
             <div class="card mt-5">
                 <div class="card-body">
+
+<pre style="white-space: pre-wrap;">
+{{results}}
+</pre>
             <pre style="white-space: pre-wrap;">
-                {{ results.response }}
+{{ results.response }}
             </pre>
         </div>
     </div>

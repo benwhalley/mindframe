@@ -1,4 +1,17 @@
 from django.contrib import admin
+from .models import JobGroup, Job
+
+
+class JobInline(admin.TabularInline):
+    model = Job
+    extra = 0
+
+
+class JobGroupAdmin(admin.ModelAdmin):
+    inlines = [JobInline]
+
+
+admin.site.register(JobGroup, JobGroupAdmin)
 
 from .models import Tool, ToolKey
 

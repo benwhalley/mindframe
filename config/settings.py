@@ -190,10 +190,18 @@ STATICFILES_FINDERS = [
     "compressor.finders.CompressorFinder",
 ]
 STORAGES = {
+ 
+     "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {
+            "location": BASE_DIR / "uploads",  
+        },
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
 
 COMPRESS_FILTERS = {
     "css": [
@@ -246,12 +254,6 @@ LOGIN_URL = "admin:index"
 # MAGICLINK_LOGIN_SENT_TEMPLATE_NAME = "magiclink/login_sent.html"
 # MAGICLINK_LOGIN_FAILED_TEMPLATE_NAME = "magiclink/login_failed.html"
 
-
-STORAGES = {
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
@@ -324,3 +326,23 @@ MAGICLINK_EMAIL_SUBJECT = config(
 
 SHELL_PLUS = "ipython"
 AUTH_USER_MODEL = "mindframe.CustomUser"
+
+
+# psql -U postgres
+# CREATE DATABASE template_with_vector TEMPLATE template1;
+# \c template_with_vector
+# CREATE EXTENSION vector;
+# -- Make sure the DB is marked as a template
+# UPDATE pg_database SET datistemplate = TRUE WHERE datname = 'template_with_vector';
+# -- Grant your Django user CONNECT privileges
+# GRANT CONNECT ON DATABASE template_with_vector TO mf;
+# -- Also needed: your_db_user must have CREATEDB privilege
+# ALTER USER mf CREATEDB;
+
+
+DATABASES["default"]["TEST"] = {
+    "TEMPLATE": "template_with_vector"
+}
+
+
+# TEST_RUNNER = 'mindframe.tests.conftest.VectorEnabledTestRunner'
