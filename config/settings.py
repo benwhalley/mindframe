@@ -175,6 +175,19 @@ CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", default=False, cas
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "run-incomplete-jobs": {
+        "task": "llmtools.tasks.run_incomplete_jobs",
+        "schedule": crontab(minute="*/10"),
+    },
+    "clear-incomplete-jobs": {
+        "task": "llmtools.tasks.clear_incomplete_jobs",
+        "schedule": crontab(minute=0, hour=0),
+    },
+}
+
 LANGUAGE_CODE = config("LANGUAGE_CODE", default="en-gb")
 TIME_ZONE = config("TIME_ZONE", default="Europe/London")
 USE_I18N = True
@@ -190,11 +203,10 @@ STATICFILES_FINDERS = [
     "compressor.finders.CompressorFinder",
 ]
 STORAGES = {
- 
-     "default": {
+    "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
         "OPTIONS": {
-            "location": BASE_DIR / "uploads",  
+            "location": BASE_DIR / "uploads",
         },
     },
     "staticfiles": {
@@ -328,7 +340,7 @@ SHELL_PLUS = "ipython"
 AUTH_USER_MODEL = "mindframe.CustomUser"
 
 
-# psql -U postgres
+# psql -U postgres
 # CREATE DATABASE template_with_vector TEMPLATE template1;
 # \c template_with_vector
 # CREATE EXTENSION vector;
@@ -340,9 +352,7 @@ AUTH_USER_MODEL = "mindframe.CustomUser"
 # ALTER USER mf CREATEDB;
 
 
-DATABASES["default"]["TEST"] = {
-    "TEMPLATE": "template_with_vector"
-}
+DATABASES["default"]["TEST"] = {"TEMPLATE": "template_with_vector"}
 
 
 # TEST_RUNNER = 'mindframe.tests.conftest.VectorEnabledTestRunner'

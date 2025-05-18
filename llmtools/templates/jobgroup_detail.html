@@ -12,6 +12,12 @@
     <h1>Job Group Details {{jobgroup.id}}</h1>
     <h2>Tool: {{ jobgroup.tool.name }}</h2>
     <a href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Edit</a>
+
+
+    <p>
+        Tool: <a href="{{jobgroup.tool.get_absolute_url}}">{{jobgroup.tool.name}}</a>
+    </p>
+
     <ul>
         {% for job in jobs %}
         <li>
@@ -25,10 +31,20 @@
     <p>Some jobs are still in progress. This page will refresh every 30 seconds.</p>
     {% endif %}
 
-    <h3>Results</h3>
-    <pre style="white-space: pre-wrap;">
-        {{jobgroup.json}}
-    </pre>
+<h3>Results</h3>
+<button onclick="copyJSON()">Copy JSON</button>
+<pre id="json-output" style="white-space: pre;">{{ jobgroup.json }}</pre>
+
+<script>
+function copyJSON() {
+    const jsonText = document.getElementById("json-output").textContent;
+    navigator.clipboard.writeText(jsonText).then(() => {
+        alert("JSON copied to clipboard.");
+    }).catch(err => {
+        alert("Failed to copy: " + err);
+    });
+}
+</script>
 
 </body>
 </html>

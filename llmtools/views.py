@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from .models import JobGroup, Job
 from django.views.generic import DetailView
+from .tasks import run_job_group
 from .models import JobGroup
 from django.core.files.uploadedfile import UploadedFile
 import zipfile
@@ -72,6 +73,7 @@ def tool_input_view(request, pk):
                                     Job.objects.create(
                                         group=job_group, source_file=django_file, source=text
                                     )
+                run_job_group.delay(job_group.id)
                 return redirect(job_group.get_absolute_url())
             cleaned_data_str = {key: str(value) for key, value in form.cleaned_data.items()}
             filled_prompt = Template(tool.prompt).safe_substitute(**cleaned_data_str)
