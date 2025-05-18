@@ -1,12 +1,14 @@
 import json
 import re
 import uuid
-from django.utils import timezone
+from string import Template
+
 from django.db import models
 from django.urls import reverse
-from .llm_calling import chatter
+from django.utils import timezone
+
 from .extract import extract_text
-from string import Template
+from .llm_calling import chatter
 
 
 class Tool(models.Model):

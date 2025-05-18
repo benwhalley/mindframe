@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import JobGroup, Job
+
+from .models import Job, JobGroup
 
 
 class JobInline(admin.TabularInline):

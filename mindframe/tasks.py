@@ -1,6 +1,7 @@
 import logging
 
 from celery import shared_task
+from decouple import config
 from django.apps import apps
 from django.db import transaction
 from django.db.models import OuterRef, Subquery
@@ -8,9 +9,7 @@ from django.utils import timezone
 
 from mindframe.conversation import respond
 from mindframe.models import ScheduledNudge
-from decouple import config
 from mindframe.telegram import TelegramBotClient
-
 from mindframe.tree import conversation_history
 
 logger = logging.getLogger(__name__)

@@ -1,25 +1,23 @@
-import re
 import json
-from string import Template
-from django.core.files import File
+import os
+import re
+import tempfile
+import zipfile
 from pathlib import Path
+from string import Template
 
 from django import forms
+from django.core.files import File
+from django.core.files.uploadedfile import UploadedFile
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from .models import JobGroup, Job
 from django.views.generic import DetailView
-from .tasks import run_job_group
-from .models import JobGroup
-from django.core.files.uploadedfile import UploadedFile
-import zipfile
-import os
-import tempfile
-from llmtools.extract import extract_text
 
+from llmtools.extract import extract_text
 from llmtools.llm_calling import chatter
 
-from .models import Tool
+from .models import Job, JobGroup, Tool
+from .tasks import run_job_group
 
 
 class ToolInputForm(forms.Form):

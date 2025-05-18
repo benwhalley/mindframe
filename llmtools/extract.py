@@ -1,6 +1,7 @@
 from pathlib import Path
-import magic
+
 import docx
+import magic
 import pdfplumber
 from pdfplumber.utils.exceptions import PdfminerException
 

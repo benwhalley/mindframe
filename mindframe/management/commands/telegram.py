@@ -1,7 +1,9 @@
 import logging
+
+from decouple import config
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from decouple import config
+
 from mindframe.telegram import TelegramBotClient
 
 logger = logging.getLogger(__name__)
