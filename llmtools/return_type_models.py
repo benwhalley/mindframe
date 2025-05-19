@@ -110,9 +110,10 @@ class IntegerResponse(BaseModel):
 ACTION_LOOKUP = defaultdict(lambda: DefaultResponse)
 ACTION_LOOKUP.update(
     {
-        "speak": SpokenResponse,
+        "respond": DefaultResponse,
         "extract": ExtractedResponse,
         "think": InternalThoughtsResponse,
+        "speak": SpokenResponse,
         "number": IntegerResponse,
         "int": IntegerResponse,
         "pick": selection_response_model,

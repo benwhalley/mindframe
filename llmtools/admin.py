@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.shortcuts import redirect
 
 from .models import Job, JobGroup
 
@@ -21,7 +22,10 @@ from .models import Tool, ToolKey
 
 @admin.register(Tool)
 class ToolAdmin(admin.ModelAdmin):
-    list_display = ["name", "get_absolute_url"]
+    list_display = ["name"]
+
+    def response_change(self, request, obj):
+        return redirect(obj.get_absolute_url())
 
 
 @admin.register(ToolKey)

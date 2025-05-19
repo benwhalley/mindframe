@@ -11,7 +11,7 @@ from django.core.files import File
 from django.core.files.uploadedfile import UploadedFile
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.generic import DetailView
+from django.views.generic import DetailView, ListView
 
 from llmtools.extract import extract_text
 from llmtools.llm_calling import chatter
@@ -23,7 +23,7 @@ from .tasks import run_job_group
 class ToolInputForm(forms.Form):
     def __init__(self, *args, tool=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["file"] = forms.FileField(label="Upload ZIP", required=False)
+
         if tool is not None:
             for field_name in tool.get_input_fields():
                 self.fields[field_name] = forms.CharField(
@@ -31,6 +31,11 @@ class ToolInputForm(forms.Form):
                     widget=forms.Textarea(attrs={"rows": 10}),
                     required=False,
                 )
+        self.fields["file"] = forms.FileField(
+            label="Upload ZIP",
+            help_text="Upload a zip with multiple files to start a batch job",
+            required=False,
+        )
 
 
 class JobGroupDetailView(DetailView):
@@ -43,6 +48,12 @@ class JobGroupDetailView(DetailView):
         context["jobs"] = self.object.jobs.all()
         context["all_complete"] = not self.object.jobs.filter(completed__isnull=True).exists()
         return context
+
+
+class ToolListView(ListView):
+    model = Tool
+    template_name = "tools/tools_list.html"
+    context_object_name = "tools"
 
 
 def tool_input_view(request, pk):
@@ -73,6 +84,7 @@ def tool_input_view(request, pk):
                                     )
                 run_job_group.delay(job_group.id)
                 return redirect(job_group.get_absolute_url())
+
             cleaned_data_str = {key: str(value) for key, value in form.cleaned_data.items()}
             filled_prompt = Template(tool.prompt).safe_substitute(**cleaned_data_str)
             results = chatter(filled_prompt, tool.model)

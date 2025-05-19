@@ -14,7 +14,7 @@ from .llm_calling import chatter
 class Tool(models.Model):
     name = models.CharField(max_length=100)
     prompt = models.TextField(
-        help_text="Use curly braces for placeholders, e.g.: 'Hello {user_name}, how are you?'"
+        help_text="Use ${curly} braces for source placeholder, e.g.: 'User input document text: ${user_name}. Extract the title: [[extract:title]]'"
     )
     model = models.ForeignKey("mindframe.LLM", on_delete=models.CASCADE)
 
@@ -26,7 +26,7 @@ class Tool(models.Model):
         return re.findall(r"\{([^}]+)\}", self.prompt)
 
     def get_absolute_url(self):
-        return reverse("tool-input", kwargs={"pk": self.pk})
+        return reverse("tool_input", kwargs={"pk": self.pk})
 
 
 class ToolKey(models.Model):
@@ -59,6 +59,8 @@ class JobGroup(models.Model):
         if self.jobs.filter(completed__isnull=True).count() == 0:
             self.complete = True
             self.save()
+            for i in self.jobs.all():
+                i.source_file.delete()
 
 
 class Job(models.Model):
@@ -68,24 +70,30 @@ class Job(models.Model):
     result = models.JSONField(null=True)
     completed = models.DateTimeField(null=True)
 
+    def __str__(self):
+        return f"{self.source_file or self.source[:50]}..."
+
     def text(self):
         return self.source_file and extract_text(self.source_file.path) or self.source or ""
 
     def filename(self):
-        return self.source_file and self.source_file.path or ""
+        return self.source_file and self.source_file.name or ""
+
+    def filepath(self):
+        return self.source_file and self.source_file.path or None
 
     def process(self):
         try:
             tool = self.group.tool
             filled_prompt = Template(tool.prompt).safe_substitute(
-                **{"source": self.text(), "file_path": self.filename()}
+                **{"source": self.text(), "file_path": self.filepath()}
             )
 
             result = dict(chatter(filled_prompt, tool.model))
             if len(result.keys()) > 1:
                 del result["RESPONSE_"]
             result["source"] = self.text()
-            result["file_path"] = self.filename()
+            result["file_name"] = self.filename()
 
             self.result = result
             self.completed = timezone.now()

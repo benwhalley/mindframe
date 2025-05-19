@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h3>LLM Tools</h3>
+  <hr>
+  <ul>
+    {% for tool in tools %}
+      <li>
+       <h5>
+        <a href="{% url 'tool_input' tool.id %}">{{ tool.name }}</a></h5>
+      </li>
+    {% endfor %}
+  </ul>
+  <hr>
+  <!-- button to add a new  -->
+  <a href="{% url 'admin:llmtools_tool_add' %}" class="btn btn-primary">Add Tool</a>
+{% endblock %}
+<hr>

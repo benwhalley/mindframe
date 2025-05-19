@@ -6,50 +6,61 @@
 <div class="container">
     <div class="row">
 
-        <h4 class="col-6">Inputs</h4>
-        <h4 class="col-6">Results for {{ tool.name }}</h4>
+        <div class="col-6">
+            <h4>Tool Prompt
 
 
-        <div class="col-md-6 mt-3">
+                <a href="{% url 'admin:llmtools_tool_change' tool.id %}" class="btn btn-outline-success btn-sm pl-4">Edit</a>
+            </h4>
 
-            <form method="POST" type="multipart/form-data" enctype="multipart/form-data">
+            <p class="small">
+                Tool prompts are templates to combine inputs and instructions to the LLM.
+                For file-based jobs, at least one placeholder is required, called <code>${source}</code>
+                For details of permitted instructions, see mindframe docs.
+                For data extraction use <code>[[extract:varname]]</code> and for other instructions use <code>[[respond:varname]]</code>. Specifying a varname is optional. Other response types are <code>speak, think, number/int, pick/decide, boolean/bool</code> and <code>poem</code>.
+
+            </p>
+
+
+            <hr>
+
+
+
+            <code style="white-space: pre-wrap;">
+{{tool.prompt|safe}}
+            </code>
+        </div>
+
+
+        <div class="col-6">
+
+            {% if results %}
+            <h4>Results for {{ tool.name }}</h4>
+                <pre style="white-space: pre-wrap;">
+                {{results}}
+                </pre>
+                <pre style="white-space: pre-wrap;">
+    {{ results.response }}
+                </pre>
+            <hr>
+            {% endif %}
+
+
+            <h4>Inputs</h4>
+
+            <p class="small">
+                Each placeholder in the prompt is a variable that can be filled in with a value. To test the prompt, fill in the values for each variable and click Submit.
+                Note, for file-based batch jobs, only a single placeholder is allowed: <code>${source}</code>.
+            </p>
+                        <form method="POST" type="multipart/form-data" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{ form|crispy }}
                 <button type="submit" class="btn btn-primary">Submit</button>
             </form>
 
+
         </div>
 
-        <div class="col-md-6">
-            <!-- bootstrap card -->
-            <div class="card mt-5">
-                <div class="card-body">
-
-<pre style="white-space: pre-wrap;">
-{{results}}
-</pre>
-            <pre style="white-space: pre-wrap;">
-{{ results.response }}
-            </pre>
-        </div>
-    </div>
-        </div>
-
-
-        <div class="col-12">
-            <hr>
-            <h4>Prompt
-
-                <a href="{% url 'admin:llmtools_tool_change' tool.id %}" class="btn btn-outline-success btn-sm pl-4">Edit</a>
-            </h4>
-
-
-
-
-            <code style="white-space: pre-wrap;">
-                {{tool.prompt|safe}}
-            </code>
-        </div>
 
     </div>
 </div>

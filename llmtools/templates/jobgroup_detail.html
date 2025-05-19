@@ -1,27 +1,51 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Group Details</title>
-    {% if not all_complete %}
-    <meta http-equiv="refresh" content="30">
-    {% endif %}
-</head>
-<body>
-    <h1>Job Group Details {{jobgroup.id}}</h1>
-    <h2>Tool: {{ jobgroup.tool.name }}</h2>
-    <a href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Edit</a>
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
 
 
-    <p>
-        Tool: <a href="{{jobgroup.tool.get_absolute_url}}">{{jobgroup.tool.name}}</a>
-    </p>
+{% block content %}
+<div class="container">
+    <div class="row">
 
-    <ul>
+        <div class="col">
+
+            <h1>Job Group Details
+                <code>{{jobgroup.id}}</code>
+            </h1>
+
+
+            <h5>Status</h5>
+
+            <li>{{ jobgroup.complete|yesno:"Completed,In progress" }}
+
+                <a href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Edit JobGroup</a>
+            </li>
+
+            <li>
+                Tool:
+        <a href="{{jobgroup.tool.get_absolute_url}}">{{jobgroup.tool.name}}</a>
+            </li>
+
+
+
+
+<hr>
+
+<h5>Jobs</h5>
+
+    <ul style="list-style-type: none;">
         {% for job in jobs %}
         <li>
-            Job ID: {{ job.id }} - Completed: {{ job.completed|yesno:"Yes,No" }}
+            {% if job.completed %}
+                <span style="color:green;">&#10004;</span>  {# ✔ U+2714 #}
+                {% else %}
+                <span style="color:red;">&#10060;</span>   {# ❌ U+274C #}
+            {% endif %}
+
+            <span class="small">{{ job }} </span>
+
+
+
         </li>
         {% endfor %}
     </ul>
@@ -31,9 +55,14 @@
     <p>Some jobs are still in progress. This page will refresh every 30 seconds.</p>
     {% endif %}
 
-<h3>Results</h3>
-<button onclick="copyJSON()">Copy JSON</button>
-<pre id="json-output" style="white-space: pre;">{{ jobgroup.json }}</pre>
+    <hr>
+
+<h3>Results
+    <button class="btn btn-outline-primary" onclick="copyJSON()">Copy JSON</button>
+
+</h3>
+
+<pre class="small" id="json-output" style="white-space: pre; font-size:.7em;">{{ jobgroup.json }}</pre>
 
 <script>
 function copyJSON() {
@@ -46,5 +75,6 @@ function copyJSON() {
 }
 </script>
 
-</body>
-</html>
+</div>
+</div>
+{% endblock %}
