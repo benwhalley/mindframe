@@ -1,7 +1,8 @@
 import json
 import re
 import uuid
-from string import Template
+
+from django.template import Template, Context
 
 from django.db import models
 from django.urls import reverse
@@ -17,9 +18,15 @@ from .llm_calling import chatter
 class Tool(models.Model):
     name = models.CharField(max_length=100)
     prompt = models.TextField(
-        help_text="Use ${curly} braces for source placeholder, e.g.: 'User input document text: ${user_name}. Extract the title: [[extract:title]]'"
+        help_text="Use {{curly}} braces for the source placeholder, and square brackets for LLM completions, e.g. [[response]]",
+        default="""{{source}}\n\nQuestion about the source\n\n[[response]]""",
     )
-    model = models.ForeignKey("mindframe.LLM", on_delete=models.CASCADE)
+    model = models.ForeignKey(
+        "mindframe.LLM", on_delete=models.CASCADE, help_text="The LLM to use for this Tool"
+    )
+    include_source = models.BooleanField(
+        default=False, help_text="Include the source text in the results JSON (can be quite large)."
+    )
 
     def __str__(self):
         return self.name
@@ -70,17 +77,29 @@ class JobGroup(TimeStampedModel):
 
 
 class Job(TimeStampedModel):
-    group = models.ForeignKey(JobGroup, on_delete=models.CASCADE, related_name="jobs")
-    source = models.TextField()
+    group = models.ForeignKey(JobGroup, on_delete=models.CASCADE, related_name="jobs", null=True)
+    tool = models.ForeignKey(Tool, on_delete=models.CASCADE, null=True)
+
+    def get_tool(self):
+        return self.tool or self.group.tool
+
+    context = models.JSONField(null=True)
+
     source_file = models.FileField(upload_to="source_files", max_length=1024 * 4)
+
     result = models.JSONField(null=True)
     completed = models.DateTimeField(null=True)
 
     def __str__(self):
-        return f"{self.source_file or self.source[:50]}..."
+        return f"{self.source_file or str(self.context)[:50]}..."
 
     def text(self):
-        return self.source_file and extract_text(self.source_file.path) or self.source or ""
+        return (
+            self.source_file
+            and extract_text(self.source_file.path)
+            or self.context.get("source", None)
+            or str(self.context)
+        )
 
     def filename(self):
         return self.source_file and self.source_file.name or ""
@@ -90,25 +109,26 @@ class Job(TimeStampedModel):
 
     def process(self):
         try:
-            tool = self.group.tool
-            filled_prompt = Template(tool.prompt).safe_substitute(
-                **{"source": self.text(), "file_path": self.filepath()}
-            )
-
-            result = dict(chatter(filled_prompt, tool.model))
+            tool = self.get_tool()
+            # Create a Template object
+            template = Template(tool.prompt)
+            ctx = Context(self.context)
+            filled_prompt = template.render(ctx)
+            result = chatter(filled_prompt, tool.model)
             if len(result.keys()) > 1:
                 del result["RESPONSE_"]
-            result["source"] = self.text()
+
+            if tool.include_source:
+                result["source"] = self.text()
+
             result["file_name"] = self.filename()
 
             self.result = result
             self.completed = timezone.now()
             self.save()
-            print(self.result)
 
         except Exception as e:
             print(str(e))
             raise e
-            result = {}
 
         return result

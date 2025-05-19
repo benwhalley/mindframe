@@ -8,7 +8,6 @@ from string import Template
 
 from django import forms
 from django.core.files import File
-from django.template import Template, Context
 from django.core.files.uploadedfile import UploadedFile
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import permission_required
@@ -35,7 +34,7 @@ class ToolInputForm(forms.Form):
                     required=False,
                 )
         self.fields["file"] = forms.FileField(
-            label="Upload ZIP",
+            label="Or, upload a ZIP file",
             help_text="Upload a zip with multiple files to start a batch job",
             required=False,
         )
@@ -91,25 +90,24 @@ def tool_input_view(request, pk):
                                         file_path
                                     )  # ← if you want to store extracted text too
                                     Job.objects.create(
-                                        group=job_group, source_file=django_file, source=text
+                                        group=job_group,
+                                        source_file=django_file,
+                                        context={"source": text},
                                     )
                 run_job_group.delay(job_group.id)
                 return redirect(job_group.get_absolute_url())
 
             cleaned_data_str = {key: str(value) for key, value in form.cleaned_data.items()}
 
-            # Create a Template object
-            template = Template(tool.prompt)
-            # Render the template with the cleaned data
-            context = Context(cleaned_data_str)
-            # raise Exception(template, context)
-            filled_prompt = template.render(context)
-            results = chatter(filled_prompt, tool.model)
+            newjob = Job.objects.create(group=None, context=cleaned_data_str, tool=tool)
+
+            newjob.save()
+            result = newjob.process()
 
             return render(
                 request,
                 "tool_result.html",
-                {"tool": tool, "results": json.dumps(results, indent=2), "form": form},
+                {"tool": tool, "results": json.dumps(result, indent=2), "form": form},
             )
     else:
         form = ToolInputForm(tool=tool)
