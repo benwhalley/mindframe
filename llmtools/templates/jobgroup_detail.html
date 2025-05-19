@@ -2,8 +2,19 @@
 {% load crispy_forms_tags %}
 {% load static %}
 
+{% block extra_head %}
+{{block.super}}
+
+{% if not jobgroup.complete %}
+<meta http-equiv="refresh" content="30">
+{% else %}
+<!-- No refresh -->
+{% endif %}
+{% endblock %}
+
 
 {% block content %}
+
 <div class="container">
     <div class="row">
 
