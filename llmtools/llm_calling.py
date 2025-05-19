@@ -1,5 +1,6 @@
-import hashlib
 import asyncio
+import hashlib
+import io
 import logging
 import re
 import traceback
@@ -7,14 +8,15 @@ from collections import OrderedDict, namedtuple
 from hashlib import sha256
 from types import FunctionType
 from typing import Any, Dict, List
-import io
+
 import requests
-from pydub import AudioSegment
 from asgiref.sync import async_to_sync, sync_to_async
+from box import Box
 from colored import Back, Fore, Style
 from django.template import Context, Template
 from langfuse.decorators import langfuse_context, observe
 from pydantic import Field
+from pydub import AudioSegment
 
 from llmtools.return_type_models import ACTION_LOOKUP
 
@@ -236,6 +238,10 @@ class ChatterResult(OrderedDict):
         # return the RESPONSE_ or last item in the dict
         return self["RESPONSE_"] or next(reversed(self.items()))[1]
 
+    @property
+    def outputs(self):
+        return Box(self)
+
 
 @observe(capture_input=False, capture_output=False)
 def chatter_(multipart_prompt, model, context={}, cache=True):
@@ -295,7 +301,7 @@ def chatter_(multipart_prompt, model, context={}, cache=True):
             prompt_parts.append(prompt_part.text)
             # Build the prompt for this completion from the parts within this segment.
             try:
-                segment_prompt = "\n\n--\n\n".join(filter(bool, prompt_parts))
+                segment_prompt = "\n\n--\n\n".join(filter(bool, map(str, prompt_parts)))
             except Exception as e:
                 logger.error(f"Error building segment prompt: {prompt_parts}\n{e}")
 

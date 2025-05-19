@@ -175,8 +175,21 @@ CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", default=False, cas
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "run-incomplete-jobs": {
+        "task": "llmtools.tasks.run_incomplete_jobs",
+        "schedule": crontab(minute="*/10"),
+    },
+    "clear-incomplete-jobs": {
+        "task": "llmtools.tasks.clear_incomplete_jobs",
+        "schedule": crontab(minute=0, hour=0),
+    },
+}
+
 LANGUAGE_CODE = config("LANGUAGE_CODE", default="en-gb")
-TIME_ZONE = config("TIME_ZONE", default="UTC")
+TIME_ZONE = config("TIME_ZONE", default="Europe/London")
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
@@ -190,10 +203,17 @@ STATICFILES_FINDERS = [
     "compressor.finders.CompressorFinder",
 ]
 STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {
+            "location": BASE_DIR / "uploads",
+        },
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
 
 COMPRESS_FILTERS = {
     "css": [
@@ -246,12 +266,6 @@ LOGIN_URL = "admin:index"
 # MAGICLINK_LOGIN_SENT_TEMPLATE_NAME = "magiclink/login_sent.html"
 # MAGICLINK_LOGIN_FAILED_TEMPLATE_NAME = "magiclink/login_failed.html"
 
-
-STORAGES = {
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
@@ -324,3 +338,21 @@ MAGICLINK_EMAIL_SUBJECT = config(
 
 SHELL_PLUS = "ipython"
 AUTH_USER_MODEL = "mindframe.CustomUser"
+
+
+# psql -U postgres
+# CREATE DATABASE template_with_vector TEMPLATE template1;
+# \c template_with_vector
+# CREATE EXTENSION vector;
+# -- Make sure the DB is marked as a template
+# UPDATE pg_database SET datistemplate = TRUE WHERE datname = 'template_with_vector';
+# -- Grant your Django user CONNECT privileges
+# GRANT CONNECT ON DATABASE template_with_vector TO mf;
+# -- Also needed: your_db_user must have CREATEDB privilege
+# ALTER USER mf CREATEDB;
+
+
+DATABASES["default"]["TEST"] = {"TEMPLATE": "template_with_vector"}
+
+
+# TEST_RUNNER = 'mindframe.tests.conftest.VectorEnabledTestRunner'

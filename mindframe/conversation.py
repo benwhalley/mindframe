@@ -55,11 +55,11 @@ def pick_speaker_for_next_response(turn: Turn):
 
 def transition_permitted(transition, turn) -> bool:
     # Test whether the conditions for a Transition are met at this Turn
-
-    ctx_data = speaker_context(turn).get("data")
+    ctx_data = speaker_context(turn)
+    # flatten out the data dict into context to make it easier to access
+    ctx_data.update(ctx_data.get("data"))
     logger.info(f"Checking transition {transition} with context data: {ctx_data}")
     clean_conditions = [cond.strip() for cond in transition.conditions.splitlines() if cond.strip()]
-
     condition_evals = []
     for cond in clean_conditions:
         logger.info(f"Evaluating condition '{cond}'")
@@ -219,7 +219,13 @@ def respond(
 
     if not with_intervention_step:
         try:
-            spkr_history = conversation_history(turn).filter(speaker=as_speaker)
+            spkr_history = (
+                conversation_history(turn)
+                .filter(speaker=as_speaker)
+                .exclude(
+                    nudges__completed_turn__isnull=False
+                )  # Exclude turns linked to a completed nudge
+            )
             speakers_prev_turn = spkr_history.filter(step__isnull=False).last()
             speakers_prev_step = speakers_prev_turn and speakers_prev_turn.step or None
             with_intervention_step = (
@@ -355,7 +361,7 @@ def respond(
 
     # ensure all the langfuse traces are identifiable by the Turn uuid
     langfuse_context.update_current_observation(
-        name=f"Response in turn: {new_turn.uuid}",  # Use new turn ID
+        name=f"{new_turn.step.intervention.title}. Response in turn: {new_turn.uuid}",  # Use new turn ID
         session_id=new_turn.uuid,  # Make sure the session ID is correct
         output=new_turn.text,
     )

@@ -877,6 +877,10 @@ class Conversation(LifecycleModel):
             pk__in=self.turns.all().values_list("step__intervention__pk", flat=True)
         )
 
+    class Meta:
+        # order by timestamp of the last turn added
+        ordering = ["-turns__timestamp"]
+
 
 class Turn(NS_Node):
     """
@@ -896,7 +900,7 @@ class Turn(NS_Node):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="turns")
     timestamp = models.DateTimeField(default=timezone.now)
     speaker = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="turns")
-    turn_type = models.CharField(choices=TurnTypes.choices)
+    turn_type = models.CharField(choices=TurnTypes.choices, max_length=255)
 
     checkpoint = models.BooleanField(
         default=False,
@@ -960,13 +964,18 @@ class Turn(NS_Node):
         help_text="The Step used to generate this contribution to the conversation. If null, contributed by a human speaker.",
     )
 
-    nudge = models.ForeignKey(
-        "Nudge",
-        help_text="The scheduled Nudge which generated this turn (if any)",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-    )
+    # nudge = models.ForeignKey(
+    #     "Nudge",
+    #     help_text="The scheduled Nudge which generated this turn (if any)",
+    #     on_delete=models.CASCADE,
+    #     null=True,
+    #     blank=True,
+    #     related_name="generated_turns",
+    # )
+
+    @property
+    def nudge(self):
+        return self.nudges.filter(due=self.timestamp).first()
 
     text = models.TextField(blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True, null=True)
@@ -1126,7 +1135,12 @@ class ScheduledNudge(LifecycleModel):
 
     objects = ScheduledNudgeManager()
 
-    turn = models.ForeignKey("Turn", on_delete=models.CASCADE, related_name="nudges")
+    turn = models.ForeignKey(
+        "Turn",
+        on_delete=models.CASCADE,
+        related_name="nudges",
+        help_text="Nudges scheduled following this turn",
+    )
     nudge = models.ForeignKey("Nudge", on_delete=models.CASCADE, related_name="scheduled_nudges")
 
     due = models.DateTimeField(blank=True, null=True)
@@ -1135,6 +1149,7 @@ class ScheduledNudge(LifecycleModel):
         "Turn",
         on_delete=models.CASCADE,
         related_name="completed_nudges",
+        help_text="The Turn created by this Nudge",
         null=True,
         blank=True,
     )

@@ -25,6 +25,19 @@ logger = logging.getLogger(__name__)
 
 
 class AdditionalTurnsForm(forms.Form):
+    def __init__(self, *args, conversation=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if conversation:
+            logger.debug(f"Conversation: {conversation}")
+            steps = Step.objects.filter(intervention__in=conversation.interventions())
+            logger.debug(f"Steps: {steps}")
+            if steps.exists():
+                self.fields["next_speaker_step"].queryset = steps
+                self.fields["subsequent_speaker_step"].queryset = steps
+            else:
+                self.fields["next_speaker_step"].queryset = Step.objects.all()
+                self.fields["subsequent_speaker_step"].queryset = Step.objects.all()
+
     n_turns = forms.IntegerField(
         label="Number of Turns",
         min_value=1,
@@ -97,7 +110,8 @@ class ConversationDetailView(LoginRequiredMixin, DetailView, FormMixin):
     def get_form_kwargs(self):
         """Pass the conversation instance to the form dynamically."""
         kwargs = super().get_form_kwargs()
-        # kwargs["conversation"] = self.object.conversation
+        kwargs["conversation"] = self.get_object().conversation
+
         return kwargs
 
     def get_context_data(self, **kwargs):

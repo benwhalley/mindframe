@@ -157,6 +157,7 @@ class ConversationAdmin(admin.ModelAdmin):
     readonly_fields = ["uuid"]
     list_display = [
         "__str__",
+        "last_turn_timestamp",
         "summary",
         "speakers",
         "active",
@@ -164,8 +165,12 @@ class ConversationAdmin(admin.ModelAdmin):
         "intervention",
         "uuid",
     ]
-    list_prefetch_related = ["intervention", "speakers"]
+    list_prefetch_related = ["intervention", "speakers", "turns"]
     search_fields = ["uuid", "turns__speaker__username", "turns__speaker__last_name"]
+
+    def last_turn_timestamp(self, obj):
+        last_turn = obj.turns.last()
+        return last_turn.timestamp if last_turn else None
 
     def n_turns(self, obj):
         return obj.turns.count()
@@ -337,7 +342,6 @@ class TurnAdmin(admin.ModelAdmin):
         "interruption",
         "speaker",
         "conversation",
-        "nudge",
         "step",
         "branch_author",
     ]
@@ -700,10 +704,11 @@ class DueSoonFilter(admin.SimpleListFilter):
 class ScheduledNudgeAdmin(admin.ModelAdmin):
     autocomplete_fields = [
         "turn",
+        "completed_turn",
         "nudge",
     ]
     list_display = [
-        "turn",
+        # "turn",
         "due",
         "completed",
         "nudge__step_to_use",
@@ -712,7 +717,12 @@ class ScheduledNudgeAdmin(admin.ModelAdmin):
     ]
     list_filter = ["completed", DueNowFilter, DueSoonFilter]
     date_hierarchy = "due"
-    readonly_fields = ["completed_turn", "completed", "nudge", "turn"]
+    # readonly_fields = [
+    #     # "completed_turn",
+    #     "completed",
+    #     "nudge",
+    #     # "turn",
+    # ]
 
 
 @admin.register(Interruption)

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+
+
+{% block content %}
+<div class="container">
+    <div class="row">
+
+        <div class="col">
+
+            <h1>Job Group:
+                <code>{{jobgroup.id}}</code>
+            </h1>
+
+
+            <h5>Status</h5>
+
+            <li>{{ jobgroup.complete|yesno:"Completed,In progress" }}
+            </li>
+
+            <li><a href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Details</a></li>
+
+            <li>
+                Too used:
+        <a href="{{jobgroup.tool.get_absolute_url}}">{{jobgroup.tool.name}}</a>
+            </li>
+
+
+
+
+<hr>
+
+<h5>Jobs</h5>
+
+    <ul style="list-style-type: none;">
+        {% for job in jobs %}
+        <li>
+            {% if job.completed %}
+                <span style="color:green;">&#10004;</span>  {# ✔ U+2714 #}
+                {% else %}
+                <span style="color:red;">&#10060;</span>   {# ❌ U+274C #}
+            {% endif %}
+
+            <span class="small">{{ job }} </span>
+
+
+
+        </li>
+        {% endfor %}
+    </ul>
+    {% if all_complete %}
+    <p>All jobs are complete.</p>
+    {% else %}
+    <p>Some jobs are still in progress. This page will refresh every 30 seconds.</p>
+    {% endif %}
+
+    <hr>
+
+<h5>Results
+    <button class="btn btn-outline-primary" onclick="copyJSON()">Copy JSON</button>
+
+</h5>
+
+<pre class="card card-body small" id="json-output" style="white-space: pre; font-size:.7em;">{{ jobgroup.json }}</pre>
+
+<script>
+function copyJSON() {
+    const jsonText = document.getElementById("json-output").textContent;
+    navigator.clipboard.writeText(jsonText).then(() => {
+        alert("JSON copied to clipboard.");
+    }).catch(err => {
+        alert("Failed to copy: " + err);
+    });
+}
+</script>
+
+</div>
+</div>
+{% endblock %}

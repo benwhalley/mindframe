@@ -1,14 +1,14 @@
 import json
+import logging
 import pickle
 
 import requests
 from box import Box
 from decouple import config
 
+from llmtools.llm_calling import transcribe_audio
 from mindframe.models import Conversation
 from mindframe.telegram import TelegramBotClient
-from llmtools.llm_calling import transcribe_audio
-import logging
 
 logger = logging.getLogger(__name__)
 

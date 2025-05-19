@@ -8,50 +8,49 @@ from mindframe.tree import conversation_history
 register = template.Library()
 
 
+def get_turns(turn, filter_type="all", n=None):
+    trns = conversation_history(turn).order_by("timestamp")
+    assert filter_type in ["step", "all", "*"]
+
+    if filter_type == "step":
+        turnsteps = [(t, t.step) for t in trns]
+        current_step = next(step for t, step in reversed(turnsteps) if step is not None)
+        first_turn_current_step = next(turn for turn, step in turnsteps if step == current_step)
+
+        trns = trns.filter(depth__gte=first_turn_current_step.depth)
+
+    if n:
+        # reverse first to select N last turns
+        trns = list(reversed(list(trns)))[:n]
+        # query again because otherwise we return a list not a queryset
+        trns = Turn.objects.filter(id__in=[turn.id for turn in trns])
+
+    return trns
+
+
 @register.simple_tag(takes_context=True)
 def turns(context, filter_type="all", n=None):
 
     # Access `session` from the context
+    # Access `session` from the context
     turn = context.get("current_turn")
-
-    if filter_type == "all":
-        t = conversation_history(turn)
-
-    elif filter_type == "step":
-        raise NotImplementedError("Filtering by step is not yet implemented.")
-        t = turns.filter(session_state__step=session.current_step())
-
-    if n:
-        # reverse first to select N last turns
-        t = list(reversed(list(t)))[:n]
-        # query again because otherwise we return a list not a queryset
-        t = Turn.objects.filter(id__in=[turn.id for turn in t])
+    trns = get_turns(turn, filter_type=filter_type, n=n)
 
     formatted_turns = "\n\n".join(
         [
             f"{t.depth}. {t.speaker.transcript_speaker_label()} {t.text}"
-            for i, t in enumerate(t.order_by("timestamp"), start=1)
+            for i, t in enumerate(trns.order_by("timestamp"), start=1)
         ]
     )
     return mark_safe(formatted_turns)
 
 
 @register.simple_tag(takes_context=True)
-def turns_with_reminder(context, reminder_text, every_n_turns, filter_type="all", total_turns=None):
+def turns_with_reminder(context, reminder_text, every_n_turns, filter_type="all"):
 
     # Access `session` from the context
     turn = context.get("current_turn")
-
-    if filter_type == "all":
-        trns = conversation_history(turn).order_by("timestamp")
-
-    elif filter_type == "step":
-        raise NotImplementedError("Filtering by step is not yet implemented.")
-
-    if total_turns:
-        trns = reversed(reversed(list(trns))[:n])
-        # query again because otherwise we return a list not a queryset
-        trns = Turn.objects.filter(id__in=[turn.id for turn in trns])
+    trns = get_turns(turn, filter_type=filter_type, n=n)
 
     formatted_turns = [
         f"{t.depth}. {t.speaker.transcript_speaker_label()} {t.text}"
