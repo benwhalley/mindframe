@@ -6,6 +6,9 @@ from string import Template
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
+from django.conf import settings
+from django_extensions.db.models import TimeStampedModel
+
 
 from .extract import extract_text
 from .llm_calling import chatter
@@ -23,7 +26,7 @@ class Tool(models.Model):
 
     def get_input_fields(self):
         # finds all {placeholder_name} in prompt
-        return re.findall(r"\{([^}]+)\}", self.prompt)
+        return re.findall(r"\{\{([^}]+)\}\}", self.prompt)
 
     def get_absolute_url(self):
         return reverse("tool_input", kwargs={"pk": self.pk})
@@ -42,9 +45,12 @@ class ToolKey(models.Model):
         return f"{self.tool.name} - {self.tool_key}"
 
 
-class JobGroup(models.Model):
+class JobGroup(TimeStampedModel):
     tool = models.ForeignKey(Tool, on_delete=models.CASCADE)
     complete = models.BooleanField(default=False)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="job_groups"
+    )
 
     def get_absolute_url(self):
         return reverse("jobgroup-detail", kwargs={"pk": self.pk})
@@ -63,7 +69,7 @@ class JobGroup(models.Model):
                 i.source_file.delete()
 
 
-class Job(models.Model):
+class Job(TimeStampedModel):
     group = models.ForeignKey(JobGroup, on_delete=models.CASCADE, related_name="jobs")
     source = models.TextField()
     source_file = models.FileField(upload_to="source_files", max_length=1024 * 4)

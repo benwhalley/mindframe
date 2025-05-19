@@ -6,16 +6,15 @@
 <div class="container">
     <div class="row">
 
+        <h3 class="col-12 mb-4">Tool: <code>{{ tool.name }}</code></h3>
         <div class="col-6">
-            <h4>Tool Prompt
-
-
+            <h4>Prompt template
                 <a href="{% url 'admin:llmtools_tool_change' tool.id %}" class="btn btn-outline-success btn-sm pl-4">Edit</a>
             </h4>
 
             <p class="small">
                 Tool prompts are templates to combine inputs and instructions to the LLM.
-                For file-based jobs, at least one placeholder is required, called <code>${source}</code>
+                For file-based jobs, only one placeholder is required/allowed, called <code>{% verbatim %}{{source}}{% endverbatim %}</code>.
                 For details of permitted instructions, see mindframe docs.
                 For data extraction use <code>[[extract:varname]]</code> and for other instructions use <code>[[respond:varname]]</code>. Specifying a varname is optional. Other response types are <code>speak, think, number/int, pick/decide, boolean/bool</code> and <code>poem</code>.
 
@@ -50,7 +49,7 @@
 
             <p class="small">
                 Each placeholder in the prompt is a variable that can be filled in with a value. To test the prompt, fill in the values for each variable and click Submit.
-                Note, for file-based batch jobs, only a single placeholder is allowed: <code>${source}</code>.
+                For file-based batch jobs, the contents of the file are extracted as text and used to fill the <code>{% verbatim %}{{source}}{% endverbatim %}</code> placeholder.
             </p>
                         <form method="POST" type="multipart/form-data" enctype="multipart/form-data">
                 {% csrf_token %}

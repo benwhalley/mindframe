@@ -8,10 +8,13 @@ from string import Template
 
 from django import forms
 from django.core.files import File
+from django.template import Template, Context
 from django.core.files.uploadedfile import UploadedFile
 from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib.auth.decorators import permission_required
 from django.urls import reverse
 from django.views.generic import DetailView, ListView
+from django.contrib.auth.mixins import PermissionRequiredMixin
 
 from llmtools.extract import extract_text
 from llmtools.llm_calling import chatter
@@ -38,7 +41,8 @@ class ToolInputForm(forms.Form):
         )
 
 
-class JobGroupDetailView(DetailView):
+class JobGroupDetailView(PermissionRequiredMixin, DetailView):
+    permission_required = "llmtools.add_jobgroup"
     model = JobGroup
     template_name = "jobgroup_detail.html"
     context_object_name = "jobgroup"
@@ -50,12 +54,19 @@ class JobGroupDetailView(DetailView):
         return context
 
 
-class ToolListView(ListView):
+class ToolListView(PermissionRequiredMixin, ListView):
+    permission_required = "llmtools.add_jobgroup"
     model = Tool
     template_name = "tools/tools_list.html"
     context_object_name = "tools"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["jobgroups"] = JobGroup.objects.filter(owner=self.request.user)
+        return context
 
+
+@permission_required("llmtools.add_jobgroup")
 def tool_input_view(request, pk):
     tool = get_object_or_404(Tool, pk=pk)
 
@@ -65,7 +76,7 @@ def tool_input_view(request, pk):
             uploaded_file = request.FILES.get("file")
             # import pdb; pdb.set_trace()
             if uploaded_file and isinstance(uploaded_file, UploadedFile):
-                job_group = JobGroup.objects.create(tool=tool)
+                job_group = JobGroup.objects.create(tool=tool, owner=request.user)
                 with tempfile.TemporaryDirectory() as temp_dir:
                     with zipfile.ZipFile(uploaded_file, "r") as zip_ref:
                         zip_ref.extractall(temp_dir)
@@ -86,7 +97,13 @@ def tool_input_view(request, pk):
                 return redirect(job_group.get_absolute_url())
 
             cleaned_data_str = {key: str(value) for key, value in form.cleaned_data.items()}
-            filled_prompt = Template(tool.prompt).safe_substitute(**cleaned_data_str)
+
+            # Create a Template object
+            template = Template(tool.prompt)
+            # Render the template with the cleaned data
+            context = Context(cleaned_data_str)
+            # raise Exception(template, context)
+            filled_prompt = template.render(context)
             results = chatter(filled_prompt, tool.model)
 
             return render(

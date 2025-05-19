@@ -8,6 +8,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.base import TemplateView
 from django.views.generic.edit import FormView
+from django.contrib.auth.mixins import PermissionRequiredMixin
 
 from mindframe.graphing import mermaid_diagram
 from mindframe.models import Intervention, Step
@@ -15,7 +16,9 @@ from mindframe.models import Intervention, Step
 logger = logging.getLogger(__name__)
 
 
-class StepDetailView(LoginRequiredMixin, DetailView):
+class StepDetailView(PermissionRequiredMixin, LoginRequiredMixin, DetailView):
+
+    permission_required = "mindframe.view_intervention"
     model = Step
 
     def get_context_data(self, **kwargs):
@@ -24,7 +27,8 @@ class StepDetailView(LoginRequiredMixin, DetailView):
         return ct
 
 
-class InterventionListView(LoginRequiredMixin, ListView):
+class InterventionListView(PermissionRequiredMixin, LoginRequiredMixin, ListView):
+    permission_required = "mindframe.view_intervention"
     model = Intervention
 
     def get_context_data(self, **kwargs):

@@ -9,7 +9,7 @@
 
         <div class="col">
 
-            <h1>Job Group Details
+            <h1>Job Group:
                 <code>{{jobgroup.id}}</code>
             </h1>
 
@@ -17,12 +17,12 @@
             <h5>Status</h5>
 
             <li>{{ jobgroup.complete|yesno:"Completed,In progress" }}
-
-                <a href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Edit JobGroup</a>
             </li>
 
+            <li><a href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Details</a></li>
+
             <li>
-                Tool:
+                Too used:
         <a href="{{jobgroup.tool.get_absolute_url}}">{{jobgroup.tool.name}}</a>
             </li>
 
@@ -57,12 +57,12 @@
 
     <hr>
 
-<h3>Results
+<h5>Results
     <button class="btn btn-outline-primary" onclick="copyJSON()">Copy JSON</button>
 
-</h3>
+</h5>
 
-<pre class="small" id="json-output" style="white-space: pre; font-size:.7em;">{{ jobgroup.json }}</pre>
+<pre class="card card-body small" id="json-output" style="white-space: pre; font-size:.7em;">{{ jobgroup.json }}</pre>
 
 <script>
 function copyJSON() {
