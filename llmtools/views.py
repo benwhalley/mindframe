@@ -96,19 +96,19 @@ def tool_input_view(request, pk):
                                     )
                 run_job_group.delay(job_group.id)
                 return redirect(job_group.get_absolute_url())
+            else:
+                cleaned_data_str = {key: str(value) for key, value in form.cleaned_data.items()}
 
-            cleaned_data_str = {key: str(value) for key, value in form.cleaned_data.items()}
+                newjob = Job.objects.create(group=None, context=cleaned_data_str, tool=tool)
 
-            newjob = Job.objects.create(group=None, context=cleaned_data_str, tool=tool)
+                newjob.save()
+                result = newjob.process()
 
-            newjob.save()
-            result = newjob.process()
-
-            return render(
-                request,
-                "tool_result.html",
-                {"tool": tool, "results": json.dumps(result, indent=2), "form": form},
-            )
+                return render(
+                    request,
+                    "tool_result.html",
+                    {"tool": tool, "results": json.dumps(result, indent=2), "form": form},
+                )
     else:
         form = ToolInputForm(tool=tool)
 
