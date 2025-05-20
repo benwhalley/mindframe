@@ -19,7 +19,15 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
 
-        for obj in BotInterface.objects.all():
+        bots_active = BotInterface.objects.all()
+        if settings.DEBUG:
+            bots_active = bots_active.filter(dev_mode=True)
+
+        self.stdout.write(f"Managing {''.join(map(str, bots_active))} bots to manage")
+        if bots_active.count() == 0:
+            raise Exception("No bots to manage. Are you in DEBUG mode?")
+
+        for obj in bots_active:
             try:
                 bot_client = obj.bot_client()
 

@@ -864,7 +864,7 @@ class Conversation(LifecycleModel):
         )
 
     def __str__(self):
-        return f"Conversation between: {', '.join(self.speakers().values_list('username', flat=True))} ()"
+        return f"Conversation between: {' and '.join(self.speakers().values_list('username', flat=True))}"
 
     def speakers(self) -> QuerySet["CustomUser"]:
         return CustomUser.objects.filter(
@@ -1197,6 +1197,8 @@ class BotInterface(LifecycleModel):
         Intervention, on_delete=models.CASCADE, related_name="interfaces"
     )
 
+    dev_mode = models.BooleanField(default=False)
+
     bot_name = models.CharField(max_length=255, null=True, blank=True)
 
     bot_secret_token = models.CharField(max_length=255, null=True, blank=True)
@@ -1209,6 +1211,9 @@ class BotInterface(LifecycleModel):
         default=BotInterfaceProviders.TELEGRAM,
     )
 
+    provider_info = models.JSONField(null=True, blank=True)
+    provider_info_updated = models.DateTimeField(null=True, blank=True)
+
     def bot_client(self):
         # todo make flexible
         from .telegram import TelegramBotClient
@@ -1219,4 +1224,4 @@ class BotInterface(LifecycleModel):
         return settings.WEBHOOK_BASE_URL + reverse("bot_webhook", args=[self.pk])
 
     def __str__(self):
-        return f"{self.provider} interface for {self.intervention}"
+        return f"{self.bot_name}: {self.provider} interface for {self.intervention}"

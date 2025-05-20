@@ -352,7 +352,7 @@ class WebhookBotClient(MindframeBotClient):
     webhook_url: str = None
     bot_secret_token: str = None
     webhook_validation_token: Optional[str] = None
-    bot_interface: BotInterface = None
+    bot_interface: "mindframe.BotInterface" = None
 
     def __init__(self, bot_interface):
         """Initialize a webhook bot client from BotInterface object"""

@@ -17,6 +17,8 @@ from ruamel.yaml import YAML
 from mindframe.graphing import mermaid_diagram
 from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, BranchReasons, TurnTypes
 from mindframe.tree import create_branch
+from django.contrib.messages import constants
+
 
 from .models import (
     LLM,
@@ -743,5 +745,20 @@ class InterruptionAdmin(admin.ModelAdmin):
 
 @admin.register(BotInterface)
 class BotInterfaceAdmin(admin.ModelAdmin):
-    list_display = ["intervention", "provider", "webhook_url"]
+    list_display = ["bot_name", "intervention", "provider", "provider_info", "webhook_url"]
     autocomplete_fields = ["intervention"]
+
+    actions = ["register"]
+
+    def register(self, request, queryset):
+        for obj in queryset:
+            if settings.DEBUG and not obj.dev_mode:
+                self.message_user(
+                    request, f"Not registering {obj} in DEBUG mode", level=constants.WARNING
+                )
+            else:
+                obj.bot_client().setup_webhook()
+                obj.provider_info = obj.bot_client().get_webhook_info()
+                obj.provider_info_updated = timezone.now()
+                obj.save()
+                self.message_user(request, f"Registered {obj}", level=constants.SUCCESS)
