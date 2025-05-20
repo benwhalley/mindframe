@@ -73,8 +73,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Application definitions
 INSTALLED_APPS = [
-    "llmtools",
-    "mindframe",
     "treebeard",
     "debug_toolbar",
     "hijack",
@@ -91,7 +89,8 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "whitenoise.runserver_nostatic",
     "rules.apps.AutodiscoverRulesConfig",
-    # "magiclink",
+    "llmtools",
+    "mindframe",
     "djmail",
     "django_celery_beat",
 ]
@@ -244,7 +243,6 @@ if DEBUG:
 AUTHENTICATION_BACKENDS = (
     "rules.permissions.ObjectPermissionBackend",
     "django.contrib.auth.backends.ModelBackend",
-    # "magiclink.backends.MagicLinkBackend",
 )
 
 LOGIN_URL = "admin:index"

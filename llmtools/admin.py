@@ -11,6 +11,8 @@ class JobInline(admin.TabularInline):
 
 class JobGroupAdmin(admin.ModelAdmin):
     inlines = [JobInline]
+    list_display = ["tool", "owner", "status", "complete", "cancelled"]
+    list_filter = ["owner", "complete", "cancelled"]
 
 
 admin.site.register(JobGroup, JobGroupAdmin)

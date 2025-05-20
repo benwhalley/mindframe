@@ -14,6 +14,8 @@ from django_extensions.db.models import TimeStampedModel
 from .extract import extract_text
 from .llm_calling import chatter
 
+from actionable.mixins import action_with_permission, ActionableObjectMixin
+
 
 class Tool(models.Model):
     name = models.CharField(max_length=100)
@@ -52,12 +54,21 @@ class ToolKey(models.Model):
         return f"{self.tool.name} - {self.tool_key}"
 
 
-class JobGroup(TimeStampedModel):
+class JobGroup(ActionableObjectMixin, TimeStampedModel):
     tool = models.ForeignKey(Tool, on_delete=models.CASCADE)
     complete = models.BooleanField(default=False)
+    cancelled = models.BooleanField(default=False)
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="job_groups"
     )
+
+    def status(self):
+        if self.cancelled:
+            return "Cancelled"
+        elif self.complete:
+            return "Complete"
+        else:
+            return "In progress"
 
     def get_absolute_url(self):
         return reverse("jobgroup-detail", kwargs={"pk": self.pk})
@@ -65,7 +76,17 @@ class JobGroup(TimeStampedModel):
     def json(self):
         return json.dumps(list(self.jobs.all().values_list("result", flat=True)), indent=2)
 
+    @action_with_permission("llmtools.cancel_jobgroup")
+    def cancel_jobs(self):
+        self.jobs.update(cancelled=True)
+        self.cancelled = True
+        self.save()
+        return True
+
     def run(self):
+        if self.cancelled:
+            raise Exception("Job group cancelled")
+
         for job in self.jobs.all():
             job.process()
 
@@ -75,10 +96,14 @@ class JobGroup(TimeStampedModel):
             for i in self.jobs.all():
                 i.source_file.delete()
 
+    class Meta:
+        ordering = ["-created"]
+
 
 class Job(TimeStampedModel):
     group = models.ForeignKey(JobGroup, on_delete=models.CASCADE, related_name="jobs", null=True)
     tool = models.ForeignKey(Tool, on_delete=models.CASCADE, null=True)
+    cancelled = models.BooleanField(default=False)
 
     def get_tool(self):
         return self.tool or self.group.tool
@@ -109,6 +134,9 @@ class Job(TimeStampedModel):
 
     def process(self):
         try:
+            if self.cancelled:
+                raise Exception("Job cancelled")
+
             tool = self.get_tool()
             # Create a Template object
             template = Template(tool.prompt)

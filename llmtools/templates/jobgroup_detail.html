@@ -25,9 +25,21 @@
             </h1>
 
 
+             {% if not jobgroup.cancelled %}
+             <button
+                class="btn btn-danger"
+                hx-post="{% url 'action' app='llmtools' model='JobGroup' identifier=jobgroup.pk %}"
+                hx-vals='{"action": "cancel_jobs"}'
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                hx-swap="outerHTML"
+                hx-target="this">
+                Cancel jobs
+            </button>
+            {% endif %}
+
             <h5>Status</h5>
 
-            <li>{{ jobgroup.complete|yesno:"Completed,In progress" }}
+            <li>{{ jobgroup.status }}
             </li>
 
             <li><a href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Details</a></li>
@@ -47,11 +59,17 @@
     <ul style="list-style-type: none;">
         {% for job in jobs %}
         <li>
-            {% if job.completed %}
+
+            {% if job.cancelled %}
+            <span>Cancelled</span>
+            {% endif %}
+
+            {% if job.completed and not job.cancelled %}
                 <span style="color:green;">&#10004;</span>  {# ✔ U+2714 #}
-                {% else %}
+            {% else %}
                 <span style="color:red;">&#10060;</span>   {# ❌ U+274C #}
             {% endif %}
+
 
             <span class="small">{{ job }} </span>
 

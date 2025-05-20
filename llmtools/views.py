@@ -61,7 +61,7 @@ class ToolListView(PermissionRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["jobgroups"] = JobGroup.objects.filter(owner=self.request.user)
+        context["jobgroups"] = JobGroup.objects.filter(owner=self.request.user).order_by("-created")
         return context
 
 
@@ -75,6 +75,12 @@ def tool_input_view(request, pk):
             uploaded_file = request.FILES.get("file")
             # import pdb; pdb.set_trace()
             if uploaded_file and isinstance(uploaded_file, UploadedFile):
+                try:
+                    with zipfile.ZipFile(uploaded_file, "r") as zip_ref:
+                        pass
+                except zipfile.BadZipFile:
+                    form.add_error("file", "The uploaded file is not a valid ZIP file.")
+                    return render(request, "tool_result.html", {"tool": tool, "form": form})
                 job_group = JobGroup.objects.create(tool=tool, owner=request.user)
                 with tempfile.TemporaryDirectory() as temp_dir:
                     with zipfile.ZipFile(uploaded_file, "r") as zip_ref:
