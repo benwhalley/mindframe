@@ -231,8 +231,6 @@ class MindframeBotClient(ABC):
     ) -> Tuple[Optional[HttpResponse], str]:
         """
         Generate and send a web link for the conversation.
-
-        TODO: the Webhook and Matrix clients need a base_url or BASE_WEB_URL param on init which is the fully qualified name of the server, so that we can redirect to the full url.
         """
         try:
             if not conversation or conversation.turns.count() == 0:

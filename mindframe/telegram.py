@@ -252,6 +252,7 @@ class TelegramBotClient(WebhookBotClient):
     def get_or_create_conversation(self, message: InboundMessage) -> Tuple[Any, bool]:
         """
         Get or create a conversation for this chat.
+        Initialises the conversation if it doesn't exist already with the user and intervention.
         """
         conversation, is_new = Conversation.objects.get_or_create(
             chat_room_id=message.chat_id, archived=False, bot_interface=self.bot_interface
@@ -379,11 +380,6 @@ class TelegramBotClient(WebhookBotClient):
             # Create new conversation
             new_conversation, _ = self.get_or_create_conversation(message)
 
-            # # Begin the conversation with the intervention
-            # conversation_started_ = self._initialise_new_conversation(
-            #     new_conversation, intervention, self.get_or_create_user(message), message.chat_id
-            # )
-
             return JsonResponse({"status": "ok"}, status=200), None
 
         except Exception as e:
@@ -402,6 +398,7 @@ class TelegramBotClient(WebhookBotClient):
         """
 
         # TODO is this logic right?
+
         intervention = conversation.interventions().first()
         try:
 
@@ -411,13 +408,8 @@ class TelegramBotClient(WebhookBotClient):
                 message.chat_id,
                 "Starting a new conversation (forgetting everything we talked about so far).",
             )
-            # Create new conversation
-            new_conversation, _ = self.get_or_create_conversation(message)
 
-            # # Begin the conversation with the intervention
-            # conversation_started_ = self._initialise_new_conversation(
-            #     new_conversation, intervention, self.get_or_create_user(message), message.chat_id
-            # )
+            new_conversation, _ = self.get_or_create_conversation(message)
 
             return JsonResponse({"status": "ok"}, status=200), None
 
