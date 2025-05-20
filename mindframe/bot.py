@@ -2,6 +2,7 @@ import asyncio
 import logging
 import threading
 import time
+from django.conf import settings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -242,7 +243,7 @@ class MindframeBotClient(ABC):
             if not last_turn:
                 return None, "No conversation history found."
 
-            url = reverse("conversation_detail", args=[last_turn.uuid])
+            url = settings.WEB_URL + reverse("conversation_detail", args=[last_turn.uuid])
 
             return None, f"Web link to this conversation: {url}"
         except Exception as e:

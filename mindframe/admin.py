@@ -745,7 +745,14 @@ class InterruptionAdmin(admin.ModelAdmin):
 
 @admin.register(BotInterface)
 class BotInterfaceAdmin(admin.ModelAdmin):
-    list_display = ["bot_name", "intervention", "provider", "provider_info", "webhook_url"]
+    list_display = [
+        "bot_name",
+        "dev_mode",
+        "intervention",
+        "provider",
+        "provider_info",
+        "webhook_url",
+    ]
     autocomplete_fields = ["intervention"]
 
     actions = ["register"]

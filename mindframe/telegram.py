@@ -319,6 +319,7 @@ class TelegramBotClient(WebhookBotClient):
         command_handlers = {
             "help": self.handle_help_command,
             "new": self.handle_new_command,
+            "clear": self.handle_clear_command,
             "settings": self.handle_settings_command,
             "web": self.handle_web_command,
             "list": self.handle_list_command,
@@ -339,7 +340,8 @@ class TelegramBotClient(WebhookBotClient):
         """
         help_text = (
             "Commands:\n"
-            "/new <INTERVENTION> - start a new conversation\n"
+            "/clear - start a fresh conversation\n"
+            "/new <bot_name> - start a new conversation with a specific bot\n"
             "/help - show this message\n"
             "/settings - show settings\n"
             "/web - show web page link for this conversation\n"
@@ -366,11 +368,9 @@ class TelegramBotClient(WebhookBotClient):
             # Get the intervention
             intervention = get_object_or_404(Intervention, slug=slug)
 
-            # Archive old conversation and create a new one
             conversation.archived = True
             conversation.save()
 
-            # Notify user
             self.send_message(
                 message.chat_id,
                 "Starting a new conversation (forgetting everything we talked about so far).",
@@ -379,10 +379,45 @@ class TelegramBotClient(WebhookBotClient):
             # Create new conversation
             new_conversation, _ = self.get_or_create_conversation(message)
 
-            # Begin the conversation with the intervention
-            conversation_started_ = self._initialise_new_conversation(
-                new_conversation, intervention, self.get_or_create_user(message), message.chat_id
+            # # Begin the conversation with the intervention
+            # conversation_started_ = self._initialise_new_conversation(
+            #     new_conversation, intervention, self.get_or_create_user(message), message.chat_id
+            # )
+
+            return JsonResponse({"status": "ok"}, status=200), None
+
+        except Exception as e:
+            logger.error(f"Error starting new conversation: {e}")
+            available = ", ".join(Intervention.objects.all().values_list("slug", flat=True))
+            return (
+                None,
+                f"Error starting intervention. Available interventions: {available}",
             )
+
+    def handle_clear_command(
+        self, args: List[str], message: InboundMessage, conversation
+    ) -> Tuple[Optional[HttpResponse], Optional[str]]:
+        """
+        Start a new conversation with the specified intervention.
+        """
+
+        # TODO is this logic right?
+        intervention = conversation.interventions().first()
+        try:
+
+            conversation.archived = True
+            conversation.save()
+            self.send_message(
+                message.chat_id,
+                "Starting a new conversation (forgetting everything we talked about so far).",
+            )
+            # Create new conversation
+            new_conversation, _ = self.get_or_create_conversation(message)
+
+            # # Begin the conversation with the intervention
+            # conversation_started_ = self._initialise_new_conversation(
+            #     new_conversation, intervention, self.get_or_create_user(message), message.chat_id
+            # )
 
             return JsonResponse({"status": "ok"}, status=200), None
 

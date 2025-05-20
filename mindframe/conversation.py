@@ -254,6 +254,7 @@ def respond(
     # - SWITCH TO THE TARGET STEP AND RESPOND
     possible_interruptions = with_intervention_step.intervention.interruptions.all()
     for i in possible_interruptions:
+        logger.info(f"Evaluating interruption {i}")
         # only do this if we're not already on the target step of the interruption
         if i.target_step == with_intervention_step:
             logger.info(
@@ -276,6 +277,10 @@ def respond(
 
         try:
             triggered = eval(i.trigger, {}, note.data)
+            logger.info(
+                f"Evaluating trigger expression: {i.trigger}, with {note.data} == {triggered}"
+            )
+
         except Exception as e:
             logger.error(f"Error evaluating trigger expression: {e}")
             triggered = False
