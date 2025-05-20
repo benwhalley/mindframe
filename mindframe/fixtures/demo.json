@@ -9,7 +9,6 @@
     "sem_ver": "1",
     "intervention_type": "therapy",
     "default_bot_user": null,
-    "is_default_intervention": true,
     "default_conversation_model": 4,
     "default_judgement_model": 4,
     "default_chunking_model": null
@@ -25,7 +24,6 @@
     "sem_ver": "1",
     "intervention_type": "client",
     "default_bot_user": null,
-    "is_default_intervention": false,
     "default_conversation_model": 4,
     "default_judgement_model": 4,
     "default_chunking_model": 3
@@ -41,7 +39,6 @@
     "sem_ver": "1",
     "intervention_type": "client",
     "default_bot_user": null,
-    "is_default_intervention": false,
     "default_conversation_model": 3,
     "default_judgement_model": null,
     "default_chunking_model": null
@@ -57,7 +54,6 @@
     "sem_ver": "1",
     "intervention_type": "client",
     "default_bot_user": null,
-    "is_default_intervention": false,
     "default_conversation_model": 3,
     "default_judgement_model": null,
     "default_chunking_model": null

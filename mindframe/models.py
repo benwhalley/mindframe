@@ -17,14 +17,14 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, OuterRef, Q, QuerySet, Subquery, Window
 from django.db.models.functions import RowNumber
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.forms.models import model_to_dict
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django_lifecycle import AFTER_CREATE, AFTER_UPDATE, LifecycleModel, hook
-from langfuse.decorators import langfuse_context, observe
+from langfuse.decorators import langfuse_context
 
 # use langfuse for tracing
 from langfuse.openai import OpenAI
@@ -35,10 +35,8 @@ from treebeard.ns_tree import NS_Node
 from llmtools.llm_calling import chatter, get_embedding, simple_chat
 from mindframe.chunking import CHUNKER_TEMPLATE
 from mindframe.settings import (
-    DEFAULT_CHUNKING_MODEL_NAME,
-    DEFAULT_CONVERSATION_MODEL_NAME,
-    DEFAULT_JUDGEMENT_MODEL_NAME,
     MINDFRAME_SHORTUUID_ALPHABET,
+    BotInterfaceProviders,
     BranchReasons,
     InterventionTypes,
     RoleChoices,
@@ -153,8 +151,6 @@ class Intervention(LifecycleModel):
                 email=f"{self.slug}{rl_}@example.com",
             )
             return s
-
-    is_default_intervention = models.BooleanField(default=False)
 
     # TODO - make this non nullable
     default_conversation_model = models.ForeignKey(
@@ -848,8 +844,11 @@ class Conversation(LifecycleModel):
     uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, editable=False)
     is_synthetic = models.BooleanField(default=False)
     archived = models.BooleanField(default=False)
-    # telegram_conversation_id = models.CharField(max_length=255, blank=True, null=True)
+
     chat_room_id = models.CharField(max_length=255, blank=True, null=True)
+    bot_interface = models.ForeignKey(
+        "BotInterface", on_delete=models.CASCADE, null=True, blank=True
+    )
 
     synthetic_turns_scheduled = models.PositiveSmallIntegerField(default=0)
 
@@ -1001,19 +1000,6 @@ class Turn(NS_Node):
 
     def __str__(self):
         return f"{self.uuid}"
-
-
-# class ChatInvite(LifecycleModel):
-#     invitor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="invites_sent")
-#     invite_code = models.CharField(max_length=255, unique=True)
-#     valid_until = models.DateTimeField(default=timezone.now+timezone.timedelta(months=1))
-
-#     def telegram_deeplink(self):
-#         from mindframe.settings import TELEGRAM_BOT_NAME
-#         if TELEGRAM_BOT_NAME:
-#             return f"https://t.me/{TELEGRAM_BOT_NAME}?start={self.invite_code}"
-#         else:
-#             return ValueError("TELEGRAM_BOT_NAME not set")
 
 
 class Nudge(LifecycleModel):
@@ -1203,3 +1189,34 @@ class ConversationalStrategy(LifecycleModel):
     key = AutoSlugField(populate_from="name")
     name = models.CharField(max_length=255)
     text = models.TextField()
+
+
+class BotInterface(LifecycleModel):
+
+    intervention = models.ForeignKey(
+        Intervention, on_delete=models.CASCADE, related_name="interfaces"
+    )
+
+    bot_name = models.CharField(max_length=255, null=True, blank=True)
+
+    bot_secret_token = models.CharField(max_length=255, null=True, blank=True)
+
+    webhook_validation_token = models.CharField(max_length=255, null=True, blank=True)
+
+    provider = models.CharField(
+        max_length=255,
+        choices=BotInterfaceProviders.choices,
+        default=BotInterfaceProviders.TELEGRAM,
+    )
+
+    def bot_client(self):
+        # todo make flexible
+        from .telegram import TelegramBotClient
+
+        return TelegramBotClient(bot_interface=self)
+
+    def webhook_url(self):
+        return settings.WEBHOOK_BASE_URL + reverse("bot_webhook", args=[self.pk])
+
+    def __str__(self):
+        return f"{self.provider} interface for {self.intervention}"

@@ -3,6 +3,7 @@ from copy import deepcopy
 
 from decouple import config
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 from django.urls import include, path
 from django.views.decorators.csrf import csrf_exempt
 
@@ -10,7 +11,7 @@ import mindframe.views.conversation as cv
 import mindframe.views.general as gv
 import mindframe.views.hyde as hv
 import mindframe.views.intervention as iv
-from mindframe.telegram import TelegramBotClient
+from mindframe.models import BotInterface
 
 
 def pickle_minimal_request(request):
@@ -28,35 +29,17 @@ def pickle_minimal_request(request):
 
 
 @csrf_exempt
-def telegram_webhook(request):
-    """
-    Django view function for handling Telegram webhook requests.
-    This function delegates processing to the BotController.
-    """
-    # capture the last request so we can capture requests and use for testing
-    # try:
-    #     with open("request.pickle", "wb") as f:
-    #         print(pickle_minimal_request(request))
-    #         f.write(pickle_minimal_request(request))
+def bot_interface(request, pk):
 
-    # except Exception as e:
-    #     print(f"Error serializing request data: {e}")
-
-    tgmb = TelegramBotClient(
-        bot_name=config("TELEGRAM_BOT_NAME", "MindframerBot"),
-        bot_secret_token=config("TELEGRAM_BOT_TOKEN", None),
-        webhook_url=config("TELEGRAM_WEBHOOK_URL", None),
-        webhook_validation_token=config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN", None),
-    )
-
-    return tgmb.process_webhook(request)
+    obj = get_object_or_404(BotInterface, pk=pk)
+    return obj.bot_client().process_webhook(request)
 
 
 urlpatterns = [
     path("chat/", include("mindframe.chat_urls")),
     path("interventions/", iv.InterventionListView.as_view(), name="intervention_list"),
     path("steps/<int:pk>/", iv.StepDetailView.as_view(), name="step_detail"),
-    path("telegram-webhook/", telegram_webhook, name="telegram_webhook"),
+    path("bot-webhook/<int:pk>", bot_interface, name="bot_webhook"),
     # Other URLs
     path(
         "start/from-turn/<str:turn_uuid>/",

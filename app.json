@@ -4,6 +4,6 @@
   "info": "https://github.com/crisward/dokku-require?tab=readme-ov-file",
   "dokku":{
     "predeploy": "python manage.py migrate",
-    "postdeploy": "python manage.py telegram --register && python manage.py telegram --info && echo 'Deployed!'"
+    "postdeploy": "python manage.py bots --register && python manage.py bots --info && echo 'Deployed!'"
   }
 }

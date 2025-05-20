@@ -24,22 +24,12 @@ from mindframe.bot import (
     WebhookBotClient,
 )
 from mindframe.conversation import listen, respond
-from mindframe.models import Conversation, CustomUser, Intervention, Turn
-from mindframe.settings import BranchReasons, TurnTypes
-from mindframe.tree import conversation_history, create_branch
+from mindframe.models import Conversation, CustomUser, Intervention
 
 logger = logging.getLogger(__name__)
 
 # Configuration constants
-TELEGRAM_WEBHOOK_VALIDATION_TOKEN = config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN", None)
 TELEGRAM_IP_RANGES = [ipaddress.ip_network(ip) for ip in ["149.154.160.0/20", "91.108.4.0/22"]]
-TELEGRAM_BOT_TOKEN = config("TELEGRAM_BOT_TOKEN", default=None)
-
-
-# TELEGRAM_BOT_TOKEN="7868408035:AAH6NxjV556QnesLYe_qt976Uby2cpnIXkI"
-# TELEGRAM_WEBHOOK_VALIDATION_TOKEN="cd7e8d19e80a49f3b083e237557d8f84"
-# TELEGRAM_WEBHOOK_URL="https://test.mindframe.llemma.net/telegram-webhook/"
-# TELEGRAM_BOT_NAME=MindFramerBot
 
 
 class TelegramBotClient(WebhookBotClient):
@@ -264,8 +254,13 @@ class TelegramBotClient(WebhookBotClient):
         Get or create a conversation for this chat.
         """
         conversation, is_new = Conversation.objects.get_or_create(
-            chat_room_id=message.chat_id, archived=False
+            chat_room_id=message.chat_id, archived=False, bot_interface=self.bot_interface
         )
+        user = self.get_or_create_user(message)
+        if is_new:
+            self._initialise_new_conversation(
+                conversation, self.intervention, user, message.chat_id
+            )
         return conversation, is_new
 
     def format_message(self, text: str) -> str:

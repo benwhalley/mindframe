@@ -7,8 +7,6 @@ from decouple import config
 from django.conf import settings
 from django.db import models
 
-TELEGRAM_BOT_NAME = config("TELEGRAM_BOT_NAME", None)
-
 DEFAULT_CONVERSATION_MODEL_NAME = config("DEFAULT_CONVERSATION_MODEL_NAME", "gpt-4o-mini")
 DEFAULT_JUDGEMENT_MODEL_NAME = config("DEFAULT_JUDGEMENT_MODEL_NAME", "gpt-4o-mini")
 DEFAULT_CHUNKING_MODEL_NAME = config("DEFAULT_CHUNKING_MODEL_NAME", "gpt-4o")
@@ -77,4 +75,8 @@ class StepJudgementFrequencyChoices(models.TextChoices):
     EXIT = "exit", "When exiting the step"
 
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
+class BotInterfaceProviders(models.TextChoices):
+    """Specifies when/how frequently a judgement should be made during a step."""
+
+    TELEGRAM = "telegram", "Telegram"
+    # MATRIX ...

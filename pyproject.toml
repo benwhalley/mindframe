@@ -34,6 +34,7 @@ dependencies = [
   "django-treebeard>=4.7.1",
   "djmail>=2.0.0",
   "gradio>=5.17.0",
+  "gunicorn>=23.0.0",
   "haystack-ai>=2.10.3",
   "honcho>=2.0.0",
   "instructor>=1.7.2",

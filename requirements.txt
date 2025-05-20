@@ -221,6 +221,8 @@ gradio-client==1.9.0
     # via gradio
 groovy==0.1.2
     # via gradio
+gunicorn==23.0.0
+    # via mindframe (pyproject.toml)
 h11==0.16.0
     # via
     #   httpcore
@@ -393,6 +395,7 @@ packaging==24.2
     #   findpython
     #   gradio
     #   gradio-client
+    #   gunicorn
     #   huggingface-hub
     #   langchain-core
     #   langfuse

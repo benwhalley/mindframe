@@ -11,13 +11,13 @@ repos:
     hooks:
       - id: black
 
-  # - repo: local
-  #   hooks:
-  #     - id: freeze-requirements
-  #       name: Freeze requirements with uv
-  #       entry: bash -c '/Users/benwhalley/.pyenv/shims/uv pip compile pyproject.toml -o requirements.txt'
-  #       language: system
-  #       pass_filenames: false
+  - repo: local
+    hooks:
+      - id: freeze-requirements
+        name: Freeze requirements with uv
+        entry: bash -c '/Users/benwhalley/.pyenv/shims/uv pip compile pyproject.toml -o requirements.txt'
+        language: system
+        pass_filenames: false
 
   # - repo: local
   #   hooks:

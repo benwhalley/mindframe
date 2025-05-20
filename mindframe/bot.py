@@ -111,163 +111,6 @@ class InboundMessage:
         return parts[1:] if len(parts) > 1 else []
 
 
-# class TypingIndicatorManager:
-#     """
-#     Manager for sending typing indicators across different platforms
-#     """
-#     def __init__(self, client):
-#         self.client = client
-#         self._typing_threads = {}  # chat_id -> thread
-#         self._stop_events = {}     # chat_id -> event
-
-#     def start_typing(self, chat_id: str, interval: float = 3.0) -> None:
-#         """
-#         Start sending typing indicators for a specific chat.
-
-#         Args:
-#             chat_id: The chat ID to send typing indicators to
-#             interval: How often to send typing indicators in seconds
-#         """
-#         # If already typing in this chat, do nothing
-#         if chat_id in self._typing_threads and self._typing_threads[chat_id].is_alive():
-#             return
-
-#         # Create a new stop event
-#         stop_event = threading.Event()
-#         self._stop_events[chat_id] = stop_event
-
-#         # Create and start the typing thread
-#         thread = threading.Thread(
-#             target=self._typing_loop,
-#             args=(chat_id, stop_event, interval),
-#             daemon=True  # Make thread a daemon so it exits when main thread exits
-#         )
-#         self._typing_threads[chat_id] = thread
-#         thread.start()
-
-#     def stop_typing(self, chat_id: str) -> None:
-#         """
-#         Stop sending typing indicators for a specific chat.
-
-#         Args:
-#             chat_id: The chat ID to stop typing indicators for
-#         """
-#         if chat_id in self._stop_events:
-#             self._stop_events[chat_id].set()
-
-#             # Wait for thread to finish if it's still alive
-#             if chat_id in self._typing_threads and self._typing_threads[chat_id].is_alive():
-#                 self._typing_threads[chat_id].join(timeout=0.5)
-
-#             # Clean up
-#             self._stop_events.pop(chat_id, None)
-#             self._typing_threads.pop(chat_id, None)
-
-#     def stop_all_typing(self) -> None:
-#         """Stop all typing indicators across all chats"""
-#         chat_ids = list(self._stop_events.keys())
-#         for chat_id in chat_ids:
-#             self.stop_typing(chat_id)
-
-#     def _typing_loop(self, chat_id: str, stop_event: threading.Event, interval: float) -> None:
-#         """
-#         Background loop that sends typing indicators until stopped.
-
-#         Args:
-#             chat_id: The chat ID to send typing indicators to
-#             stop_event: Event that will be set when typing should stop
-#             interval: How often to send typing indicators in seconds
-#         """
-#         while not stop_event.is_set():
-#             try:
-#                 self.client.send_typing_indicator(chat_id)
-#             except Exception as e:
-#                 logger.error(f"Error sending typing indicator: {e}")
-
-#             # Wait for the interval or until stopped
-#             stop_event.wait(timeout=interval)
-
-
-# class AsyncTypingIndicatorManager:
-#     """
-#     Manager for sending typing indicators across different platforms with async support
-#     """
-#     def __init__(self, client):
-#         self.client = client
-#         self._typing_tasks = {}  # chat_id -> task
-#         self._stop_events = {}   # chat_id -> event
-
-#     async def start_typing(self, chat_id: str, interval: float = 3.0) -> None:
-#         """
-#         Start sending typing indicators for a specific chat.
-
-#         Args:
-#             chat_id: The chat ID to send typing indicators to
-#             interval: How often to send typing indicators in seconds
-#         """
-#         # If already typing in this chat, do nothing
-#         if chat_id in self._typing_tasks and not self._typing_tasks[chat_id].done():
-#             return
-
-#         # Create a new stop event
-#         stop_event = asyncio.Event()
-#         self._stop_events[chat_id] = stop_event
-
-#         # Create and start the typing task
-#         task = asyncio.create_task(self._typing_loop(chat_id, stop_event, interval))
-#         self._typing_tasks[chat_id] = task
-
-#     async def stop_typing(self, chat_id: str) -> None:
-#         """
-#         Stop sending typing indicators for a specific chat.
-
-#         Args:
-#             chat_id: The chat ID to stop typing indicators for
-#         """
-#         if chat_id in self._stop_events:
-#             self._stop_events[chat_id].set()
-
-#             # Wait for task to finish if it's still running
-#             if chat_id in self._typing_tasks and not self._typing_tasks[chat_id].done():
-#                 try:
-#                     await asyncio.wait_for(self._typing_tasks[chat_id], timeout=0.5)
-#                 except asyncio.TimeoutError:
-#                     # If task doesn't finish in time, continue anyway
-#                     pass
-
-#             # Clean up
-#             self._stop_events.pop(chat_id, None)
-#             self._typing_tasks.pop(chat_id, None)
-
-#     async def stop_all_typing(self) -> None:
-#         """Stop all typing indicators across all chats"""
-#         chat_ids = list(self._stop_events.keys())
-#         for chat_id in chat_ids:
-#             await self.stop_typing(chat_id)
-
-#     async def _typing_loop(self, chat_id: str, stop_event: asyncio.Event, interval: float) -> None:
-#         """
-#         Background loop that sends typing indicators until stopped.
-
-#         Args:
-#             chat_id: The chat ID to send typing indicators to
-#             stop_event: Event that will be set when typing should stop
-#             interval: How often to send typing indicators in seconds
-#         """
-#         while not stop_event.is_set():
-#             try:
-#                 await self.client.send_typing_indicator(chat_id)
-#             except Exception as e:
-#                 logger.error(f"Error sending typing indicator: {e}")
-
-#             # Wait for the interval or until stopped
-#             try:
-#                 await asyncio.wait_for(stop_event.wait(), timeout=interval)
-#             except asyncio.TimeoutError:
-#                 # This is expected when the timeout expires before the event is set
-#                 pass
-
-
 class MindframeBotClient(ABC):
     """
     Abstract base class for bot clients.
@@ -277,7 +120,6 @@ class MindframeBotClient(ABC):
     def __init__(self):
         """Initialize the bot client"""
         pass
-        # self.typing_manager = None  # Will be set in subclasses
 
     @abstractmethod
     def get_or_create_user(self, message: InboundMessage) -> Any:
@@ -504,114 +346,55 @@ class MindframeBotClient(ABC):
 class WebhookBotClient(MindframeBotClient):
     """
     Base class for webhook-based bot clients like Telegram, Slack, etc.
-    This handles the synchronous pattern with webhooks.
     """
 
     bot_name: str = None
     webhook_url: str = None
     bot_secret_token: str = None
     webhook_validation_token: Optional[str] = None
-    client_type = ClientType.WEBHOOK
 
-    def __init__(self, bot_name, bot_secret_token, webhook_url=None, webhook_validation_token=None):
-        """Initialize webhook bot client"""
+    def __init__(self, bot_interface):
+        """Initialize a webhook bot client from BotInterface object"""
         super().__init__()
-        self.bot_name = bot_name
-        self.bot_secret_token = bot_secret_token
-        self.webhook_url = webhook_url
-        self.webhook_validation_token = webhook_validation_token
+        self.bot_name = bot_interface.bot_name
+        self.bot_secret_token = bot_interface.bot_secret_token
+        self.webhook_url = bot_interface.webhook_url()
+        self.webhook_validation_token = bot_interface.webhook_validation_token
+        # todo: make this a list?
+        self.intervention = bot_interface.intervention
 
-        # self.typing_manager = TypingIndicatorManager(self)
+    def setup_webhook(self):
+        raise NotImplementedError("Not implemented")
 
+    def delete_webhook(self):
+        raise NotImplementedError("Not implemented")
 
-# class ConnectionBotClient(MindframeBotClient):
-#     """
-#     Base class for connection-based bot clients like Matrix, etc.
-#     This handles the asynchronous pattern with persistent connections.
-#     """
+    def get_webhook_info(self):
+        raise NotImplementedError("Not implemented")
 
-#     bot_name:Optional[str] = None
-#     webhook_url:Optional[str] = None
-#     webhook_validation_token:Optional[str] = None
-#     bot_secret_token:Optional[str]= None
-#     client_type = ClientType.CONNECTION
+    def validate_request(self, request):
+        raise NotImplementedError("Not implemented")
 
+    def parse_message(self, request):
+        raise NotImplementedError("Not implemented")
 
-#     async def setup_typing_manager(self):
-#         """Initialize the async typing manager"""
-#         self.typing_manager = AsyncTypingIndicatorManager(self)
+    def get_or_create_conversation(self, message):
+        raise NotImplementedError("Not implemented")
 
-#     @abstractmethod
-#     async def initialize(self) -> bool:
-#         """
-#         Initialize the client connection.
-#         This is where async initialization happens.
+    def get_or_create_conversation(self, message):
+        raise NotImplementedError("Not implemented")
 
-#         Returns True if successful, False otherwise.
-#         """
-#         pass
+    def format_message(self, text):
+        raise NotImplementedError("Not implemented")
 
-#     @abstractmethod
-#     async def login(self) -> bool:
-#         """
-#         Log in to the platform.
-#         Returns True if successful, False otherwise.
-#         """
-#         pass
+    def send_message(self, chat_id, text):
+        raise NotImplementedError("Not implemented")
 
-#     @abstractmethod
-#     async def register_handlers(self) -> None:
-#         """
-#         Register message handlers with the platform client.
-#         This is where you'd set up callbacks for different event types.
-#         """
-#         pass
+    def send_typing_indicator(self, chat_id):
+        raise NotImplementedError("Not implemented")
 
-#     @abstractmethod
-#     async def start_listening(self) -> None:
-#         """
-#         Start listening for messages.
-#         This typically starts a long-running loop or connection.
-#         """
-#         pass
+    def handle_command(self, message, conversation):
+        raise NotImplementedError("Not implemented")
 
-#     @abstractmethod
-#     async def parse_message(self, event) -> InboundMessage:
-#         """
-#         Parse a platform event into a standardized InboundMessage.
-
-#         Args:
-#             event: The platform-specific event object
-
-#         Returns:
-#             InboundMessage object with standardized message data
-#         """
-#         pass
-
-#     @abstractmethod
-#     async def send_message(self, chat_id: str, text: str) -> bool:
-#         """
-#         Send a message to the platform.
-#         Returns True if successful, False otherwise.
-#         """
-#         pass
-
-#     @abstractmethod
-#     async def send_typing_indicator(self, chat_id: str) -> bool:
-#         """
-#         Send a typing indicator or equivalent to the platform.
-#         Returns True if successful, False otherwise.
-#         """
-#         pass
-
-#     async def start_typing(self, chat_id: str) -> None:
-#         """
-#         Start sending continuous typing indicators for a chat.
-#         """
-#         await self.typing_manager.start_typing(chat_id)
-
-#     async def stop_typing(self, chat_id: str) -> None:
-#         """
-#         Stop sending typing indicators for a chat.
-#         """
-#         await self.typing_manager.stop_typing(chat_id)
+    def process_webhook(self, request):
+        raise

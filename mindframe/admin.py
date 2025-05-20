@@ -20,6 +20,7 @@ from mindframe.tree import create_branch
 
 from .models import (
     LLM,
+    BotInterface,
     Conversation,
     CustomUser,
     Interruption,
@@ -387,14 +388,12 @@ class InterventionAdmin(admin.ModelAdmin):
     list_display = (
         "title_version",
         "ver",
-        "is_default_intervention",
         "intervention_type",
         "slug",
         "title",
         "start_session_button",
     )
     search_fields = ("title",)
-    list_editable = ["is_default_intervention"]
     readonly_fields = ["version"]
     autocomplete_fields = [
         "default_conversation_model",
@@ -740,3 +739,9 @@ class InterruptionAdmin(admin.ModelAdmin):
         "trigger",
         "resolution",
     ]
+
+
+@admin.register(BotInterface)
+class BotInterfaceAdmin(admin.ModelAdmin):
+    list_display = ["intervention", "provider", "webhook_url"]
+    autocomplete_fields = ["intervention"]

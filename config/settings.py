@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 REDIS_URL = config("REDIS_URL", default="redis://redis:6379/0")
 CHAT_URL = config("CHAT_URL", default=None)
 WEB_URL = config("WEB_URL", default=None)
+WEBHOOK_BASE_URL = config("WEBHOOK_BASE_URL", default=WEB_URL)
+
+if WEBHOOK_BASE_URL != WEB_URL:
+    logger.info(f"WEBHOOK_BASE_URL: {WEBHOOK_BASE_URL}")
 
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
