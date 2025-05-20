@@ -80,7 +80,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 INSTALLED_APPS = [
     "treebeard",
     "debug_toolbar",
-    "hijack",
     "crispy_forms",
     "crispy_bootstrap5",
     # "compressor",
@@ -109,7 +108,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "hijack.middleware.HijackUserMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 
@@ -324,8 +322,7 @@ DEBUG_TOOLBAR_PANELS = [
 ]
 
 LOGIN_REDIRECT_URL = "/"
-HIJACK_LOGIN_REDIRECT_URL = "/"
-HIJACK_LOGOUT_REDIRECT_URL = "/"
+
 
 MAGICLINK_EMAIL_STYLES = {
     "logo_url": "https://psybot.llemma.net/static/logoplymouth.png",

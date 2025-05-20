@@ -182,6 +182,7 @@ httpx==0.28.1
     #   gradio
     #   gradio-client
     #   langfuse
+    #   langsmith
     #   openai
     #   python-telegram-bot
     #   safehttpx
@@ -217,14 +218,30 @@ jiter==0.8.2
     # via
     #   instructor
     #   openai
+jsonpatch==1.33
+    # via langchain-core
+jsonpointer==3.0.0
+    # via jsonpatch
 jsonschema==4.23.0
     # via haystack-ai
 jsonschema-specifications==2025.4.1
     # via jsonschema
 kombu==5.5.3
     # via celery
+langchain==0.3.25
+    # via mindframe (pyproject.toml)
+langchain-core==0.3.60
+    # via
+    #   langchain
+    #   langchain-text-splitters
+langchain-text-splitters==0.3.8
+    # via langchain
 langfuse==2.60.3
     # via mindframe (pyproject.toml)
+langsmith==0.3.42
+    # via
+    #   langchain
+    #   langchain-core
 lazy-imports==0.4.0
     # via haystack-ai
 lxml==5.4.0
@@ -265,14 +282,18 @@ openai==1.76.0
     #   haystack-ai
     #   instructor
 orjson==3.10.16
-    # via gradio
+    # via
+    #   gradio
+    #   langsmith
 packaging==24.2
     # via
     #   gradio
     #   gradio-client
     #   gunicorn
     #   huggingface-hub
+    #   langchain-core
     #   langfuse
+    #   langsmith
 pandas==2.2.3
     # via gradio
 pandoc==2.4
@@ -336,7 +357,10 @@ pydantic==2.11.3
     #   haystack-ai
     #   haystack-experimental
     #   instructor
+    #   langchain
+    #   langchain-core
     #   langfuse
+    #   langsmith
     #   openai
 pydantic-core==2.33.1
     # via
@@ -384,6 +408,8 @@ pyyaml==6.0.2
     #   gradio
     #   haystack-ai
     #   huggingface-hub
+    #   langchain
+    #   langchain-core
     #   watchdog
 rcssmin==1.1.2
     # via django-compressor
@@ -405,9 +431,14 @@ requests==2.32.3
     #   haystack-ai
     #   huggingface-hub
     #   instructor
+    #   langchain
     #   langfuse
+    #   langsmith
     #   posthog
+    #   requests-toolbelt
     #   tiktoken
+requests-toolbelt==1.0.0
+    # via langsmith
 rich==13.9.4
     # via
     #   instructor
@@ -447,6 +478,8 @@ sniffio==1.3.1
     # via
     #   anyio
     #   openai
+sqlalchemy==2.0.41
+    # via langchain
 sqlparse==0.5.3
     # via
     #   django
@@ -461,6 +494,7 @@ tenacity==9.1.2
     # via
     #   haystack-ai
     #   instructor
+    #   langchain-core
 tiktoken==0.9.0
     # via mindframe (pyproject.toml)
 tomlkit==0.13.2
@@ -488,12 +522,14 @@ typing-extensions==4.13.2
     #   gradio-client
     #   haystack-ai
     #   huggingface-hub
+    #   langchain-core
     #   openai
     #   psycopg
     #   pydantic
     #   pydantic-core
     #   python-docx
     #   referencing
+    #   sqlalchemy
     #   typer
     #   typing-inspection
 typing-inspection==0.4.0
@@ -532,3 +568,5 @@ wrapt==1.17.2
     # via langfuse
 yarl==1.20.0
     # via aiohttp
+zstandard==0.23.0
+    # via langsmith
