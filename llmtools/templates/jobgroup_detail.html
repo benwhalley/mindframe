@@ -6,7 +6,7 @@
 {{block.super}}
 
 {% if not jobgroup.complete %}
-<meta http-equiv="refresh" content="30">
+<meta http-equiv="refresh" content="10">
 {% else %}
 <!-- No refresh -->
 {% endif %}
@@ -81,7 +81,7 @@
     {% if all_complete %}
     <p>All jobs are complete.</p>
     {% else %}
-    <p>Some jobs are still in progress. This page will refresh every 30 seconds.</p>
+    <p>Some jobs are still in progress. This page will refresh every 10 seconds until it's complete.</p>
     {% endif %}
 
     <hr>

@@ -1,7 +1,7 @@
 import json
 import re
 import uuid
-
+import logging
 from django.conf import settings
 from django.db import models
 from django.template import Context, Template
@@ -13,6 +13,8 @@ from actionable.mixins import ActionableObjectMixin, action_with_permission
 
 from .extract import extract_text
 from .llm_calling import chatter
+
+logger = logging.getLogger(__name__)
 
 
 class Tool(models.Model):
@@ -85,8 +87,9 @@ class JobGroup(ActionableObjectMixin, TimeStampedModel):
         if self.cancelled:
             raise Exception("Job group cancelled")
 
+        logger.info(f"Processing JobGroup: {self.id}")
         for job in self.jobs.all():
-            job.process()
+            job.run()
 
         if self.jobs.filter(completed__isnull=True).count() == 0:
             self.complete = True
@@ -102,6 +105,12 @@ class Job(TimeStampedModel):
     group = models.ForeignKey(JobGroup, on_delete=models.CASCADE, related_name="jobs", null=True)
     tool = models.ForeignKey(Tool, on_delete=models.CASCADE, null=True)
     cancelled = models.BooleanField(default=False)
+
+    def ready_to_run(self):
+        if self.group and self.group.cancelled:
+            return False
+
+        return not self.cancelled and not self.completed
 
     def get_tool(self):
         return self.tool or self.group.tool
@@ -130,10 +139,14 @@ class Job(TimeStampedModel):
     def filepath(self):
         return self.source_file and self.source_file.path or None
 
-    def process(self):
+    def run(self, force=False):
+        logger.info(f"Running job: {self.id}")
         try:
             if self.cancelled:
                 raise Exception("Job cancelled")
+
+            if self.completed and not force:
+                raise Exception("Job already completed")
 
             tool = self.get_tool()
             # Create a Template object
@@ -154,7 +167,6 @@ class Job(TimeStampedModel):
             self.save()
 
         except Exception as e:
-            print(str(e))
-            raise e
+            logger.error(f"Error running job: {self.id}: {e}")
 
         return result

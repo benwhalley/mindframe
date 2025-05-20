@@ -90,7 +90,6 @@ click==8.1.8
     #   click-didyoumean
     #   click-plugins
     #   click-repl
-    #   nltk
     #   typer
     #   uvicorn
 click-didyoumean==0.3.1
@@ -307,8 +306,6 @@ jmespath==1.0.1
     # via
     #   boto3
     #   botocore
-joblib==1.4.2
-    # via nltk
 jsonpatch==1.33
     # via langchain-core
 jsonpointer==3.0.0
@@ -371,8 +368,6 @@ multidict==6.4.3
     #   yarl
 networkx==3.4.2
     # via haystack-ai
-nltk==3.9.1
-    # via mindframe (pyproject.toml)
 numpy==2.2.5
     # via
     #   gradio
@@ -570,7 +565,6 @@ referencing==0.36.2
 regex==2024.11.6
     # via
     #   dateparser
-    #   nltk
     #   tiktoken
 requests==2.32.3
     # via
@@ -666,7 +660,6 @@ tqdm==4.67.1
     # via
     #   haystack-ai
     #   huggingface-hub
-    #   nltk
     #   openai
     #   proglog
 traitlets==5.14.3

@@ -19,7 +19,7 @@ from llmtools.extract import extract_text
 from llmtools.llm_calling import chatter
 
 from .models import Job, JobGroup, Tool
-from .tasks import run_job_group
+from .tasks import run_job
 
 
 class ToolInputForm(forms.Form):
@@ -100,13 +100,15 @@ def tool_input_view(request, pk):
                                         source_file=django_file,
                                         context={"source": text},
                                     )
-                run_job_group.delay(job_group.id)
+                # schedule jobs to run
+                [run_job.delay(i.id) for i in job_group.jobs.all()]
                 return redirect(job_group.get_absolute_url())
             else:
                 cleaned_data_str = {key: str(value) for key, value in form.cleaned_data.items()}
 
                 newjob = Job.objects.create(group=None, context=cleaned_data_str, tool=tool)
 
+                # do this synchronously and wait now
                 newjob.save()
                 result = newjob.process()
 
