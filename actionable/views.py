@@ -1,9 +1,10 @@
-from django.apps import apps
-from django.views import View
-from django.http import JsonResponse, HttpResponseForbidden, HttpResponseNotFound
-from django.utils.decorators import method_decorator
-from django.contrib.auth.decorators import login_required
 import rules
+from django.apps import apps
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseForbidden, HttpResponseNotFound, JsonResponse
+from django.utils.decorators import method_decorator
+from django.views import View
+
 from .mixins import ActionableObjectMixin
 
 

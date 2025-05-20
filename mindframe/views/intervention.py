@@ -1,14 +1,13 @@
 import logging
 
 from django.conf import settings
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.base import TemplateView
 from django.views.generic.edit import FormView
-from django.contrib.auth.mixins import PermissionRequiredMixin
 
 from mindframe.graphing import mermaid_diagram
 from mindframe.models import Intervention, Step

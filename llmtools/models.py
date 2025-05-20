@@ -2,19 +2,17 @@ import json
 import re
 import uuid
 
-from django.template import Template, Context
-
+from django.conf import settings
 from django.db import models
+from django.template import Context, Template
 from django.urls import reverse
 from django.utils import timezone
-from django.conf import settings
 from django_extensions.db.models import TimeStampedModel
 
+from actionable.mixins import ActionableObjectMixin, action_with_permission
 
 from .extract import extract_text
 from .llm_calling import chatter
-
-from actionable.mixins import action_with_permission, ActionableObjectMixin
 
 
 class Tool(models.Model):

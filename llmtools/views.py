@@ -7,13 +7,13 @@ from pathlib import Path
 from string import Template
 
 from django import forms
+from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.files import File
 from django.core.files.uploadedfile import UploadedFile
 from django.shortcuts import get_object_or_404, redirect, render
-from django.contrib.auth.decorators import permission_required
 from django.urls import reverse
 from django.views.generic import DetailView, ListView
-from django.contrib.auth.mixins import PermissionRequiredMixin
 
 from llmtools.extract import extract_text
 from llmtools.llm_calling import chatter
