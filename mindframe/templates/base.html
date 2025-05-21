@@ -23,6 +23,13 @@
 
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Ancizar+Sans:ital,wght@0,100..1000;1,100..1000&display=swap" rel="stylesheet">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Ancizar+Sans:ital,wght@0,100..1000;1,100..1000&family=Inconsolata:wght@200..900&display=swap" rel="stylesheet">
 
 
     {% block extra_head %}{% endblock %}
@@ -45,21 +52,41 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
 
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'intervention_list' %}">Bots</a>
+
+                    <li>
+                        <a class="nav-link" href="{% url 'about' %}">About mindframe</a>
                     </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'intervention_list' %}">Interventions</a>
+                    </li>
+
 
 
                     <!-- <li class="nav-item">
                         <a class="nav-link" href="{% url 'import_conversation' %}">Import Conversation</a>
                     </li> -->
-                    <!-- a menu item for tools -->
+
+
+                     {% if user.is_staff %}
                     <li>
                         <a class="nav-link" href="{% url 'tool_list' %}">Tools</a>
                     </li>
+                    {% endif %}
+
+
+                    {% if user.is_staff %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'create_referal' %}">Initiate conversation</a>
+                    </li>
+                    {% endif %}
+
+
+                    {% if user.is_staff %}
                     <li class="nav-item">
                         <a class="nav-link" href="/admin/">Admin</a>
                     </li>
+                    {% endif %}
 
                 </ul>
 

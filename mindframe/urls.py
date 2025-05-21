@@ -6,11 +6,13 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import include, path
 from django.views.decorators.csrf import csrf_exempt
+from django.views.generic.base import TemplateView
 
 import mindframe.views.conversation as cv
 import mindframe.views.general as gv
 import mindframe.views.hyde as hv
 import mindframe.views.intervention as iv
+import mindframe.views.referals as rv
 from mindframe.models import BotInterface
 
 
@@ -77,5 +79,8 @@ urlpatterns = [
         name="conversation_mermaid",
     ),
     path("rag-test/", hv.RAGHyDEComparisonView.as_view(), name="rag_test"),
-    path("", gv.IndexView.as_view(), name="index"),  # Index page
+    path("referal/create/", rv.CreateReferalView.as_view(), name="create_referal"),
+    path("referal/<str:uuid>/", rv.ReferalDetailView.as_view(), name="referal_detail"),
+    path("", TemplateView.as_view(template_name="index.html"), name="index"),
+    path("abbout", TemplateView.as_view(template_name="about.html"), name="about"),
 ]

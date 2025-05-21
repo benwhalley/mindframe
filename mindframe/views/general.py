@@ -10,7 +10,6 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.text import slugify
-from django.views.generic.base import TemplateView
 from django.views.generic.detail import DetailView
 from django.views.generic.edit import FormView
 
@@ -19,10 +18,6 @@ from mindframe.models import CustomUser, Intervention, Turn
 from mindframe.silly import silly_name
 
 logger = logging.getLogger(__name__)
-
-
-class IndexView(LoginRequiredMixin, TemplateView):
-    template_name = "index.html"
 
 
 def start_gradio_chat(

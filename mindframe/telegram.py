@@ -3,28 +3,28 @@ TODO: Design decision about whether to capture system messages like response to 
 """
 
 import html
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from mindframe.models import Referal, Intervention
+
 import ipaddress
 import json
 import logging
-import traceback
 from typing import Any, Dict, List, Optional, Tuple
-
+import traceback
 import requests
-from decouple import config
-from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404
-from django.urls import reverse
-from telegram import Bot, Update
+from telegram import Update
 
 from mindframe.bot import (
     InboundMessage,
     MediaContent,
     MediaType,
-    ReactionContent,
     WebhookBotClient,
 )
 from mindframe.conversation import listen, respond
-from mindframe.models import Conversation, CustomUser, Intervention
+
+from django.http import HttpResponse
+from mindframe.models import Conversation, CustomUser
 
 logger = logging.getLogger(__name__)
 
@@ -313,13 +313,14 @@ class TelegramBotClient(WebhookBotClient):
             return False
 
     def handle_command(
-        self, message: InboundMessage, conversation
+        self, message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], Optional[str]]:
         """
         Handle Telegram-specific commands.
         """
         # Command handler mapping
         command_handlers = {
+            "start": self.handle_start_command,
             "help": self.handle_help_command,
             "new": self.handle_new_command,
             "clear": self.handle_clear_command,
@@ -330,13 +331,15 @@ class TelegramBotClient(WebhookBotClient):
         }
 
         if message.command in command_handlers:
-            return command_handlers[message.command](message.command_args, message, conversation)
+            return command_handlers[message.command](
+                message.command_args, message, conversation, request
+            )
 
         # If command not recognized, return a message about unknown command
         return None, f"Unknown command: /{message.command}. Type /help for available commands."
 
     def handle_help_command(
-        self, args: List[str], message: InboundMessage, conversation
+        self, args: List[str], message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], str]:
         """
         Help command implementation for Telegram.
@@ -353,8 +356,33 @@ class TelegramBotClient(WebhookBotClient):
         )
         return None, help_text
 
+    def handle_start_command(
+        self, args: List[str], message: InboundMessage, conversation, request
+    ) -> Tuple[Optional[HttpResponse], Optional[str]]:
+        """
+        Start a new conversation with the specified intervention.
+        """
+        if not args:
+            logger.info(f"No args for start command: {args}")
+            return (
+                None,
+                "...",
+            )
+        token = args[0].strip()
+        referal = Referal.objects.get(uuid=token)
+
+        conversation.archived = True
+        conversation.save()
+
+        conversation = referal.conversation
+        conversation.chat_room_id = message.chat_id
+        conversation.save()
+
+        self.send_message(message.chat_id, "Using referal code ...")
+        return JsonResponse({"status": "ok"}, status=200), None
+
     def handle_new_command(
-        self, args: List[str], message: InboundMessage, conversation
+        self, args: List[str], message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], Optional[str]]:
         """
         Start a new conversation with the specified intervention.
@@ -422,7 +450,7 @@ class TelegramBotClient(WebhookBotClient):
             )
 
     def handle_settings_command(
-        self, args: List[str], message: InboundMessage, conversation
+        self, args: List[str], message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], str]:
         """
         Settings command implementation for Telegram.
@@ -432,6 +460,7 @@ class TelegramBotClient(WebhookBotClient):
 
     # METHODS TO ACTUALLY HANDLE USER INPUT
     def process_webhook(self, request) -> HttpResponse:
+        """Process an incoming webhook request from Telegram."""
 
         try:
             message = self.parse_message(request)
@@ -439,7 +468,7 @@ class TelegramBotClient(WebhookBotClient):
             conversation, is_new = self.get_or_create_conversation(message)
 
             if message.command:
-                response, reply_text = self.handle_command(message, conversation)
+                response, reply_text = self.handle_command(message, conversation, request)
                 if response is not None:
                     return response
                 if reply_text is not None:
@@ -472,6 +501,7 @@ class TelegramBotClient(WebhookBotClient):
     def continue_webhook_conversation(self, user, conversation, message: InboundMessage):
         """Continue an existing conversation for a webhook client"""
         self.send_typing_indicator(message.chat_id)
+        logger.info(f"Continuing conversation {conversation.uuid} with user {user.username}")
         turn_to_respond_to = conversation.turns.all().last()
         user_turn = listen(turn_to_respond_to, message.text, user)
         bot_turn = respond(user_turn)

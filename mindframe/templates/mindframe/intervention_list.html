@@ -1,18 +1,28 @@
 {% extends "base.html" %}
 {% block content %}
-    <h1>Interventions</h1>
+
+
+<h1>Interventions</h1>
 
     {% for i in object_list %}
     <hr>
         <div class="row">
             <div class="col-4">
-                <h2><code>{{i.slug}}</code> <br>{{i.title}}</h2>
+                <h2>
+                    {% if user.is_authenticated %}
+                    <code>{{i.slug}}</code>
+                    <br>
+                    {% endif %}
+                    {{i.title}}</h2>
+
+                    <p class="lead small">{{i.description|default:""}}</p>
+
+                {% if user.is_authenticated %}
                 <a class="btn btn-sm btn-outline-danger mr-1" href="{% url 'start_gradio_chat' i.slug %}">Start Chat</a>
 
                 <a class="btn btn-sm btn-outline-primary" href="{% url 'admin:mindframe_intervention_change' i.id %}">Edit</a>
 
-
-
+                {% endif %}
             </div>
             <div class="col-1"></div>
             <div class="col-7">

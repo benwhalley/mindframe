@@ -26,13 +26,13 @@ class StepDetailView(PermissionRequiredMixin, LoginRequiredMixin, DetailView):
         return ct
 
 
-class InterventionListView(PermissionRequiredMixin, LoginRequiredMixin, ListView):
-    permission_required = "mindframe.view_intervention"
+class InterventionListView(ListView):
+    # permission_required = "mindframe.view_intervention"
     model = Intervention
 
     def get_context_data(self, **kwargs):
         ct = super().get_context_data(**kwargs)
-        ct["object_list"] = Intervention.objects.all()
+        ct["object_list"] = Intervention.objects.filter(public=True)
         for i in ct["object_list"]:
             i.mermaid = mermaid_diagram(i)
         return ct

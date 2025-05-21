@@ -61,6 +61,9 @@ class ToolListView(PermissionRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        if not self.request.user.is_authenticated:
+            return context
+
         context["jobgroups"] = JobGroup.objects.filter(owner=self.request.user).order_by("-created")
         return context
 

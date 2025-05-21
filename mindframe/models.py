@@ -28,6 +28,7 @@ from langfuse.decorators import langfuse_context
 
 # use langfuse for tracing
 from langfuse.openai import OpenAI
+from model_utils.models import SoftDeletableModel, TimeFramedModel, TimeStampedModel
 from pgvector.django import HnswIndex, L2Distance, VectorField
 from recurrent.event_parser import RecurringEvent
 from treebeard.ns_tree import NS_Node
@@ -119,6 +120,16 @@ class Intervention(LifecycleModel):
     slug = AutoSlugField(populate_from="title", unique=True, editable=True, always_update=False)
     version = models.CharField(max_length=64, null=True, editable=False)
     sem_ver = models.CharField(max_length=64, null=True, editable=True)
+
+    public = models.BooleanField(
+        default=False,
+        help_text="Whether this intervention is publicly visible on the web frontend.",
+    )
+    description = models.TextField(
+        blank=True,
+        null=True,
+        help_text="A description of the intervention, for use in the web frontend.",
+    )
 
     intervention_type = models.CharField(
         choices=InterventionTypes.choices,
@@ -566,25 +577,35 @@ class Note(models.Model):
         related_name="notes",
     )
 
-    judgement = models.ForeignKey("Judgement", on_delete=models.CASCADE, related_name="notes")
+    judgement = models.ForeignKey(
+        "Judgement", on_delete=models.CASCADE, related_name="notes", null=True, blank=True
+    )
+
     timestamp = models.DateTimeField(default=timezone.now)
 
     # for clinical Note type records, save a 'text' key
     # for other return types, save multiple string keys
     # type of this values is Dict[str, str | int]
-    # todo? add some validatio?
+    # todo? add some validation?
     data = models.JSONField(default=dict, null=True, blank=True)
 
     class Meta:
         ordering = ["timestamp"]
 
+    def variable_name(self):
+        # compute a variable name for the data to be accessed in prompts
+        # if from a judgement, use that
+        # if from a referal, use the keyword  'data'
+        if self.judgement:
+            return self.judgement.variable_name
+        if self.referal:
+            return "external"
+
     def val(self):
         return Box(self.data, default_box=True)
 
     def __str__(self):
-        return (
-            f"[{self.judgement.variable_name}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
-        )
+        return f"[{self.judgement and self.judgement.variable_name or '-'}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
 
 
 ### QuerySet for MemoryChunk (Supports Chaining)
@@ -856,6 +877,15 @@ class Conversation(LifecycleModel):
     def last_turn_added(self):
         return self.turns.all().order_by("-timestamp").first()
 
+    def chat_url(self):
+        # redirect to gradio chat at the tip of the conversation
+        return reverse(
+            "start_gradio_chat_from_turn",
+            args=[
+                self.turns.all().order_by("depth").last().uuid,
+            ],
+        )
+
     def get_absolute_url(self):
         return settings.WEB_URL + reverse(
             "conversation_transcript",
@@ -877,9 +907,9 @@ class Conversation(LifecycleModel):
             pk__in=self.turns.all().values_list("step__intervention__pk", flat=True)
         )
 
-    class Meta:
-        # order by timestamp of the last turn added
-        ordering = ["-turns__timestamp"]
+    # class Meta:
+    #     # order by timestamp of the last turn added
+    #     ordering = ["-turns__timestamp"]
 
 
 class Turn(NS_Node):
@@ -991,7 +1021,8 @@ class Turn(NS_Node):
     def notes_data(self):
         # Assumes Note has a ForeignKey to Turn with related_name="notes"
         return "\n".join(
-            f"<{note.judgement.variable_name}>: {note.data}" for note in self.notes.all()
+            f"<{note.judgement and note.judgement.variable_name}>: {note.data}"
+            for note in self.notes.all()
         )
 
     notes_data.short_description = "Notes Data"
@@ -1192,31 +1223,97 @@ class ConversationalStrategy(LifecycleModel):
     text = models.TextField()
 
 
+class ReferalToken(SoftDeletableModel, TimeFramedModel, LifecycleModel):
+    label = models.CharField(max_length=255, blank=True, null=True)
+    token = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False)
+    permitted_interventions = models.ManyToManyField("Intervention", blank=True)
+    valid_for_groups = models.ManyToManyField("auth.Group", blank=True)
+
+    def __str__(self):
+        return f"ReferalToken: {self.label and self.label or 'Unlabelled'} <{self.token}>"
+
+    def user_valid(self, user):
+        if not self.valid_for_groups.exists():
+            return True
+
+        if user.groups.filter(pk__in=self.valid_for_groups.values_list("pk", flat=True)).exists():
+            return True
+        else:
+            logger.warning(
+                f"User {username} not found in valid_for_groups for ReferalToken {self.token}"
+            )
+
+
+class Referal(TimeStampedModel, LifecycleModel):
+    """
+    Records when an external service refers a user to Mindframe
+
+    Referals are created with a form post containing the following Json data
+
+    {
+        "token": str, # must be a valid ReferalToken.token
+        "intervention": str, # must be a valid Intervention.slug
+        "username": str, # must be a valid CustomUser.username AND username_valid() must be True
+        "data": {str: str} # keys are valid python identifiers; values are also strings.
+    }
+
+    When valid, the form post creates a new Conversation object, using the intervention specified via the conversation.initialise_new_conversation function.
+
+    The data field is validated and stored in a new Note object on the first user turn of the Conversation. A reference to the Note is stored in the Referal object.
+
+    After creation, the API returns the uuid for the Referal like this:
+
+    {
+        "referal": str  # the new Referal.uuid
+    }
+    """
+
+    uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False)
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name="referals"
+    )
+    source = models.ForeignKey(
+        "ReferalToken", blank=False, null=False, related_name="referals", on_delete=models.PROTECT
+    )
+    # used to record metadata about the referal http request - whatever we can capture
+    log = models.JSONField(default=dict, null=True, blank=True)
+    note = models.OneToOneField(
+        "Note", blank=True, null=True, on_delete=models.CASCADE, related_name="referal"
+    )
+
+    def external_chat_link(self):
+        if self.conversation.bot_interface:
+            bn = self.conversation.bot_interface.bot_name
+            telegram_link = f"https://t.me/{bn}?start={self.uuid}"
+            return telegram_link
+        else:
+            return None
+
+    def __str__(self):
+        return f"{self.source.token[:8]} created -> {self.conversation}"
+
+
 class BotInterface(LifecycleModel):
 
+    # allow to be a list with a default
     intervention = models.ForeignKey(
         Intervention, on_delete=models.CASCADE, related_name="interfaces"
     )
-
-    dev_mode = models.BooleanField(default=False)
-
-    bot_name = models.CharField(max_length=255, null=True, blank=True)
-
-    bot_secret_token = models.CharField(max_length=255, null=True, blank=True)
-
-    webhook_validation_token = models.CharField(max_length=255, null=True, blank=True)
-
     provider = models.CharField(
         max_length=255,
         choices=BotInterfaceProviders.choices,
         default=BotInterfaceProviders.TELEGRAM,
     )
+    bot_name = models.CharField(max_length=255, null=True, blank=True)
+    dev_mode = models.BooleanField(default=False)
+    bot_secret_token = models.CharField(max_length=255, null=True, blank=True)
+    webhook_validation_token = models.CharField(max_length=255, null=True, blank=True)
 
     provider_info = models.JSONField(null=True, blank=True)
     provider_info_updated = models.DateTimeField(null=True, blank=True)
 
     def bot_client(self):
-        # todo make flexible
+        # todo make flexible to diff subclasses
         from .telegram import TelegramBotClient
 
         return TelegramBotClient(bot_interface=self)

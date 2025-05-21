@@ -9,9 +9,7 @@ Reduce contact points in group interventions?
 # Roadmap for `mindframe` development
 
 
-DataPoint/DataPackage/Observation/Note
-Allow arbitrary dumps of key=val data to be posted to a conversation or turn
-from externally?
+Test async version of webhook and chat UI
 
 
 ComputedData

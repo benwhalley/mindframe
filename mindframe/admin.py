@@ -32,6 +32,8 @@ from .models import (
     MemoryChunk,
     Note,
     Nudge,
+    Referal,
+    ReferalToken,
     ScheduledNudge,
     Step,
     StepJudgement,
@@ -160,6 +162,7 @@ class ConversationAdmin(admin.ModelAdmin):
     readonly_fields = ["uuid"]
     list_display = [
         "__str__",
+        "id",
         "last_turn_timestamp",
         "summary",
         "speakers",
@@ -390,6 +393,7 @@ class InterventionAdmin(admin.ModelAdmin):
     list_display = (
         "title_version",
         "ver",
+        "public",
         "intervention_type",
         "slug",
         "title",
@@ -401,7 +405,9 @@ class InterventionAdmin(admin.ModelAdmin):
         "default_conversation_model",
         "default_judgement_model",
         "default_chunking_model",
+        "default_bot_user",
     ]
+    list_editable = ["public"]
 
     def title_version(self, obj):
         return f"{obj.title} ({obj.sem_ver})"
@@ -741,6 +747,24 @@ class InterruptionAdmin(admin.ModelAdmin):
         "trigger",
         "resolution",
     ]
+
+
+@admin.register(ReferalToken)
+class ReferalTokenAdmin(admin.ModelAdmin):
+    list_display = ("token", "start", "end")
+    list_filter = ("start", "end")
+    search_fields = ("token",)
+    autocomplete_fields = ["permitted_interventions", "valid_for_groups"]
+    readonly_fields = ["token"]
+
+
+@admin.register(Referal)
+class ReferalAdmin(admin.ModelAdmin):
+    list_display = ("uuid", "source", "conversation", "created")
+    list_filter = ("created",)
+    search_fields = ("uuid", "source__token", "conversation__uuid")
+    autocomplete_fields = ["conversation", "source", "note"]
+    readonly_fields = ["uuid", "created"]
 
 
 @admin.register(BotInterface)

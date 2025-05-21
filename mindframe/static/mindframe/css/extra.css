@@ -1,6 +1,13 @@
-.btn-group-xs > .btn, .btn-xs {
-  padding: .25rem .4rem;
-  font-size: .75rem;
-  line-height: .5;
-  border-radius: .2rem;
+body {
+  font-family: "Ancizar Sans", sans-serif;
+}
+
+/* Force override for common sans/serif elements */
+html, body, p, span, div, h1, h2, h3, h4, h5, h6, a, li, ul, ol, blockquote, button, input, select, textarea, label, strong, em, b, i {
+  font-family: "Ancizar Sans", sans-serif;
+}
+
+/* Preserve monospace fonts */
+code, pre, kbd, samp, tt {
+  font-family: "Inconsolata", monospace;
 }

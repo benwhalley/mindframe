@@ -151,6 +151,9 @@ def speaker_context(turn) -> dict:
     # a Turn is created with a history of previous turns, and for a specific speaker
     # this means we can navigate up the tree to identify context which this speaker
     # would have access to when making their contribution
+    """
+    > speaker_context(Turn.objects.all().last())
+    """
 
     history_list = conversation_history(turn)
     history = get_ordered_queryset(Turn, [i.pk for i in history_list])
@@ -158,6 +161,7 @@ def speaker_context(turn) -> dict:
     speaker_turns = history.filter(speaker=turn.speaker)
     speaker_notes = Note.objects.filter(turn__pk__in=[i.pk for i in speaker_turns])
 
+    # we want to know how many turns ago the current Step started
     # find the first turn with the same step, then count how many descendents it has in the history to count N turns from the start of this Step; +1 to include the first in the count
     try:
         n_turns_step = (
@@ -174,6 +178,7 @@ def speaker_context(turn) -> dict:
         "speaker_turns": speaker_turns,
         "data": make_data_variable(speaker_notes),
     }
+
     logger.info(f"Prompt context:\n{pprint.pformat(context, width=1)}")
     return context
 
