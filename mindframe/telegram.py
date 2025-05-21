@@ -249,7 +249,9 @@ class TelegramBotClient(WebhookBotClient):
 
         return user
 
-    def get_or_create_conversation(self, message: InboundMessage) -> Tuple[Any, bool]:
+    def get_or_create_conversation(
+        self, message: InboundMessage, intervention=None
+    ) -> Tuple[Any, bool]:
         """
         Get or create a conversation for this chat.
         Initialises the conversation if it doesn't exist already with the user and intervention.
@@ -260,7 +262,7 @@ class TelegramBotClient(WebhookBotClient):
         user = self.get_or_create_user(message)
         if is_new:
             self._initialise_new_conversation(
-                conversation, self.intervention, user, message.chat_id
+                conversation, intervention or self.intervention, user, message.chat_id
             )
         return conversation, is_new
 
@@ -368,17 +370,18 @@ class TelegramBotClient(WebhookBotClient):
         try:
             # Get the intervention
             intervention = get_object_or_404(Intervention, slug=slug)
-
+            logger.info(f"Started new conversation using {intervention}")
             conversation.archived = True
             conversation.save()
 
             self.send_message(
                 message.chat_id,
-                "Starting a new conversation (forgetting everything we talked about so far).",
+                f"Starting a new conversation with {intervention.title}. \n\nForgetting everything we talked about so far)...",
             )
 
-            # Create new conversation
-            new_conversation, _ = self.get_or_create_conversation(message)
+            new_conversation, _ = self.get_or_create_conversation(
+                message, intervention=intervention
+            )
 
             return JsonResponse({"status": "ok"}, status=200), None
 
@@ -397,9 +400,6 @@ class TelegramBotClient(WebhookBotClient):
         Start a new conversation with the specified intervention.
         """
 
-        # TODO is this logic right?
-
-        intervention = conversation.interventions().first()
         try:
 
             conversation.archived = True
