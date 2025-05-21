@@ -1,3 +1,11 @@
+# Research ideas
+
+Long term qual interviews
+Maintenance tools between sessions
+Maintenance after intervention ends 
+Reduce contact points in group interventions?
+
+
 # Roadmap for `mindframe` development
 
 
