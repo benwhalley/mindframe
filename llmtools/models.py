@@ -56,11 +56,16 @@ class ToolKey(models.Model):
 
 class JobGroup(ActionableObjectMixin, TimeStampedModel):
     tool = models.ForeignKey(Tool, on_delete=models.CASCADE)
-    complete = models.BooleanField(default=False)
     cancelled = models.BooleanField(default=False)
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="job_groups"
     )
+
+    def complete(self):
+        return all(self.jobs.all().values_list("completed", flat=True))
+
+    def in_progress(self):
+        return (not self.cancelled) and (not self.complete)
 
     def status(self):
         if self.cancelled:

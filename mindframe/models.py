@@ -192,6 +192,7 @@ class Intervention(LifecycleModel):
 
     class Meta:
         unique_together = ("title", "version", "sem_ver")
+        ordering = ["slug"]
 
 
 class StepJudgementManager(models.Manager):

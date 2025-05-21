@@ -5,13 +5,8 @@
     {% for i in object_list %}
     <hr>
         <div class="row">
-            <div class="col-5">
-                <h2>{{i.title}}</h2>
-                <ul>
-                    <li>Short code: <code>{{i.slug}}</code></li>
-                    <li>Default chat model: {{i.default_conversation_model}}</li>
-
-                </ul>
+            <div class="col-4">
+                <h2><code>{{i.slug}}</code> <br>{{i.title}}</h2>
                 <a class="btn btn-sm btn-outline-danger mr-1" href="{% url 'start_gradio_chat' i.slug %}">Start Chat</a>
 
                 <a class="btn btn-sm btn-outline-primary" href="{% url 'admin:mindframe_intervention_change' i.id %}">Edit</a>
@@ -19,8 +14,9 @@
 
 
             </div>
+            <div class="col-1"></div>
             <div class="col-7">
-                <div class="mermaid">
+                <div class="mermaid d-none">
                     {{ i.mermaid|safe }}
                 </div>
                 <div class="d-none">
@@ -34,11 +30,17 @@
     {% endfor %}
 
 
+<!-- render mermaid, delay visible till rendered -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({ startOnLoad: true });
 
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-    <script>
-        mermaid.initialize({ startOnLoad: true });
-    </script>
+    document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".mermaid").forEach((el) => {
+        el.classList.remove("d-none");
+    });
+});
+</script>
 
 
 {% endblock %}

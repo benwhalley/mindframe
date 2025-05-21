@@ -18,16 +18,16 @@
 <div class="container">
     <div class="row">
 
-        <div class="col">
+        <div class="col-6">
 
             <h1>Job Group:
                 <code>{{jobgroup.id}}</code>
             </h1>
 
 
-             {% if not jobgroup.cancelled %}
+             {% if jobgroup.in_progress %}
              <button
-                class="btn btn-danger"
+                class="float-end btn btn-danger"
                 hx-post="{% url 'action' app='llmtools' model='JobGroup' identifier=jobgroup.pk %}"
                 hx-vals='{"action": "cancel_jobs"}'
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
@@ -39,22 +39,23 @@
 
             <h5>Status</h5>
 
-            <li>{{ jobgroup.status }}
-            </li>
-
-            <li><a href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Details</a></li>
-
-            <li>
+             <li class="mb-2">
                 Tool used:
         <a href="{{jobgroup.tool.get_absolute_url}}">{{jobgroup.tool.name}}</a>
             </li>
 
+            <li>Status: {{ jobgroup.status }}
+            <li>All jobs completed: {{jobgroup.complete}}</li>
+            <li>Cancelled: {{jobgroup.cancelled}}</li>
+
+            </li>
+
+            <li class="mt-2">
+                <a href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Details</a>
+            </li>
 
 
-
-<hr>
-
-<h5>Jobs</h5>
+<h5 class="mt-4">Jobs</h5>
 
     <ul style="list-style-type: none;">
         {% for job in jobs %}
@@ -64,14 +65,15 @@
             <span>Cancelled</span>
             {% endif %}
 
+            <p class="small col-11" style="word-break: break-all;">
             {% if job.completed and not job.cancelled %}
                 <span style="color:green;">&#10004;</span>  {# ✔ U+2714 #}
             {% else %}
                 <span style="color:red;">&#10060;</span>   {# ❌ U+274C #}
             {% endif %}
 
-
-            <span class="small">{{ job }} </span>
+                {{ job }}
+            </p>
 
 
 
@@ -84,11 +86,15 @@
     <p>Some jobs are still in progress. This page will refresh every 10 seconds until it's complete.</p>
     {% endif %}
 
-    <hr>
+    <hr class="mb-5">
+</div>
+
+<div class="col-6">
 
 <h5>Results
-    <button class="btn btn-outline-primary" onclick="copyJSON()">Copy JSON</button>
-
+    &nbsp;&nbsp;
+    <button class="btn btn-sm mb-2 btn-outline-primary" onclick="copyJSON()">
+        Copy JSON</button>
 </h5>
 
 <pre class="card card-body small" id="json-output" style="white-space: pre; font-size:.7em;">{{ jobgroup.json }}</pre>
@@ -103,6 +109,10 @@ function copyJSON() {
     });
 }
 </script>
+
+</div>
+
+</div>
 
 </div>
 </div>
