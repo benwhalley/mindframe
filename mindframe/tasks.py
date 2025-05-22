@@ -1,22 +1,34 @@
+# tasks.py
 import logging
 
+from box import Box
 from celery import shared_task
 from decouple import config
 from django.apps import apps
 from django.db import transaction
 from django.db.models import OuterRef, Subquery
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from mindframe.conversation import respond
-from mindframe.models import ScheduledNudge
+from mindframe.models import BotInterface, ScheduledNudge
 from mindframe.tree import conversation_history
 
 logger = logging.getLogger(__name__)
 
 
 @shared_task
-def execute_nudges():
+def process_webhook_async(pk, request_data):
+    obj = get_object_or_404(BotInterface, pk=pk)
+    # Box allows dotted access so mostly works to fake a request
+    # with attrs like `request.POST`
+    fake_request = Box(request_data)
+    obj.bot_client().process_webhook(fake_request)
+    return True
 
+
+@shared_task
+def execute_nudges():
     last_scheduled_nudges_to_execute = ScheduledNudge.objects.due_now()
     logger.info(f"Found {len(last_scheduled_nudges_to_execute)} nudges to execute")
 

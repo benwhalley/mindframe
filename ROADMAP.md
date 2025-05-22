@@ -147,6 +147,12 @@ Some models are very simple classifiers and don't need ChatGPT 4. We should thin
 
 ### Queuing and scheduling
 
+
+When a Bot user sends multiple messages in a row, the bot will process each in turn using celery. This might be wasteful... it could be better to kill existing tasks when recieving new input? Keep a key/lock/semaphore on the conversation model?
+
+
+
+----
 At present, when we add Judements to step all are run against the LLM before
 the transition is evaluated.
 

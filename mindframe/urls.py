@@ -30,11 +30,30 @@ def pickle_minimal_request(request):
     return pickle.dumps(minimal_data)
 
 
+# @csrf_exempt
+# def bot_interface(request, pk):
+#     obj = get_object_or_404(BotInterface, pk=pk)
+#     return obj.bot_client().process_webhook(request)
+
+
+from mindframe.tasks import process_webhook_async
+
+
 @csrf_exempt
 def bot_interface(request, pk):
-
     obj = get_object_or_404(BotInterface, pk=pk)
-    return obj.bot_client().process_webhook(request)
+    request_data = {
+        "method": request.method,
+        "headers": dict(request.headers),
+        "body": request.body.decode("utf-8"),  # or .hex() if binary data is possible
+        "GET": request.GET.dict(),
+        "POST": request.POST.dict(),
+        # TODO if files are needed add them to the request
+    }
+    process_webhook_async.delay(pk, request_data)
+    print(request, request.body, pk)
+    # Return early
+    return HttpResponse("OK", status=200)
 
 
 urlpatterns = [
