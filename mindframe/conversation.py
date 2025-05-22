@@ -109,7 +109,8 @@ def evaluate_judgement(judgement, turn):
 def evaluate_judgement_task(judgement_pk, turn_pk):
     judgement = Judgement.objects.get(pk=judgement_pk)
     turn = Turn.objects.get(pk=turn_pk)
-    return evaluate_judgement(judgement, turn)
+    note = evaluate_judgement(judgement, turn)
+    return note and True or False
 
 
 @observe(capture_input=False, capture_output=False)
