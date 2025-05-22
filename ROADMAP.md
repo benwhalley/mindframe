@@ -1,3 +1,15 @@
+
+- budgets for bot conversations? 50 max turns?
+- allow public interactions?
+- catch errors related to budget overruns
+
+https://docs.litellm.ai/docs/proxy/users
+{
+  "detail":"Authentication Error, ExceededTokenBudget: Current spend for token: 7.2e-05; Max Budget for Token: 2e-07"
+}
+
+
+
 # Research ideas
 
 Long term qual interviews

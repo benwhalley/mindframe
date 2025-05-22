@@ -42,14 +42,16 @@ def group_notes(notes_queryset):
     """
     latest_notes = {}
     all_notes = defaultdict(list)
+    notes_list = list(notes_queryset)
+    for i in notes_list:
+        i.vn = i.variable_name()
+    var_names = [i.vn for i in notes_list]
 
-    for note in notes_queryset:
-        var_name = note.variable_name()
-        all_notes[var_name].append(note and note.data or None)
+    for i in var_names:
+        all_notes[i] = [i for i in notes_list if i.vn == i]
 
-        # Keep only the latest note (timestamp ordering assumed from Meta)
-        if var_name not in latest_notes or note.timestamp > latest_notes[var_name].timestamp:
-            latest_notes[var_name] = note and note.data or None
+    for i in var_names:
+        latest_notes[i] = sorted(notes_list, key=lambda x: x.timestamp, reverse=True)[0]
 
     # Combine into the final dict with both keys
     grouped = {}
