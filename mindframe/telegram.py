@@ -3,16 +3,15 @@ TODO: Design decision about whether to capture system messages like response to 
 """
 
 import html
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-from mindframe.models import Referal, Intervention
-
 import ipaddress
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
 import traceback
+from typing import Any, Dict, List, Optional, Tuple
+
 import requests
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404
 from telegram import Update
 
 from mindframe.bot import (
@@ -22,9 +21,7 @@ from mindframe.bot import (
     WebhookBotClient,
 )
 from mindframe.conversation import listen, respond
-
-from django.http import HttpResponse
-from mindframe.models import Conversation, CustomUser
+from mindframe.models import Conversation, CustomUser, Intervention, Referal
 
 logger = logging.getLogger(__name__)
 

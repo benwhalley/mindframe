@@ -4,6 +4,7 @@ import pprint
 import shortuuid
 from django.conf import settings
 from django.contrib import admin
+from django.contrib.messages import constants
 from django.db import models
 from django.forms import Textarea
 from django.forms.models import model_to_dict
@@ -17,8 +18,6 @@ from ruamel.yaml import YAML
 from mindframe.graphing import mermaid_diagram
 from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, BranchReasons, TurnTypes
 from mindframe.tree import create_branch
-from django.contrib.messages import constants
-
 
 from .models import (
     LLM,

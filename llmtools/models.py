@@ -1,7 +1,8 @@
 import json
+import logging
 import re
 import uuid
-import logging
+
 from django.conf import settings
 from django.db import models
 from django.template import Context, Template

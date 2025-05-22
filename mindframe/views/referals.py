@@ -2,8 +2,8 @@ import json
 import logging
 
 from decouple import config
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django import forms
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -15,13 +15,13 @@ from django.views.generic import DetailView, FormView
 
 from mindframe.conversation import initialise_new_conversation
 from mindframe.models import (
+    BotInterface,
     Conversation,
     CustomUser,
     Intervention,
     Note,
     Referal,
     ReferalToken,
-    BotInterface,
 )
 
 logger = logging.getLogger(__name__)

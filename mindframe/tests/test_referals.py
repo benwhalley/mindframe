@@ -1,16 +1,17 @@
 import json
 from datetime import timedelta
-from django.test import TestCase, Client
+
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from mindframe.models import (
+    Conversation,
     CustomUser,
     Intervention,
-    ReferalToken,
-    Conversation,
     Note,
     Referal,
+    ReferalToken,
 )
 
 

@@ -4,9 +4,10 @@ import django.db.models.deletion
 import django.db.models.manager
 import django.utils.timezone
 import django_lifecycle.mixins
-import mindframe.shortuuidfield
 import model_utils.fields
 from django.db import migrations, models
+
+import mindframe.shortuuidfield
 
 
 class Migration(migrations.Migration):

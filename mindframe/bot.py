@@ -2,12 +2,12 @@ import asyncio
 import logging
 import threading
 import time
-from django.conf import settings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from django.conf import settings
 from django.http import HttpResponse
 from django.urls import reverse
 
