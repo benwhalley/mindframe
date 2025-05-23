@@ -77,6 +77,9 @@ def bot_interface(request, pk):
 
 urlpatterns = [
     path("chat/", include("mindframe.chat_urls")),
+    path(
+        "interventions/<str:slug>/", iv.InterventionDetailView.as_view(), name="intervention_detail"
+    ),
     path("interventions/", iv.InterventionListView.as_view(), name="intervention_list"),
     path("steps/<int:pk>/", iv.StepDetailView.as_view(), name="step_detail"),
     path("bot-webhook/<int:pk>", bot_interface, name="bot_webhook"),

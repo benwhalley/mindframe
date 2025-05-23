@@ -36,3 +36,13 @@ class InterventionListView(ListView):
         for i in ct["object_list"]:
             i.mermaid = mermaid_diagram(i)
         return ct
+
+
+class InterventionDetailView(PermissionRequiredMixin, LoginRequiredMixin, DetailView):
+    permission_required = "mindframe.view_intervention"
+    model = Intervention
+
+    def get_context_data(self, **kwargs):
+        ct = super().get_context_data(**kwargs)
+        ct["mermaid"] = mermaid_diagram(self.object)
+        return ct

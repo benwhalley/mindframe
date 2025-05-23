@@ -11,3 +11,16 @@ html, body, p, span, div, h1, h2, h3, h4, h5, h6, a, li, ul, ol, blockquote, but
 code, pre, kbd, samp, tt {
   font-family: "Inconsolata", monospace;
 }
+
+@media print {
+  body {
+    font-size: 0.7rem;
+  }
+}
+
+@media print {
+  .col-print-12 {
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+  }
+}
