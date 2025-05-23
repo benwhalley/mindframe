@@ -419,7 +419,7 @@ class TelegramBotClient(WebhookBotClient):
             )
 
     def handle_clear_command(
-        self, args: List[str], message: InboundMessage, conversation
+        self, args: List[str], message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], Optional[str]]:
         """
         Start a new conversation with the specified intervention.

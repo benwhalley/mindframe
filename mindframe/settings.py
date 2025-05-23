@@ -7,6 +7,10 @@ from decouple import config
 from django.conf import settings
 from django.db import models
 
+USE_CELERY_FOR_WEBHOOKS = not settings.DEBUG
+SAVE_TELEGRAM_REQUESTS = settings.DEBUG
+
+
 DEFAULT_CONVERSATION_MODEL_NAME = config("DEFAULT_CONVERSATION_MODEL_NAME", "gpt-4o-mini")
 DEFAULT_JUDGEMENT_MODEL_NAME = config("DEFAULT_JUDGEMENT_MODEL_NAME", "gpt-4o-mini")
 DEFAULT_CHUNKING_MODEL_NAME = config("DEFAULT_CHUNKING_MODEL_NAME", "gpt-4o")

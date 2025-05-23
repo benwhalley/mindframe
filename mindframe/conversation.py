@@ -55,7 +55,10 @@ def pick_speaker_for_next_response(turn: Turn):
 
 def transition_permitted(transition, turn) -> bool:
     # Test whether the conditions for a Transition are met at this Turn
+
     ctx_data = speaker_context(turn)
+    logger.info(f"Checking transition {transition} with context data: {ctx_data}")
+
     # flatten out the data dict into context to make it easier to access
     ctx_data.update(ctx_data.get("data"))
     logger.info(f"Checking transition {transition} with context data: {ctx_data}")
@@ -320,8 +323,9 @@ def respond(
     ]
 
     logger.info("Run online Judgements syncronously")
-    [evaluate_judgement(sj.judgement, new_turn) for sj in judgements_to_make if not sj.offline]
 
+    [evaluate_judgement(sj.judgement, new_turn) for sj in judgements_to_make if not sj.offline]
+    # import pdb; pdb.set_trace()
     # ARE INTERRUPTIONS RESOLVED?
     # TODO: implement this
     # - check if we are in an interruption (unresolved checkpoint in the conversation history?)    # - if so, build a context dictionary using the Notes from judgements on this Turn
@@ -397,6 +401,7 @@ def apply_step_transition_and_judgements(turn, transitions_possible) -> Turn:
             for i in turn.step.stepjudgements.filter(when=StepJudgementFrequencyChoices.EXIT)
         ]
         [evaluate_judgement(j, turn) for j in judgements_to_make]
+
         transition_selected = transitions_possible.first()
         turn.step = transition_selected.to_step
         turn.save()

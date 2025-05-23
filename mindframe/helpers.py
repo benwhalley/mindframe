@@ -21,55 +21,25 @@ def get_ordered_queryset(model, pk_list):
     return model.objects.filter(pk__in=pk_list).order_by(ordering)
 
 
-from collections import defaultdict
-
-
-def group_notes(notes_queryset):
-    """
-    Group a queryset of Note objects by their variable_name.
-
-    For each unique variable_name, returns:
-    - A key with the variable name mapped to the latest Note (by timestamp).
-    - A key with the suffix '__all' mapped to a list of all Notes with that variable name.
-
-    Args:
-        notes_queryset (QuerySet): A Django queryset of Note objects.
-
-    Returns:
-        dict: A dictionary with keys:
-            - '<variable_name>': the most recent Note with that variable name.
-            - '<variable_name>__all': a list of all Notes with that variable name.
-    """
-    latest_notes = {}
-    all_notes = defaultdict(list)
-    notes_list = list(notes_queryset)
-    for i in notes_list:
-        i.vn = i.variable_name()
-    var_names = [i.vn for i in notes_list]
-
-    for i in var_names:
-        all_notes[i] = [i for i in notes_list if i.vn == i]
-
-    for i in var_names:
-        latest_notes[i] = sorted(notes_list, key=lambda x: x.timestamp, reverse=True)[0]
-
-    # Combine into the final dict with both keys
-    grouped = {}
-    for var_name, note_list in all_notes.items():
-        grouped[var_name] = latest_notes[var_name]
-        grouped[f"{var_name}__all"] = note_list
-
-    return grouped
-
-
 def make_data_variable(notes):
     """This makes the `data` context variable, used in the prompt template.
 
     The layout/structure of this object is important because end-users will access it in templates and it needs to be consistent/predictable and provide good defaults.
     """
 
-    dd = group_notes(notes)
-    return Box(dd, default_box=True)
+    # Ensure notes are ordered from newest to oldest
+    notes = notes.order_by("-timestamp")
+
+    ctx = {}
+    seen = set()
+
+    for note in notes:
+        var = note.variable_name()
+        if var and var not in seen:
+            ctx[var] = note.data
+            seen.add(var)
+    print(f"\n\n\n{ctx}\n\n\n")
+    return Box(ctx, default_box=True)
 
 
 def hsv_to_rgb(h, s, v):

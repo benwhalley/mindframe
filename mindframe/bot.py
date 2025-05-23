@@ -227,7 +227,7 @@ class MindframeBotClient(ABC):
         pass
 
     def handle_web_command(
-        self, args: List[str], message: InboundMessage, conversation
+        self, args: List[str], message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], str]:
         """
         Generate and send a web link for the conversation.
@@ -249,7 +249,7 @@ class MindframeBotClient(ABC):
             return None, "Could not generate web link for this conversation."
 
     def handle_list_command(
-        self, args: List[str], message: InboundMessage, conversation
+        self, args: List[str], message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], str]:
         """
         List available interventions.
@@ -259,8 +259,12 @@ class MindframeBotClient(ABC):
             if not available:
                 return None, "No interventions are currently available."
 
-            intervention_list = "\n".join([f"{i.title}: `{i.slug}`" for i in available])
-            return None, f"The available interventions are:\n{intervention_list}"
+            intervention_list = "\n\n".join([f"    {i.slug} = {i.title}" for i in available])
+            return (
+                None,
+                f"The available interventions are:\n\n{intervention_list}"
+                + "\n\nTo start a new conversation, type /new CODE",
+            )
         except Exception as e:
             logger.error(f"Error listing interventions: {e}")
             return None, "Could not retrieve the list of interventions."
