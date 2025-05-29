@@ -5,7 +5,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 from string import Template
-
+import pandas as pd
 from django import forms
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
