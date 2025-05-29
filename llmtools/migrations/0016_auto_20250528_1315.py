@@ -1,5 +1,6 @@
 import django.db.models.deletion
 from django.db import migrations, models
+from decouple import config
 
 
 def create_default_llm_and_credentials(apps, schema_editor):
@@ -10,16 +11,21 @@ def create_default_llm_and_credentials(apps, schema_editor):
         pk=1,
         defaults={
             "label": "Default credentials",
-            "llm_api_key": "dummy-key",
-            "llm_base_url": "https://example.com",  # or whatever your default is
+            "llm_api_key": config("LITELLM_API_KEY", "dummy-key"),
+            "llm_base_url": config("LITELLM_BASE_URL", "https://example.com"),
         },
     )
 
     LLM.objects.get_or_create(
         pk=1,
         defaults={
+            "model_name": "gpt-4o-mini",
+        },
+    )
+    LLM.objects.get_or_create(
+        pk=2,
+        defaults={
             "model_name": "gpt-4o",
-            "credentials": creds,
         },
     )
 
@@ -27,7 +33,7 @@ def create_default_llm_and_credentials(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("llmtools", "0015_llmcredentials_label"),  # or whatever the previous migration is
+        ("llmtools", "0015_llmcredentials_label"),
     ]
 
     operations = [

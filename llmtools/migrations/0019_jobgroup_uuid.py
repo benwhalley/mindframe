@@ -15,7 +15,7 @@ def assign_uuids(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("llmtools", "0011_remove_jobgroup_complete"),
+        ("llmtools", "0018_remove_llm_credentials"),
     ]
 
     operations = [
