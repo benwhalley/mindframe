@@ -7,10 +7,11 @@ from pathlib import Path
 from string import Template
 
 from django import forms
-from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.files import File
 from django.core.files.uploadedfile import UploadedFile
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.generic import DetailView, ListView
@@ -20,6 +21,18 @@ from llmtools.llm_calling import chatter
 
 from .models import Job, JobGroup, Tool
 from .tasks import run_job
+
+
+@login_required
+def download_excel(request, uuid: str):
+    jg = get_object_or_404(JobGroup, uuid=uuid)
+    buffer = jg.xlsx()
+
+    response = HttpResponse(
+        buffer, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="output.xlsx"'
+    return response
 
 
 class ToolInputForm(forms.Form):
@@ -113,12 +126,13 @@ def tool_input_view(request, pk):
 
                 # do this synchronously and wait now
                 newjob.save()
-                result = newjob.process()
-
+                result = newjob.run()
+                jsonres = json.dumps([result], indent=2)
+                csvres = pd.DataFrame([result]).to_csv()
                 return render(
                     request,
                     "tool_result.html",
-                    {"tool": tool, "results": json.dumps(result, indent=2), "form": form},
+                    {"tool": tool, "results": jsonres, "form": form, "csv": csvres},
                 )
     else:
         form = ToolInputForm(tool=tool)

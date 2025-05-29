@@ -69,8 +69,9 @@ else:
 
 logger.info(f"DJMAIL_REAL_BACKEND is set to {DJMAIL_REAL_BACKEND}")
 
-
-langfuse_handler = CallbackHandler()
+langfuse_handler = CallbackHandler(
+    secret_key=config("LANGFUSE_SECRET_KEY"), public_key=config("LANGFUSE_PUBLIC_KEY")
+)
 # logger.info("Langfuse auth: ", langfuse_handler.auth_check())
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
@@ -97,6 +98,7 @@ INSTALLED_APPS = [
     "mindframe",
     "djmail",
     "django_celery_beat",
+    "markdownit",
 ]
 
 MIDDLEWARE = [

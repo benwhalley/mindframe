@@ -1,15 +1,20 @@
+import base64
 import json
 import logging
 import re
 import uuid
+from io import BytesIO
 
 import instructor
+import pandas as pd
 from django.conf import settings
 from django.db import models
 from django.template import Context, Template
 from django.urls import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
+from openpyxl import Workbook
+from openpyxl.styles import Alignment
 
 # use langfuse for tracing
 from langfuse.openai import OpenAI
@@ -65,6 +70,7 @@ class ToolKey(models.Model):
 
 
 class JobGroup(ActionableObjectMixin, TimeStampedModel):
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     tool = models.ForeignKey(Tool, on_delete=models.CASCADE)
     cancelled = models.BooleanField(default=False)
     owner = models.ForeignKey(
@@ -87,6 +93,44 @@ class JobGroup(ActionableObjectMixin, TimeStampedModel):
 
     def get_absolute_url(self):
         return reverse("jobgroup-detail", kwargs={"pk": self.pk})
+
+    def results(self):
+        return list(self.jobs.all().values_list("result", flat=True))
+
+    def csv(self):
+        return pd.DataFrame(self.results()).to_csv()
+
+    def xlsx(self):
+        data = list(self.jobs.all().values_list("result", flat=True))
+        wb = Workbook()
+        ws = wb.active
+
+        # Write headers
+        headers = list(data[0].keys())
+        ws.append(headers)
+
+        # Write rows
+        for row in data:
+            ws.append([row[h] for h in headers])
+
+        # Enable text wrap for all cells
+        wrap_alignment = Alignment(wrap_text=True)
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=ws.max_column):
+            for cell in row:
+                cell.alignment = wrap_alignment
+
+        # Optionally auto-adjust column width
+        for col in ws.columns:
+            max_length = max(len(str(cell.value or "")) for cell in col)
+            adjusted_width = min(max_length + 2, 80)
+            ws.column_dimensions[col[0].column_letter].width = adjusted_width
+
+        # Save
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        return buffer
 
     def json(self):
         return json.dumps(list(self.jobs.all().values_list("result", flat=True)), indent=2)
@@ -156,6 +200,7 @@ class Job(TimeStampedModel):
 
     def run(self, force=False):
         logger.info(f"Running job: {self.id}")
+        result = None
         try:
             if self.cancelled:
                 raise Exception("Job cancelled")
