@@ -123,5 +123,5 @@ urlpatterns = [
     path("referal/create/", rv.CreateReferalView.as_view(), name="create_referal"),
     path("referal/<str:uuid>/", rv.ReferalDetailView.as_view(), name="referal_detail"),
     path("", TemplateView.as_view(template_name="index.html"), name="index"),
-    path("abbout", TemplateView.as_view(template_name="about.html"), name="about"),
+    path("about/", TemplateView.as_view(template_name="about.html"), name="about"),
 ]
