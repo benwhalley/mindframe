@@ -73,16 +73,18 @@ def make_referal_using_token(token, intervention_slug, username, data=None, bot_
 class ReferalForm(forms.Form):
     referal_token = forms.ModelChoiceField(queryset=ReferalToken.objects.none())
     intervention = forms.ModelChoiceField(queryset=Intervention.objects.none())
-    username = forms.CharField(required=True, initial="robert")
+    username = forms.CharField(
+        required=True, initial="robert", help_text="A username for this participant."
+    )
+    create_if_doesnt_exist = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text="If this is checked, a new user will be created if one matching the username doesn't already exist.",
+    )
     bot_interface = forms.ModelChoiceField(queryset=BotInterface.objects.none())
-    create_if_doesnt_exist = forms.BooleanField(required=False, initial=True)
     data = forms.JSONField(
         required=False,
-        initial={
-            "nickname": "Ben",
-            "interests": "climbing, tennis, poetry",
-            "current_emotion": "happy",
-        },
+        initial={"nickname": "..."},
     )
     redirect = forms.ChoiceField(
         choices=[("web", "Web"), ("telegram", "Telegram"), ("json", "JSON")], initial="web"
