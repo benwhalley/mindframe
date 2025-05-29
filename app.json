@@ -4,6 +4,6 @@
   "info": "https://github.com/crisward/dokku-require?tab=readme-ov-file",
   "dokku":{
     "predeploy": "echo 'pre-deploy hook'",
-    "postdeploy": "python manage.py migrate && python manage.py bots --register && python manage.py bots --info && echo 'Deployed!'"
+    "postdeploy": "python manage.py migrate --skip-checks && python manage.py bots --register && python manage.py bots --info && echo 'Deployed!'"
   }
 }
