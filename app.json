@@ -1,9 +1,8 @@
 {
   "name": "Mindframe",
   "description": "Mindframe",
-  "info": "https://github.com/crisward/dokku-require?tab=readme-ov-file",
   "dokku":{
     "predeploy": "echo 'pre-deploy hook'",
-    "postdeploy": "python manage.py migrate && python manage.py bots --register && python manage.py bots --info && echo 'Deployed!'"
+    "postdeploy": "./manage.py migrate --skip-checks && ./manage.py ensure_defaults && ./manage.py bots --register && ./manage.py bots --info && echo 'Deployed!'"
   }
 }

@@ -1,7 +1,20 @@
 from django.contrib import admin
 from django.shortcuts import redirect
 
-from .models import Job, JobGroup
+from .models import LLM, Job, JobGroup, LLMCredentials
+
+
+@admin.register(LLM)
+class LLMAdmin(admin.ModelAdmin):
+    search_fields = ["model_name"]
+    list_display = [
+        "model_name",
+    ]
+
+
+@admin.register(LLMCredentials)
+class LLMCredentialsAdmin(admin.ModelAdmin):
+    search_fields = ["label"]
 
 
 class JobInline(admin.TabularInline):

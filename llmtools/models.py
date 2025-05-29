@@ -3,12 +3,16 @@ import logging
 import re
 import uuid
 
+import instructor
 from django.conf import settings
 from django.db import models
 from django.template import Context, Template
 from django.urls import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
+
+# use langfuse for tracing
+from langfuse.openai import OpenAI
 
 from actionable.mixins import ActionableObjectMixin, action_with_permission
 
@@ -25,8 +29,13 @@ class Tool(models.Model):
         default="""{{source}}\n\nQuestion about the source\n\n[[response]]""",
     )
     model = models.ForeignKey(
-        "mindframe.LLM", on_delete=models.CASCADE, help_text="The LLM to use for this Tool"
+        "llmtools.LLM",
+        on_delete=models.CASCADE,
+        help_text="The LLM to use for this Tool",
+        default=1,
     )
+    credentials = models.ForeignKey("LLMCredentials", on_delete=models.PROTECT, default=1)
+
     include_source = models.BooleanField(
         default=False, help_text="Include the source text in the results JSON (can be quite large)."
     )
@@ -159,7 +168,7 @@ class Job(TimeStampedModel):
             template = Template(tool.prompt)
             ctx = Context(self.context)
             filled_prompt = template.render(ctx)
-            result = chatter(filled_prompt, tool.model)
+            result = chatter(filled_prompt, tool.model, tool.credentials)
             if len(result.keys()) > 1:
                 del result["RESPONSE_"]
 
@@ -176,3 +185,55 @@ class Job(TimeStampedModel):
             logger.error(f"Error running job: {self.id}: {e}")
 
         return result
+
+
+class LLM(models.Model):
+    """Store details of Language Models used."""
+
+    model_name = models.CharField(
+        max_length=255, help_text="Litellm model name, e.g. llama3.2 or gpt-4o"
+    )
+
+    def __str__(self) -> str:
+        return self.model_name
+
+    def chatter(self, prompt, credentials, context=None):
+        from llmtools.llm_calling import chatter
+
+        return chatter(prompt, model=self, credentials=credentials, context={}, log_context={})
+
+    def client(self, credentials):
+        # this is an Azure/OpenAI clent instance, but is used to query the litellm
+        # proxy. It must provide chat.completions.create_with_completion and
+        # client.chat.completions.create
+        return instructor.from_openai(
+            OpenAI(api_key=credentials.llm_api_key, base_url=credentials.llm_base_url)
+        )
+
+    def natural_key(self):
+        return (self.model_name,)
+
+    class Meta:
+        unique_together = [("model_name",)]
+
+
+class LLMCredentials(models.Model):
+
+    label = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return self.label or self.llm_api_key[:5]
+
+    llm_api_key = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Override for LLM API key, used for this BotInterface.",
+    )
+
+    llm_base_url = models.CharField(
+        max_length=1024,
+        null=True,
+        blank=True,
+        help_text="Optional base URL for Litellm/OpenAI proxy for this interface.",
+    )

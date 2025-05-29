@@ -14,17 +14,13 @@ from django.views.generic.base import TemplateView
 from django.views.generic.detail import DetailView
 from django.views.generic.edit import FormMixin, FormView
 
+from llmtools.models import LLM
 from mindframe.conversation import add_turns_task
 from mindframe.models import (
-    LLM,
-    Conversation,
-    CustomUser,
     Intervention,
     Memory,
-    Note,
     Turn,
 )
-from mindframe.silly import silly_name
 from mindframe.tree import conversation_history
 
 logger = logging.getLogger(__name__)

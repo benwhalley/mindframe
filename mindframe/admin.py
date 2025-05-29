@@ -20,7 +20,6 @@ from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, BranchReasons, Turn
 from mindframe.tree import create_branch
 
 from .models import (
-    LLM,
     BotInterface,
     Conversation,
     CustomUser,
@@ -245,14 +244,6 @@ class ConversationAdmin(admin.ModelAdmin):
         return custom_urls + urls
 
 
-@admin.register(LLM)
-class LLMAdmin(admin.ModelAdmin):
-    search_fields = ["model_name"]
-    list_display = [
-        "model_name",
-    ]
-
-
 class TransitionInline(admin.TabularInline):
     model = Transition
     fk_name = "from_step"
@@ -475,120 +466,8 @@ class InterventionAdmin(admin.ModelAdmin):
     def export_intervention(self, request, object_id):
         raise NotImplementedError("Exporting interventions is not yet implemented.")
 
-    #         intervention = Intervention.objects.filter(pk=object_id).first()
-
-    #         # all fields except id
-    #         step_fields = [f.name for f in Step._meta.get_fields() if f.name != "id"]
-    #         judgement_fields = [f.name for f in Judgement._meta.get_fields() if f.name != "id"]
-    #         memory_fields = [f.name for f in Memory._meta.get_fields() if f.name != "id"]
-
-    #         related_objects = {
-    #             "intervention": model_to_dict(intervention, fields=Intervention.exported_fields),
-    #             "steps": list(intervention.steps.values(*Step.exported_fields)),
-    #             "judgements": list(
-    #                 Judgement.objects.filter(intervention=intervention).values(
-    #                     *Judgement.exported_fields
-    #                 )
-    #             ),
-    #             "memories": list(intervention.memories.values(*Memory.exported_fields)),
-    #             # note we need to handle these differently on import
-    #             "transitions": list(
-    #                 Transition.objects.filter(to_step__intervention=intervention).values(
-    #                     *Transition.exported_fields
-    #                 )
-    #             ),
-    #         }
-
-    #         # Serialize
-    #         stream = io.StringIO()
-    #         yaml.dump(related_objects, stream)
-    #         stream.seek(0)
-
-    #         response = HttpResponse(
-    #             stream.read(),
-    #             content_type="application/yaml",
-    #         )
-    #         response["Content-Disposition"] = (
-    #             f'attachment; filename="intervention_{intervention.slug}.yaml"'
-    #         )
-    #         return response
-
     def import_intervention(self, request):
         raise NotImplementedError("Importing interventions is not yet implemented.")
-
-    #         if request.method == "POST":
-    #             form = InterventionImportForm(request.POST, request.FILES)
-    #             if form.is_valid():
-    #                 with transaction.atomic():
-    #                     file = form.cleaned_data["file"]
-    #                     try:
-    #                         data = yaml.load(file)
-    #                         intervention_data = data.pop("intervention")
-
-    #                         # Generate a new semantic version (you can customize this logic)
-    #                         new_sem_ver = f"{intervention_data.get('sem_ver', '1.0.1')}-imported"
-
-    #                         # Create a new intervention with a different version
-    #                         intervention = Intervention.objects.create(
-    #                             title=f"{intervention_data['title']} (Imported)",
-    #                             short_title=intervention_data["short_title"],
-    #                             slug=None,  # Let AutoSlugField generate a new slug
-    #                             sem_ver=new_sem_ver,
-    #                         )
-
-    #                         # Keep a mapping of old IDs to new instances for steps and judgements
-    #                         step_mapping = {}
-    #                         judgement_mapping = {}
-
-    #                         # Create the mapping during step import
-    #                         step_mapping = {}
-    #                         for step_data in data["steps"]:
-    #                             step_data.pop("id", None)  # Remove the original ID
-    #                             step_data["intervention_id"] = intervention.id
-    #                             new_step = Step.objects.create(**step_data)
-    #                             step_mapping[new_step.slug] = new_step
-
-    #                         # Import Judgements
-    #                         for judgement_data in data["judgements"]:
-    #                             judgement_data.pop("id", None)  # Remove the original ID
-    #                             judgement_data["intervention_id"] = intervention.id
-    #                             new_judgement = Judgement.objects.create(**judgement_data)
-    #                             judgement_mapping[judgement_data["variable_name"]] = new_judgement
-
-    #                         # Import Examples
-    #                         for example_data in data["examples"]:
-    #                             example_data.pop("id", None)  # Remove the original ID
-    #                             example_data["intervention_id"] = intervention.id
-    #                             Example.objects.create(**example_data)
-
-    #                         # Import Transitions
-    #                         # note we lookup by slug among the NEWLY CREATED ste[]
-    #                         for transition_data in data["transitions"]:
-
-    #                             transition_data["from_step"] = step_mapping[
-    #                                 transition_data.pop("from_step__slug")
-    #                             ]
-    #                             transition_data["to_step"] = step_mapping[
-    #                                 transition_data.pop("to_step__slug")
-    #                             ]
-    #                             # Create the new Transition object
-    #                             Transition.objects.create(**transition_data)
-
-    #                         messages.success(
-    #                             request,
-    #                             f"Imported Intervention '{intervention.title}' with version '{new_sem_ver} ({intervention.ver()})'.",
-    #                         )
-    #                         return redirect("admin:mindframe_intervention_changelist")
-    #                     except Exception as e:
-    #                         messages.error(request, f"Error importing intervention: {e}")
-    #         else:
-    #             form = InterventionImportForm()
-
-    #         context = {
-    #             "form": form,
-    #             "title": "Import Intervention",
-    #         }
-    #         return render(request, "admin/intervention_import.html", context)
 
     def start_session(self, request, intervention_id):
         intervention = Intervention.objects.get(pk=intervention_id)
@@ -598,6 +477,8 @@ class InterventionAdmin(admin.ModelAdmin):
             defaults={"role": "therapist", "email": "linda@example.com"},
         )
         conversation = Conversation.objects.create()
+        conversation.max_turns = intervention.default_max_turns
+
         human_starter = Turn.add_root(
             conversation=conversation,
             speaker=request.user,

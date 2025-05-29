@@ -5,7 +5,6 @@ from datetime import timedelta
 from itertools import groupby
 
 import dateparser
-import instructor
 import shortuuid
 from autoslug import AutoSlugField
 from box import Box
@@ -25,15 +24,12 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django_lifecycle import AFTER_CREATE, AFTER_UPDATE, LifecycleModel, hook
 from langfuse.decorators import langfuse_context
-
-# use langfuse for tracing
-from langfuse.openai import OpenAI
 from model_utils.models import SoftDeletableModel, TimeFramedModel, TimeStampedModel
 from pgvector.django import HnswIndex, L2Distance, VectorField
 from recurrent.event_parser import RecurringEvent
 from treebeard.ns_tree import NS_Node
 
-from llmtools.llm_calling import chatter, get_embedding, simple_chat
+from llmtools.llm_calling import get_embedding, simple_chat
 from mindframe.chunking import CHUNKER_TEMPLATE
 from mindframe.settings import (
     MINDFRAME_SHORTUUID_ALPHABET,
@@ -125,6 +121,8 @@ class Intervention(LifecycleModel):
         default=False,
         help_text="Whether this intervention is publicly visible on the web frontend.",
     )
+    default_max_turns = models.PositiveSmallIntegerField(blank=True, null=True)
+
     description = models.TextField(
         blank=True,
         null=True,
@@ -163,27 +161,20 @@ class Intervention(LifecycleModel):
             )
             return s
 
-    # TODO - make this non nullable
     default_conversation_model = models.ForeignKey(
-        "LLM",
+        "llmtools.LLM",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         related_name="default_for_conversations",
     )
     default_judgement_model = models.ForeignKey(
-        "LLM",
+        "llmtools.LLM",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         related_name="default_for_judgements",
     )
 
     default_chunking_model = models.ForeignKey(
-        "LLM",
+        "llmtools.LLM",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         related_name="default_for_chunking",
     )
 
@@ -448,7 +439,7 @@ class Judgement(models.Model):
         max_length=255,
     )
     model = models.ForeignKey(
-        "LLM",
+        "llmtools.LLM",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -466,60 +457,6 @@ class Judgement(models.Model):
         unique_together = [
             ("intervention", "variable_name"),
         ]
-
-
-class LLMManager(models.Manager):
-    def get_by_natural_key(
-        self,
-        model_name,
-    ):
-        return self.get(model_name=model_name)
-
-
-class LLM(models.Model):
-    """Store details of Language Models used for Step and Judgement execution"""
-
-    objects = LLMManager()
-
-    model_name = models.CharField(
-        max_length=255, help_text="Litellm model name, e.g. llama3.2 or gpt-4o"
-    )
-
-    api_key = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Litellm API key, defaults to LITELLM_API_KEY",
-    )
-    base_url = models.CharField(
-        max_length=1024,
-        blank=True,
-        null=True,
-        help_text="Litellm base URL defaults to LITELLM_ENDPOINT",
-    )
-
-    def __str__(self) -> str:
-        return self.model_name
-
-    def chatter(self, prompt, context=None):
-        from llmtools.llm_calling import chatter
-
-        return chatter(prompt, self, context={}, log_context={})
-
-    @property
-    def client(self):
-        # this is an Azure/OpenAI clent instance, but is used to query the litellm
-        # proxy. It must provide chat.completions.create_with_completion and
-        # client.chat.completions.create
-        return instructor.from_openai(
-            OpenAI(api_key=config("LITELLM_API_KEY"), base_url=config("LITELLM_ENDPOINT"))
-        )
-
-    def natural_key(self):
-        return (self.model_name,)
-
-    class Meta:
-        unique_together = [("model_name",)]
 
 
 # ################################################ #
@@ -611,7 +548,7 @@ class Note(models.Model):
 ### QuerySet for MemoryChunk (Supports Chaining)
 class MemoryChunkQuerySet(models.QuerySet):
     def search(self, query, method="semantic", llm=None, top_k=5):
-        """
+        """Generalized search function supporting both HyDE and semantic search.
         Generalized search function supporting both HyDE and semantic search.
 
         Args:
@@ -632,6 +569,7 @@ class MemoryChunkQuerySet(models.QuerySet):
 
         # Generate the hypothetical document for HyDE, then embed it
         elif method == "hyde":
+            raise Exception("Need to add credentials to this search")
             if not llm:
                 raise ValueError("HyDE search requires an LLM instance.")
             hyde_prompt = f"""
@@ -812,6 +750,7 @@ class Memory(LifecycleModel):
 
         # Generate chunks using the LLM chunking model
         numbered_text = "\n".join([f"{i+1}: {l}" for i, l in enumerate(textlines)])
+        raise Exception("Need to add credentials to this LLM call")
         chunks = llm.chatter(CHUNKER_TEMPLATE.format(source=numbered_text)).response
 
         embedding_texts = []
@@ -871,6 +810,11 @@ class Conversation(LifecycleModel):
     bot_interface = models.ForeignKey(
         "BotInterface", on_delete=models.CASCADE, null=True, blank=True
     )
+    llm_credentials = models.ForeignKey(
+        "llmtools.LLMCredentials", on_delete=models.PROTECT, default=1
+    )
+
+    max_turns = models.PositiveSmallIntegerField(blank=True, null=True)
 
     synthetic_turns_scheduled = models.PositiveSmallIntegerField(default=0)
 
@@ -1311,6 +1255,10 @@ class BotInterface(LifecycleModel):
 
     provider_info = models.JSONField(null=True, blank=True)
     provider_info_updated = models.DateTimeField(null=True, blank=True)
+
+    budget_max_conversation_turns = models.PositiveSmallIntegerField(
+        null=True, blank=True, help_text="Maximum number of turns in a conversation"
+    )
 
     def bot_client(self):
         # todo make flexible to diff subclasses

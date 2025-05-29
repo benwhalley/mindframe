@@ -170,14 +170,14 @@ def parse_prompt(prompt_text) -> OrderedDict:
 
 
 @observe(capture_input=False, capture_output=False)
-def structured_chat(prompt, llm, return_type, max_retries=3, extra_body={}):
+def structured_chat(prompt, llm, credentials, return_type, max_retries=3, extra_body={}):
     """
     Make a tool call to an LLM, returning the `response` field, and a completion object
     """
 
     langfuse_context.update_current_observation(input=prompt)
     try:
-        res, com = llm.client.chat.completions.create_with_completion(
+        res, com = llm.client(credentials).chat.completions.create_with_completion(
             model=llm.model_name,
             response_model=return_type,
             messages=[{"role": "user", "content": prompt}],
@@ -188,6 +188,7 @@ def structured_chat(prompt, llm, return_type, max_retries=3, extra_body={}):
 
     except Exception as e:
         full_traceback = traceback.format_exc()
+        raise e
         logger.warning(f"Error calling LLM: {e}\n{full_traceback}")
         res, com = None, None
 
@@ -195,7 +196,7 @@ def structured_chat(prompt, llm, return_type, max_retries=3, extra_body={}):
 
 
 @observe(capture_input=False, capture_output=False)
-def simple_chat(prompt, llm, extra_body={}):
+def simple_chat(prompt, llm, credentials, extra_body={}):
     """For a text prompt and LLM model, return a string completion."""
 
     # we can't use chat_with_completion because it needs a response model
@@ -204,7 +205,7 @@ def simple_chat(prompt, llm, extra_body={}):
     langfuse_context.update_current_observation(input=prompt)
 
     try:
-        res = llm.client.chat.completions.create(
+        res = llm.client(credentials).chat.completions.create(
             model=llm.model_name,
             response_model=None,
             messages=[{"role": "user", "content": prompt}],
@@ -244,7 +245,7 @@ class ChatterResult(OrderedDict):
 
 
 @observe(capture_input=False, capture_output=False)
-def chatter_(multipart_prompt, model, context={}, cache=True):
+def chatter_(multipart_prompt, model, credentials, context={}, cache=True):
     """
     Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next.
 
@@ -326,7 +327,7 @@ def chatter_(multipart_prompt, model, context={}, cache=True):
 
             # Call the LLM via structured_chat.
             res, completion_obj = structured_chat(
-                rendered_prompt, model, return_type=rt, extra_body=extra_body
+                rendered_prompt, model, credentials, return_type=rt, extra_body=extra_body
             )
             res = res and res.response or None
 
@@ -439,7 +440,9 @@ class SegmentDependencyGraph:
         return execution_plan
 
 
-async def chatter_async(multipart_prompt: str, model, context={}, cache=True) -> ChatterResult:
+async def chatter_async(
+    multipart_prompt: str, model, credentials, context={}, cache=True
+) -> ChatterResult:
     """
     Parallel version of chatter that processes independent segments concurrently.
 
@@ -481,7 +484,7 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
 
             # Use sync_to_async to safely call chatter from async context
             task = sync_to_async(chatter_, thread_sensitive=True)(
-                segment, model, accumulated_context, cache
+                segment, model, credentials, accumulated_context, cache
             )
             segment_tasks.append(task)
 
@@ -501,9 +504,9 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
     return final_results
 
 
-def chatter(multipart_prompt: str, model, context={}, cache=True) -> ChatterResult:
+def chatter(multipart_prompt: str, model, credentials, context={}, cache=True) -> ChatterResult:
     """Synchronous wrapper for chatter_async"""
-    return async_to_sync(chatter_async)(multipart_prompt, model, context, cache)
+    return async_to_sync(chatter_async)(multipart_prompt, model, credentials, context, cache)
 
 
 from moviepy import VideoFileClip

@@ -1,7 +1,13 @@
 
-- budgets for bot conversations? 50 max turns?
+
+- rationalise the starting of new conversatins for Bot and Anonymous web sessions
+
 - allow public interactions?
 - catch errors related to budget overruns
+
+
+
+- allow for different LLM API keys for bot interfaces
 
 https://docs.litellm.ai/docs/proxy/users
 {
