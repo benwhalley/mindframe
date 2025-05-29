@@ -98,6 +98,7 @@ django==5.2
     #   django-debug-toolbar
     #   django-extensions
     #   django-lifecycle
+    #   django-markdownit
     #   django-model-utils
     #   django-ninja
     #   django-shortuuidfield
@@ -124,6 +125,8 @@ django-extensions==4.1
     # via mindframe (pyproject.toml)
 django-lifecycle==1.2.4
     # via mindframe (pyproject.toml)
+django-markdownit==0.5.0
+    # via mindframe (pyproject.toml)
 django-model-utils==5.0.0
     # via mindframe (pyproject.toml)
 django-ninja==1.4.1
@@ -140,6 +143,8 @@ djmail==2.0.0
     # via mindframe (pyproject.toml)
 docstring-parser==0.16
     # via instructor
+et-xmlfile==2.0.0
+    # via openpyxl
 executing==2.2.0
     # via stack-data
 fastapi==0.115.12
@@ -247,7 +252,9 @@ lazy-imports==0.4.0
 lxml==5.4.0
     # via python-docx
 markdown-it-py==3.0.0
-    # via rich
+    # via
+    #   django-markdownit
+    #   rich
 markupsafe==3.0.2
     # via
     #   gradio
@@ -269,6 +276,8 @@ multidict==6.4.3
     #   yarl
 networkx==3.4.2
     # via haystack-ai
+nh3==0.2.21
+    # via django-markdownit
 numpy==2.2.5
     # via
     #   gradio
@@ -281,6 +290,8 @@ openai==1.76.0
     # via
     #   haystack-ai
     #   instructor
+openpyxl==3.1.5
+    # via mindframe (pyproject.toml)
 orjson==3.10.16
     # via
     #   gradio

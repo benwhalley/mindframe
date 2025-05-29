@@ -6,7 +6,6 @@ from pathlib import Path
 
 import dj_database_url
 from decouple import Csv, config
-
 from langfuse.callback import CallbackHandler
 
 logger = logging.getLogger(__name__)
@@ -99,6 +98,7 @@ INSTALLED_APPS = [
     "mindframe",
     "djmail",
     "django_celery_beat",
+    "markdownit",
 ]
 
 MIDDLEWARE = [
