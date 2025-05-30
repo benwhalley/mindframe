@@ -11,9 +11,9 @@ from django.shortcuts import get_object_or_404
 from langfuse.decorators import langfuse_context, observe
 
 from llmtools.llm_calling import chatter
+from llmtools.models import LLM, LLMCredentials
 from mindframe.helpers import get_ordered_queryset, make_data_variable
 from mindframe.models import (
-    LLM,
     Conversation,
     CustomUser,
     Intervention,
@@ -37,6 +37,37 @@ from mindframe.tree import conversation_history, is_interrupted, iter_conversati
 logger = logging.getLogger(__name__)
 
 
+def budget_exceeded(turn: Turn) -> Optional[Turn]:
+    """Check if there is budget allocated for this conversation."""
+    history = conversation_history(turn, to_leaf=True)
+    N = len(history) + 1  # accounting for JOIN turn
+    if turn.conversation.max_turns and (N >= turn.conversation.max_turns):
+        logger.warning(f"Conversation {turn.conversation.uuid[:6]} has reached its max_turns.")
+        return True
+
+    bi = turn.conversation.bot_interface
+    if bi and bi.budget_max_conversation_turns:
+        if N >= turn.conversation.bot_interface.budget_max_conversation_turns:
+            logger.warning(
+                f"Conversation {turn.conversation.uuid[:6]} has reached its budget based on the Bot Interface."
+            )
+            return True
+
+    return False
+
+
+def budget_exceeded_warning_turn(turn: Turn) -> Turn:
+    new_turn = turn.add_child(
+        uuid=mfuuid(),
+        conversation=turn.conversation,
+        speaker=CustomUser.objects.get(username="system"),
+        text="The conversation has reached its maximum number of turns allowed.",
+        turn_type=TurnTypes.SYSTEM,
+    )
+    new_turn.save()
+    return new_turn
+
+
 def pick_speaker_for_next_response(turn: Turn):
     """Decide who should respond next in the conversation.
 
@@ -55,7 +86,10 @@ def pick_speaker_for_next_response(turn: Turn):
 
 def transition_permitted(transition, turn) -> bool:
     # Test whether the conditions for a Transition are met at this Turn
+
     ctx_data = speaker_context(turn)
+    logger.info(f"Checking transition {transition} with context data: {ctx_data}")
+
     # flatten out the data dict into context to make it easier to access
     ctx_data.update(ctx_data.get("data"))
     logger.info(f"Checking transition {transition} with context data: {ctx_data}")
@@ -75,19 +109,22 @@ def transition_permitted(transition, turn) -> bool:
     return all(result for _, result in condition_evals)
 
 
-def get_model_for_turn(turn, type_="conversation") -> LLM:
+def get_credentials_for_turn(turn) -> LLMCredentials:
+    crd = LLMCredentials.objects.all().first()
+    if crd:
+        return crd
+    else:
+        raise Exception("No credentials found")
 
+
+def get_model_for_turn(turn, type_="conversation") -> LLM:
     interv = turn.step and turn.step.intervention or None
+    if not interv:
+        raise Exception("No intervention found")
     if type_.startswith("con"):
-        return LLM.objects.filter(
-            model_name=turn.step
-            and interv.default_conversation_model
-            or DEFAULT_CONVERSATION_MODEL_NAME
-        ).first()
+        return interv.default_conversation_model
     elif type_.startswith("jud"):
-        return LLM.objects.filter(
-            model_name=turn.step and interv.default_judgement_model or DEFAULT_JUDGEMENT_MODEL_NAME
-        ).first()
+        return interv.default_judgement_model
     else:
         raise NotImplementedError("Model type not recognised.")
 
@@ -96,9 +133,11 @@ def get_model_for_turn(turn, type_="conversation") -> LLM:
 def evaluate_judgement(judgement, turn):
     ctx = speaker_context(turn)
     model = judgement.model or get_model_for_turn(turn, "judgement")
+
     llmres = chatter(
         judgement.prompt_template,
         model=model,
+        credentials=get_credentials_for_turn(turn),
         context=ctx,
     )
     nt = Note.objects.create(turn=turn, judgement=judgement, data=llmres)
@@ -109,7 +148,8 @@ def evaluate_judgement(judgement, turn):
 def evaluate_judgement_task(judgement_pk, turn_pk):
     judgement = Judgement.objects.get(pk=judgement_pk)
     turn = Turn.objects.get(pk=turn_pk)
-    return evaluate_judgement(judgement, turn)
+    note = evaluate_judgement(judgement, turn)
+    return note and True or False
 
 
 @observe(capture_input=False, capture_output=False)
@@ -125,6 +165,7 @@ def complete_the_turn(turn) -> Turn:
     llmres = chatter(
         turn.step.prompt_template,
         model=model,
+        credentials=get_credentials_for_turn(turn),
         context=ctx,
     )
     turn.metadata = llmres
@@ -151,6 +192,9 @@ def speaker_context(turn) -> dict:
     # a Turn is created with a history of previous turns, and for a specific speaker
     # this means we can navigate up the tree to identify context which this speaker
     # would have access to when making their contribution
+    """
+    > speaker_context(Turn.objects.all().last())
+    """
 
     history_list = conversation_history(turn)
     history = get_ordered_queryset(Turn, [i.pk for i in history_list])
@@ -158,6 +202,7 @@ def speaker_context(turn) -> dict:
     speaker_turns = history.filter(speaker=turn.speaker)
     speaker_notes = Note.objects.filter(turn__pk__in=[i.pk for i in speaker_turns])
 
+    # we want to know how many turns ago the current Step started
     # find the first turn with the same step, then count how many descendents it has in the history to count N turns from the start of this Step; +1 to include the first in the count
     try:
         n_turns_step = (
@@ -174,6 +219,7 @@ def speaker_context(turn) -> dict:
         "speaker_turns": speaker_turns,
         "data": make_data_variable(speaker_notes),
     }
+
     logger.info(f"Prompt context:\n{pprint.pformat(context, width=1)}")
     return context
 
@@ -213,9 +259,13 @@ def respond(
 
     """
 
+    if budget_exceeded(turn):
+        return budget_exceeded_warning_turn(turn)
+
     if not as_speaker:
         # this will be a Bot
         as_speaker = pick_speaker_for_next_response(turn)
+        assert as_speaker.role == RoleChoices.BOT, "Speaker is not a bot"
 
     if not with_intervention_step:
         try:
@@ -254,6 +304,7 @@ def respond(
     # - SWITCH TO THE TARGET STEP AND RESPOND
     possible_interruptions = with_intervention_step.intervention.interruptions.all()
     for i in possible_interruptions:
+        logger.info(f"Evaluating interruption {i}")
         # only do this if we're not already on the target step of the interruption
         if i.target_step == with_intervention_step:
             logger.info(
@@ -276,6 +327,10 @@ def respond(
 
         try:
             triggered = eval(i.trigger, {}, note.data)
+            logger.info(
+                f"Evaluating trigger expression: {i.trigger}, with {note.data} == {triggered}"
+            )
+
         except Exception as e:
             logger.error(f"Error evaluating trigger expression: {e}")
             triggered = False
@@ -309,6 +364,7 @@ def respond(
     ]
 
     logger.info("Run online Judgements syncronously")
+
     [evaluate_judgement(sj.judgement, new_turn) for sj in judgements_to_make if not sj.offline]
 
     # ARE INTERRUPTIONS RESOLVED?
@@ -364,6 +420,7 @@ def respond(
         name=f"{new_turn.step.intervention.title}. Response in turn: {new_turn.uuid}",  # Use new turn ID
         session_id=new_turn.uuid,  # Make sure the session ID is correct
         output=new_turn.text,
+        input=turn.text,
     )
     langfuse_context.flush()
 
@@ -386,6 +443,7 @@ def apply_step_transition_and_judgements(turn, transitions_possible) -> Turn:
             for i in turn.step.stepjudgements.filter(when=StepJudgementFrequencyChoices.EXIT)
         ]
         [evaluate_judgement(j, turn) for j in judgements_to_make]
+
         transition_selected = transitions_possible.first()
         turn.step = transition_selected.to_step
         turn.save()

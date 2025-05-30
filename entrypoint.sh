@@ -2,6 +2,8 @@
 set -e
 
 APP_TYPE="${MINDFRAME_APP_TYPE:-django}"
+WORKERS="${WORKERS:-3}"
+
 
 case "$APP_TYPE" in
   "chat")
@@ -9,8 +11,7 @@ case "$APP_TYPE" in
     exec python chatbot.py
     ;;
   "django")
-    echo "Starting Daphne"
-    exec daphne -b 0.0.0.0 -p "$PORT" --verbosity 3 config.asgi:application
+  exec gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers "$WORKERS"
     ;;
   *)
     echo "Unknown MINDFRAME_APP_TYPE: $APP_TYPE"

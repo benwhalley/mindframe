@@ -5,7 +5,6 @@ from datetime import timedelta
 from itertools import groupby
 
 import dateparser
-import instructor
 import shortuuid
 from autoslug import AutoSlugField
 from box import Box
@@ -17,28 +16,24 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, OuterRef, Q, QuerySet, Subquery, Window
 from django.db.models.functions import RowNumber
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.forms.models import model_to_dict
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django_lifecycle import AFTER_CREATE, AFTER_UPDATE, LifecycleModel, hook
-from langfuse.decorators import langfuse_context, observe
-
-# use langfuse for tracing
-from langfuse.openai import OpenAI
+from langfuse.decorators import langfuse_context
+from model_utils.models import SoftDeletableModel, TimeFramedModel, TimeStampedModel
 from pgvector.django import HnswIndex, L2Distance, VectorField
 from recurrent.event_parser import RecurringEvent
 from treebeard.ns_tree import NS_Node
 
-from llmtools.llm_calling import chatter, get_embedding, simple_chat
+from llmtools.llm_calling import get_embedding, simple_chat
 from mindframe.chunking import CHUNKER_TEMPLATE
 from mindframe.settings import (
-    DEFAULT_CHUNKING_MODEL_NAME,
-    DEFAULT_CONVERSATION_MODEL_NAME,
-    DEFAULT_JUDGEMENT_MODEL_NAME,
     MINDFRAME_SHORTUUID_ALPHABET,
+    BotInterfaceProviders,
     BranchReasons,
     InterventionTypes,
     RoleChoices,
@@ -122,6 +117,18 @@ class Intervention(LifecycleModel):
     version = models.CharField(max_length=64, null=True, editable=False)
     sem_ver = models.CharField(max_length=64, null=True, editable=True)
 
+    public = models.BooleanField(
+        default=False,
+        help_text="Whether this intervention is publicly visible on the web frontend.",
+    )
+    default_max_turns = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    description = models.TextField(
+        blank=True,
+        null=True,
+        help_text="A description of the intervention, for use in the web frontend.",
+    )
+
     intervention_type = models.CharField(
         choices=InterventionTypes.choices,
         default=InterventionTypes.THERAPY,
@@ -154,29 +161,20 @@ class Intervention(LifecycleModel):
             )
             return s
 
-    is_default_intervention = models.BooleanField(default=False)
-
-    # TODO - make this non nullable
     default_conversation_model = models.ForeignKey(
-        "LLM",
+        "llmtools.LLM",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         related_name="default_for_conversations",
     )
     default_judgement_model = models.ForeignKey(
-        "LLM",
+        "llmtools.LLM",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         related_name="default_for_judgements",
     )
 
     default_chunking_model = models.ForeignKey(
-        "LLM",
+        "llmtools.LLM",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         related_name="default_for_chunking",
     )
 
@@ -196,6 +194,7 @@ class Intervention(LifecycleModel):
 
     class Meta:
         unique_together = ("title", "version", "sem_ver")
+        ordering = ["slug"]
 
 
 class StepJudgementManager(models.Manager):
@@ -440,7 +439,7 @@ class Judgement(models.Model):
         max_length=255,
     )
     model = models.ForeignKey(
-        "LLM",
+        "llmtools.LLM",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -458,60 +457,6 @@ class Judgement(models.Model):
         unique_together = [
             ("intervention", "variable_name"),
         ]
-
-
-class LLMManager(models.Manager):
-    def get_by_natural_key(
-        self,
-        model_name,
-    ):
-        return self.get(model_name=model_name)
-
-
-class LLM(models.Model):
-    """Store details of Language Models used for Step and Judgement execution"""
-
-    objects = LLMManager()
-
-    model_name = models.CharField(
-        max_length=255, help_text="Litellm model name, e.g. llama3.2 or gpt-4o"
-    )
-
-    api_key = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Litellm API key, defaults to LITELLM_API_KEY",
-    )
-    base_url = models.CharField(
-        max_length=1024,
-        blank=True,
-        null=True,
-        help_text="Litellm base URL defaults to LITELLM_ENDPOINT",
-    )
-
-    def __str__(self) -> str:
-        return self.model_name
-
-    def chatter(self, prompt, context=None):
-        from llmtools.llm_calling import chatter
-
-        return chatter(prompt, self, context={}, log_context={})
-
-    @property
-    def client(self):
-        # this is an Azure/OpenAI clent instance, but is used to query the litellm
-        # proxy. It must provide chat.completions.create_with_completion and
-        # client.chat.completions.create
-        return instructor.from_openai(
-            OpenAI(api_key=config("LITELLM_API_KEY"), base_url=config("LITELLM_ENDPOINT"))
-        )
-
-    def natural_key(self):
-        return (self.model_name,)
-
-    class Meta:
-        unique_together = [("model_name",)]
 
 
 # ################################################ #
@@ -569,31 +514,41 @@ class Note(models.Model):
         related_name="notes",
     )
 
-    judgement = models.ForeignKey("Judgement", on_delete=models.CASCADE, related_name="notes")
+    judgement = models.ForeignKey(
+        "Judgement", on_delete=models.CASCADE, related_name="notes", null=True, blank=True
+    )
+
     timestamp = models.DateTimeField(default=timezone.now)
 
     # for clinical Note type records, save a 'text' key
     # for other return types, save multiple string keys
     # type of this values is Dict[str, str | int]
-    # todo? add some validatio?
+    # todo? add some validation?
     data = models.JSONField(default=dict, null=True, blank=True)
 
     class Meta:
         ordering = ["timestamp"]
 
+    def variable_name(self):
+        # compute a variable name for the data to be accessed in prompts
+        # if from a judgement, use that
+        # if from a referal, use the keyword  'data'
+        if self.judgement:
+            return self.judgement.variable_name
+        if self.referal:
+            return "external"
+
     def val(self):
         return Box(self.data, default_box=True)
 
     def __str__(self):
-        return (
-            f"[{self.judgement.variable_name}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
-        )
+        return f"[{self.judgement and self.judgement.variable_name or '-'}] made {self.timestamp.strftime('%d %b %Y, %-I:%M')}"
 
 
 ### QuerySet for MemoryChunk (Supports Chaining)
 class MemoryChunkQuerySet(models.QuerySet):
     def search(self, query, method="semantic", llm=None, top_k=5):
-        """
+        """Generalized search function supporting both HyDE and semantic search.
         Generalized search function supporting both HyDE and semantic search.
 
         Args:
@@ -614,6 +569,7 @@ class MemoryChunkQuerySet(models.QuerySet):
 
         # Generate the hypothetical document for HyDE, then embed it
         elif method == "hyde":
+            raise Exception("Need to add credentials to this search")
             if not llm:
                 raise ValueError("HyDE search requires an LLM instance.")
             hyde_prompt = f"""
@@ -794,6 +750,7 @@ class Memory(LifecycleModel):
 
         # Generate chunks using the LLM chunking model
         numbered_text = "\n".join([f"{i+1}: {l}" for i, l in enumerate(textlines)])
+        raise Exception("Need to add credentials to this LLM call")
         chunks = llm.chatter(CHUNKER_TEMPLATE.format(source=numbered_text)).response
 
         embedding_texts = []
@@ -848,13 +805,30 @@ class Conversation(LifecycleModel):
     uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, editable=False)
     is_synthetic = models.BooleanField(default=False)
     archived = models.BooleanField(default=False)
-    # telegram_conversation_id = models.CharField(max_length=255, blank=True, null=True)
+
     chat_room_id = models.CharField(max_length=255, blank=True, null=True)
+    bot_interface = models.ForeignKey(
+        "BotInterface", on_delete=models.CASCADE, null=True, blank=True
+    )
+    llm_credentials = models.ForeignKey(
+        "llmtools.LLMCredentials", on_delete=models.PROTECT, default=1
+    )
+
+    max_turns = models.PositiveSmallIntegerField(blank=True, null=True)
 
     synthetic_turns_scheduled = models.PositiveSmallIntegerField(default=0)
 
     def last_turn_added(self):
         return self.turns.all().order_by("-timestamp").first()
+
+    def chat_url(self):
+        # redirect to gradio chat at the tip of the conversation
+        return reverse(
+            "start_gradio_chat_from_turn",
+            args=[
+                self.turns.all().order_by("depth").last().uuid,
+            ],
+        )
 
     def get_absolute_url(self):
         return settings.WEB_URL + reverse(
@@ -865,7 +839,7 @@ class Conversation(LifecycleModel):
         )
 
     def __str__(self):
-        return f"Conversation between: {', '.join(self.speakers().values_list('username', flat=True))} ()"
+        return f"Conversation between: {' and '.join(self.speakers().values_list('username', flat=True))}"
 
     def speakers(self) -> QuerySet["CustomUser"]:
         return CustomUser.objects.filter(
@@ -877,9 +851,9 @@ class Conversation(LifecycleModel):
             pk__in=self.turns.all().values_list("step__intervention__pk", flat=True)
         )
 
-    class Meta:
-        # order by timestamp of the last turn added
-        ordering = ["-turns__timestamp"]
+    # class Meta:
+    #     # order by timestamp of the last turn added
+    #     ordering = ["-turns__timestamp"]
 
 
 class Turn(NS_Node):
@@ -991,7 +965,8 @@ class Turn(NS_Node):
     def notes_data(self):
         # Assumes Note has a ForeignKey to Turn with related_name="notes"
         return "\n".join(
-            f"<{note.judgement.variable_name}>: {note.data}" for note in self.notes.all()
+            f"<{note.judgement and note.judgement.variable_name}>: {note.data}"
+            for note in self.notes.all()
         )
 
     notes_data.short_description = "Notes Data"
@@ -1001,19 +976,6 @@ class Turn(NS_Node):
 
     def __str__(self):
         return f"{self.uuid}"
-
-
-# class ChatInvite(LifecycleModel):
-#     invitor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="invites_sent")
-#     invite_code = models.CharField(max_length=255, unique=True)
-#     valid_until = models.DateTimeField(default=timezone.now+timezone.timedelta(months=1))
-
-#     def telegram_deeplink(self):
-#         from mindframe.settings import TELEGRAM_BOT_NAME
-#         if TELEGRAM_BOT_NAME:
-#             return f"https://t.me/{TELEGRAM_BOT_NAME}?start={self.invite_code}"
-#         else:
-#             return ValueError("TELEGRAM_BOT_NAME not set")
 
 
 class Nudge(LifecycleModel):
@@ -1203,3 +1165,109 @@ class ConversationalStrategy(LifecycleModel):
     key = AutoSlugField(populate_from="name")
     name = models.CharField(max_length=255)
     text = models.TextField()
+
+
+class ReferalToken(SoftDeletableModel, TimeFramedModel, LifecycleModel):
+    label = models.CharField(max_length=255, blank=True, null=True)
+    token = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False)
+    permitted_interventions = models.ManyToManyField("Intervention", blank=True)
+    valid_for_groups = models.ManyToManyField("auth.Group", blank=True)
+
+    def __str__(self):
+        return f"ReferalToken: {self.label and self.label or 'Unlabelled'} <{self.token}>"
+
+    def user_valid(self, user):
+        if not self.valid_for_groups.exists():
+            return True
+
+        if user.groups.filter(pk__in=self.valid_for_groups.values_list("pk", flat=True)).exists():
+            return True
+        else:
+            logger.warning(
+                f"User {username} not found in valid_for_groups for ReferalToken {self.token}"
+            )
+
+
+class Referal(TimeStampedModel, LifecycleModel):
+    """
+    Records when an external service refers a user to Mindframe
+
+    Referals are created with a form post containing the following Json data
+
+    {
+        "token": str, # must be a valid ReferalToken.token
+        "intervention": str, # must be a valid Intervention.slug
+        "username": str, # must be a valid CustomUser.username AND username_valid() must be True
+        "data": {str: str} # keys are valid python identifiers; values are also strings.
+    }
+
+    When valid, the form post creates a new Conversation object, using the intervention specified via the conversation.initialise_new_conversation function.
+
+    The data field is validated and stored in a new Note object on the first user turn of the Conversation. A reference to the Note is stored in the Referal object.
+
+    After creation, the API returns the uuid for the Referal like this:
+
+    {
+        "referal": str  # the new Referal.uuid
+    }
+    """
+
+    uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False)
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name="referals"
+    )
+    source = models.ForeignKey(
+        "ReferalToken", blank=False, null=False, related_name="referals", on_delete=models.PROTECT
+    )
+    # used to record metadata about the referal http request - whatever we can capture
+    log = models.JSONField(default=dict, null=True, blank=True)
+    note = models.OneToOneField(
+        "Note", blank=True, null=True, on_delete=models.CASCADE, related_name="referal"
+    )
+
+    def external_chat_link(self):
+        if self.conversation.bot_interface:
+            bn = self.conversation.bot_interface.bot_name
+            telegram_link = f"https://t.me/{bn}?start={self.uuid}"
+            return telegram_link
+        else:
+            return None
+
+    def __str__(self):
+        return f"{self.source.token[:8]} created -> {self.conversation}"
+
+
+class BotInterface(LifecycleModel):
+
+    # allow to be a list with a default
+    intervention = models.ForeignKey(
+        Intervention, on_delete=models.CASCADE, related_name="interfaces"
+    )
+    provider = models.CharField(
+        max_length=255,
+        choices=BotInterfaceProviders.choices,
+        default=BotInterfaceProviders.TELEGRAM,
+    )
+    bot_name = models.CharField(max_length=255, null=True, blank=True)
+    dev_mode = models.BooleanField(default=False)
+    bot_secret_token = models.CharField(max_length=255, null=True, blank=True)
+    webhook_validation_token = models.CharField(max_length=255, null=True, blank=True)
+
+    provider_info = models.JSONField(null=True, blank=True)
+    provider_info_updated = models.DateTimeField(null=True, blank=True)
+
+    budget_max_conversation_turns = models.PositiveSmallIntegerField(
+        null=True, blank=True, help_text="Maximum number of turns in a conversation"
+    )
+
+    def bot_client(self):
+        # todo make flexible to diff subclasses
+        from .telegram import TelegramBotClient
+
+        return TelegramBotClient(bot_interface=self)
+
+    def webhook_url(self):
+        return settings.WEBHOOK_BASE_URL + reverse("bot_webhook", args=[self.pk])
+
+    def __str__(self):
+        return f"{self.bot_name}: {self.provider} interface for {self.intervention}"

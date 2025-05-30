@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import io
+import json
 import logging
 import re
 import traceback
@@ -15,6 +16,7 @@ from box import Box
 from colored import Back, Fore, Style
 from django.template import Context, Template
 from langfuse.decorators import langfuse_context, observe
+from moviepy import VideoFileClip
 from pydantic import Field
 from pydub import AudioSegment
 
@@ -170,14 +172,13 @@ def parse_prompt(prompt_text) -> OrderedDict:
 
 
 @observe(capture_input=False, capture_output=False)
-def structured_chat(prompt, llm, return_type, max_retries=3, extra_body={}):
+def structured_chat(prompt, llm, credentials, return_type, max_retries=3, extra_body={}):
     """
     Make a tool call to an LLM, returning the `response` field, and a completion object
     """
 
-    langfuse_context.update_current_observation(input=prompt)
     try:
-        res, com = llm.client.chat.completions.create_with_completion(
+        res, com = llm.client(credentials).chat.completions.create_with_completion(
             model=llm.model_name,
             response_model=return_type,
             messages=[{"role": "user", "content": prompt}],
@@ -188,14 +189,16 @@ def structured_chat(prompt, llm, return_type, max_retries=3, extra_body={}):
 
     except Exception as e:
         full_traceback = traceback.format_exc()
+        raise e
         logger.warning(f"Error calling LLM: {e}\n{full_traceback}")
         res, com = None, None
 
+    langfuse_context.update_current_observation(input=prompt, output=res)
     return res, com
 
 
 @observe(capture_input=False, capture_output=False)
-def simple_chat(prompt, llm, extra_body={}):
+def simple_chat(prompt, llm, credentials, extra_body={}):
     """For a text prompt and LLM model, return a string completion."""
 
     # we can't use chat_with_completion because it needs a response model
@@ -204,7 +207,7 @@ def simple_chat(prompt, llm, extra_body={}):
     langfuse_context.update_current_observation(input=prompt)
 
     try:
-        res = llm.client.chat.completions.create(
+        res = llm.client(credentials).chat.completions.create(
             model=llm.model_name,
             response_model=None,
             messages=[{"role": "user", "content": prompt}],
@@ -244,7 +247,7 @@ class ChatterResult(OrderedDict):
 
 
 @observe(capture_input=False, capture_output=False)
-def chatter_(multipart_prompt, model, context={}, cache=True):
+def chatter_(multipart_prompt, model, credentials, context={}, cache=True):
     """
     Split a prompt template into parts and iteratively complete each part, using previous prompts and completions as context for the next.
 
@@ -326,7 +329,7 @@ def chatter_(multipart_prompt, model, context={}, cache=True):
 
             # Call the LLM via structured_chat.
             res, completion_obj = structured_chat(
-                rendered_prompt, model, return_type=rt, extra_body=extra_body
+                rendered_prompt, model, credentials, return_type=rt, extra_body=extra_body
             )
             res = res and res.response or None
 
@@ -401,7 +404,8 @@ class SegmentDependencyGraph:
         for i, segment in enumerate(self.segments):
             segment_id = f"segment_{i}"
             # Find all template variables {{ VAR}} in the segment
-            template_vars = set(re.findall(r"\{\{\s*(\w+)\s*\}\}", segment))
+            # template_vars = set(re.findall(r"\{\{\s*(\w+)\s*\}\}", segment))
+            template_vars = set(re.findall(r"\{\{\s*(\w+)\s*\}\}", TEMPLATE_PREFIX + segment))
 
             # For each template variable, find which earlier segment defines it
             for var in template_vars:
@@ -439,7 +443,10 @@ class SegmentDependencyGraph:
         return execution_plan
 
 
-async def chatter_async(multipart_prompt: str, model, context={}, cache=True) -> ChatterResult:
+@observe(capture_input=False, capture_output=False)
+async def chatter_async(
+    multipart_prompt: str, model, credentials, context={}, cache=True
+) -> ChatterResult:
     """
     Parallel version of chatter that processes independent segments concurrently.
 
@@ -464,7 +471,7 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
     # Analyze dependencies between segments
     dependency_graph = SegmentDependencyGraph(segments)
     execution_plan = dependency_graph.get_execution_plan()
-    print(execution_plan)
+    logger.info(f"Execution plan: {execution_plan}")
 
     # Final results and accumulated context
     final_results = ChatterResult()
@@ -481,7 +488,7 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
 
             # Use sync_to_async to safely call chatter from async context
             task = sync_to_async(chatter_, thread_sensitive=True)(
-                segment, model, accumulated_context, cache
+                segment, model, credentials, accumulated_context, cache
             )
             segment_tasks.append(task)
 
@@ -492,21 +499,22 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
         for i, result in enumerate(batch_results):
             accumulated_context.update(dict(result))
             final_results.update(dict(result))
-
+        logger.info("Accumulated context", accumulated_context)
     # Set RESPONSE_ if needed
     if "RESPONSE_" not in final_results and final_results:
         last_key = next(reversed(final_results))
         final_results["RESPONSE_"] = final_results[last_key]
 
+    langfuse_context.update_current_observation(
+        input=multipart_prompt, output=json.dumps(final_results)
+    )
+
     return final_results
 
 
-def chatter(multipart_prompt: str, model, context={}, cache=True) -> ChatterResult:
+def chatter(multipart_prompt: str, model, credentials, context={}, cache=True) -> ChatterResult:
     """Synchronous wrapper for chatter_async"""
-    return async_to_sync(chatter_async)(multipart_prompt, model, context, cache)
-
-
-from moviepy import VideoFileClip
+    return async_to_sync(chatter_async)(multipart_prompt, model, credentials, context, cache)
 
 
 def convert_audio(input_bytes, to="mp3"):

@@ -1,9 +1,33 @@
+
+
+- rationalise the starting of new conversatins for Bot and Anonymous web sessions
+
+- allow public interactions?
+- catch errors related to budget overruns
+
+
+
+- allow for different LLM API keys for bot interfaces
+
+https://docs.litellm.ai/docs/proxy/users
+{
+  "detail":"Authentication Error, ExceededTokenBudget: Current spend for token: 7.2e-05; Max Budget for Token: 2e-07"
+}
+
+
+
+# Research ideas
+
+Long term qual interviews
+Maintenance tools between sessions
+Maintenance after intervention ends
+Reduce contact points in group interventions?
+
+
 # Roadmap for `mindframe` development
 
 
-DataPoint/DataPackage/Observation/Note
-Allow arbitrary dumps of key=val data to be posted to a conversation or turn
-from externally?
+Test async version of webhook and chat UI
 
 
 ComputedData
@@ -129,6 +153,12 @@ Some models are very simple classifiers and don't need ChatGPT 4. We should thin
 
 ### Queuing and scheduling
 
+
+When a Bot user sends multiple messages in a row, the bot will process each in turn using celery. This might be wasteful... it could be better to kill existing tasks when recieving new input? Keep a key/lock/semaphore on the conversation model?
+
+
+
+----
 At present, when we add Judements to step all are run against the LLM before
 the transition is evaluated.
 

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+
+    <div class="row">
+
+        <h1 class="col-12">
+            Referral Created Successfully
+        </h1>
+
+
+        <div class="col">
+            <div>
+                <h5>Web Link</h5>
+                <a href="{{referal.conversation.get_absolute_url}}" class="text-blue-600 hover:underline break-all">{{ referal.conversation.get_absolute_url }}</a>
+
+
+                <h5 class="mt-4">External Chat Links To Start Conversation</h5>
+            <p>
+                <a class="btn btn-primary" href="{{referal.conversation.chat_url}}" class="text-blue-600 hover:underline break-all"> Chat in web UI </a>
+            </p>
+            <p>
+                {% if referal.external_chat_link %}
+            <a class="btn btn-outline-primary" href="{{referal.external_chat_link}}" class="text-blue-600 hover:underline break-all"> {{referal.external_chat_link}} </a>
+            {% endif %}
+            </p>
+            </div>
+        </div>
+        <div class="col-4">
+
+            <p>Referal: {{ referal.uuid }}</p>
+            <p>Conversation: <a href="{{referal.conversation.get_absolute_url}}">{{ referal.conversation.uuid }}</a></p>
+
+
+        </div>
+
+    </div>
+
+    <div class="flex space-x-4">
+        <a href="{{ web_url }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            Open in Web
+        </a>
+        <a href="{{ telegram_link }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+            Open in Telegram
+        </a>
+    </div>
+</div>
+</div>
+{% endblock %}

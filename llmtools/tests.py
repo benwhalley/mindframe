@@ -10,11 +10,14 @@ from mindframe.models import LLM
 class LLMToolsTestCase(TestCase):
     def setUp(self):
         self.mini = LLM.objects.create(model_name="gpt-4o-mini")
+        raise Exception("Need to add credentials to LLM")
+        self.credentials = None
 
     def test_chatter_joke(self):
         jk = chatter(
             "Think about mammals very briefly, in one or 2 lines: [[THOUGHTS]] Now tell me a joke. [[speak:JOKE]]",
             self.mini,
+            self.credentials,
         )
 
         self.assertIsInstance(jk["JOKE"], str)
@@ -35,6 +38,7 @@ class LLMToolsTestCase(TestCase):
         rr = chatter(
             "Which is more interesting for nerds: art, science or magic? [[pick:topic|art,science,magic]]",
             self.mini,
+            self.credentials,
         )
 
         self.assertIn(rr["topic"], ["art", "science", "magic"])
@@ -51,6 +55,7 @@ class LLMToolsTestCase(TestCase):
         newusers, completions = structured_chat(
             "Create a list of 3 imaginary users. Use consistent field names for each item. Use the tools [[users]]",
             self.mini,
+            self.credentials,
             return_type=UserList,
         )
 

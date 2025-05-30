@@ -1,80 +1,185 @@
 {% extends "base.html" %}
+{% load markdown %}
 {% load crispy_forms_tags %}
 {% load static %}
 
+{% block extra_head %}
+{{block.super}}
+
+{% if not jobgroup.complete %}
+<meta http-equiv="refresh" content="10">
+{% else %}
+<!-- No refresh -->
+{% endif %}
+{% endblock %}
+
 
 {% block content %}
+
 <div class="container">
     <div class="row">
 
-        <div class="col">
 
-            <h1>Job Group:
+            <h1 class="col-12 mb-4">Job Group:
                 <code>{{jobgroup.id}}</code>
             </h1>
 
 
-            <h5>Status</h5>
-
-            <li>{{ jobgroup.complete|yesno:"Completed,In progress" }}
-            </li>
-
-            <li><a href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Details</a></li>
-
-            <li>
-                Too used:
-        <a href="{{jobgroup.tool.get_absolute_url}}">{{jobgroup.tool.name}}</a>
-            </li>
 
 
+<div class="col-8">
 
+  <h5 class=" mb-3">Jobs/Results
+  </h5>
 
-<hr>
+  <button class="btn btn-sm mb-2 btn-outline-primary" onclick="copyJSON()">
+          Copy JSON</button>
 
-<h5>Jobs</h5>
+      <a class="btn btn-sm mb-2 btn-outline-success" href="{% url 'jobgroup_excel' jobgroup.uuid %}">
+          Download CSV</a>
 
-    <ul style="list-style-type: none;">
-        {% for job in jobs %}
-        <li>
-            {% if job.completed %}
-                <span style="color:green;">&#10004;</span>  {# ✔ U+2714 #}
-                {% else %}
-                <span style="color:red;">&#10060;</span>   {# ❌ U+274C #}
+  <style>
+
+  .accordion-body.small h1,
+  .accordion-body.small h2,
+  .accordion-body.small h3,
+  .accordion-body.small h4,
+  .accordion-body.small h5,
+  .accordion-body.small h6 {
+    font-size: 1em;
+    margin-top: 0.5em;
+    margin-bottom: 0.25em;
+    font-weight: 600;
+  }
+
+  .accordion-body.small p {
+    font-size: 0.875em;
+    margin-bottom: 0.5em;
+  }
+
+  .accordion-body.small ul,
+  .accordion-body.small ol {
+    font-size: 0.875em;
+    margin-left: 1.25em;
+  }
+
+  .accordion-body.small code {
+    font-size: 0.8em;
+  }
+
+  </style>
+  <div class="accordion" id="resultsAccordion">
+    {% for i in jobs %}
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
+
+          <button class="accordion-button {{forloop.first|yesno:",collapsed"}}"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#collapse-{{ forloop.counter }}"
+                  aria-expanded="false"
+                  aria-controls="collapse-{{ forloop.counter }}">
+
+            {% if job.cancelled %}
+              <span>Cancelled</span>
             {% endif %}
 
-            <span class="small">{{ job }} </span>
+            {% if i.completed and not i.cancelled %}
+                <span class="p-1 small" style="color:green;">&#10004;</span>  {# ✔ U+2714 #}
+            {% else %}
+                <span class="p-1 small"style="color:red;">&#10060;</span>   {# ❌ U+274C #}
+            {% endif %}
+
+            {{ i|truncatechars:60 }}
+
+          </button>
+        </h2>
+        <div id="collapse-{{ forloop.counter }}"
+            class="accordion-collapse {{forloop.first|yesno:",collapse"}}"
+            aria-labelledby="heading-{{ forloop.counter }}"
+            data-bs-parent="#resultsAccordion">
+          <div class="accordion-body p-2 small">
+            <ul class="list-group list-group-flush">
+              {% for j, k in i.result.items %}
+                <li class="list-group-item">
+                  <code>{{ j }}</code>: {{ k|markdown }}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  </div>
+
+  <div class="col-4">
+    <h5>Status</h5>
 
 
-
-        </li>
-        {% endfor %}
-    </ul>
-    {% if all_complete %}
-    <p>All jobs are complete.</p>
-    {% else %}
-    <p>Some jobs are still in progress. This page will refresh every 30 seconds.</p>
+    {% if jobgroup.cost %}
+    <p>Cost: ${{ jobgroup.cost }}</p>
     {% endif %}
+    {% if all_complete %}
+      <p class="mt-3">All jobs are complete.</p>
+      {% else %}
+      <p class="mt-3">Some jobs are still in progress. This page will refresh every 10 seconds until it's complete.</p>
+      {% endif %}
 
-    <hr>
+              {% if jobgroup.in_progress %}
+              <button
+                  class="float-end btn btn-danger"
+                  hx-post="{% url 'action' app='llmtools' model='JobGroup' identifier=jobgroup.pk %}"
+                  hx-vals='{"action": "cancel_jobs"}'
+                  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                  hx-swap="outerHTML"
+                  hx-target="this">
+                  Cancel jobs
+              </button>
+              {% endif %}
 
-<h5>Results
-    <button class="btn btn-outline-primary" onclick="copyJSON()">Copy JSON</button>
 
-</h5>
 
-<pre class="card card-body small" id="json-output" style="white-space: pre; font-size:.7em;">{{ jobgroup.json }}</pre>
+              <li class="mb-2">
+                  Tool used:
+          <a href="{{jobgroup.tool.get_absolute_url}}">{{jobgroup.tool.name}}</a>
+              </li>
 
-<script>
-function copyJSON() {
-    const jsonText = document.getElementById("json-output").textContent;
-    navigator.clipboard.writeText(jsonText).then(() => {
-        alert("JSON copied to clipboard.");
-    }).catch(err => {
-        alert("Failed to copy: " + err);
-    });
-}
-</script>
+              <li>Status: {{ jobgroup.status }}
+              <li>All jobs completed: {{jobgroup.complete}}</li>
+              <li>Cancelled: {{jobgroup.cancelled}}</li>
+              <li>UUID: <code>{{ jobgroup.uuid |truncatechars:6 }}</code></li>
+              </li>
 
-</div>
-</div>
-{% endblock %}
+              <a class="mt-2 btn btn-outline-secondary" href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Edit Details</a>
+
+  </div>
+
+
+
+  <pre class="card card-body small d-none" id="json-output" style="white-space: pre; font-size:.7em; max-height:200px">{{ jobgroup.json }}</pre>
+
+
+
+
+  <script>
+  function copyJSON() {
+      const jsonText = document.getElementById("json-output").textContent;
+      navigator.clipboard.writeText(jsonText).then(() => {
+          alert("JSON copied to clipboard.");
+      }).catch(err => {
+          alert("Failed to copy: " + err);
+      });
+  }
+
+
+  </script>
+
+  </div>
+
+  </div>
+
+  </div>
+  </div>
+  {% endblock %}

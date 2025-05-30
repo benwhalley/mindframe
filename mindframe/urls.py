@@ -1,62 +1,88 @@
+import logging
 import pickle
 from copy import deepcopy
+from pathlib import Path
 
 from decouple import config
+from django.conf import settings
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 from django.urls import include, path
+from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
+from django.views.generic.base import TemplateView
 
 import mindframe.views.conversation as cv
 import mindframe.views.general as gv
 import mindframe.views.hyde as hv
 import mindframe.views.intervention as iv
-from mindframe.telegram import TelegramBotClient
+import mindframe.views.referals as rv
+from mindframe.models import BotInterface
+from mindframe.settings import SAVE_TELEGRAM_REQUESTS, USE_CELERY_FOR_WEBHOOKS
+from mindframe.tasks import process_webhook_async
+
+logger = logging.getLogger(__name__)
 
 
-def pickle_minimal_request(request):
+# use this for saving telegram requests for playback later
+def dump_minimal_request(request):
+    try:
+        body = request.body.decode("utf-8")
+    except UnicodeDecodeError:
+        body = "<binary data not UTF-8>"
     minimal_data = {
         "path": request.path,
         "method": request.method,
         "GET": dict(request.GET),
         "POST": dict(request.POST),
-        "META": dict(request.META),
+        "body": body,
         "headers": dict(request.headers),
-        "session": dict(request.session),
-        "body": request.body,
+        # these cause serialisation issues
+        # "META": dict(request.META),
+        # "session": dict(request.session),
     }
     return pickle.dumps(minimal_data)
 
 
 @csrf_exempt
-def telegram_webhook(request):
-    """
-    Django view function for handling Telegram webhook requests.
-    This function delegates processing to the BotController.
-    """
-    # capture the last request so we can capture requests and use for testing
-    # try:
-    #     with open("request.pickle", "wb") as f:
-    #         print(pickle_minimal_request(request))
-    #         f.write(pickle_minimal_request(request))
+def bot_interface(request, pk):
+    obj = get_object_or_404(BotInterface, pk=pk)
+    request_data = {
+        "method": request.method,
+        "headers": dict(request.headers),
+        "body": request.body.decode("utf-8"),  # or .hex() if binary data is possible
+        "GET": request.GET.dict(),
+        "POST": request.POST.dict(),
+        # TODO if files are needed add them to the request
+    }
+    print(request, request.body, pk)
 
-    # except Exception as e:
-    #     print(f"Error serializing request data: {e}")
+    if USE_CELERY_FOR_WEBHOOKS:
+        process_webhook_async(pk, request_data)
+    else:
+        process_webhook_async.delay(pk, request_data)
 
-    tgmb = TelegramBotClient(
-        bot_name=config("TELEGRAM_BOT_NAME", "MindframerBot"),
-        bot_secret_token=config("TELEGRAM_BOT_TOKEN", None),
-        webhook_url=config("TELEGRAM_WEBHOOK_URL", None),
-        webhook_validation_token=config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN", None),
-    )
+    if SAVE_TELEGRAM_REQUESTS:
+        timestamp = now().strftime("%Y%m%d-%H%M%S")
+        filename = Path(f"telegram_requests/{timestamp}_{pk}.pickle")
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(filename, "wb") as f:
+                f.write(dump_minimal_request(request))
+        except Exception as e:
+            logger.error(f"Error saving telegram request: {e}")
 
-    return tgmb.process_webhook(request)
+    return HttpResponse("OK", status=200)
 
 
 urlpatterns = [
     path("chat/", include("mindframe.chat_urls")),
+    path(
+        "interventions/<str:slug>/", iv.InterventionDetailView.as_view(), name="intervention_detail"
+    ),
     path("interventions/", iv.InterventionListView.as_view(), name="intervention_list"),
     path("steps/<int:pk>/", iv.StepDetailView.as_view(), name="step_detail"),
-    path("telegram-webhook/", telegram_webhook, name="telegram_webhook"),
+    path("bot-webhook/<int:pk>", bot_interface, name="bot_webhook"),
     # Other URLs
     path(
         "start/from-turn/<str:turn_uuid>/",
@@ -94,5 +120,8 @@ urlpatterns = [
         name="conversation_mermaid",
     ),
     path("rag-test/", hv.RAGHyDEComparisonView.as_view(), name="rag_test"),
-    path("", gv.IndexView.as_view(), name="index"),  # Index page
+    path("referal/create/", rv.CreateReferalView.as_view(), name="create_referal"),
+    path("referal/<str:uuid>/", rv.ReferalDetailView.as_view(), name="referal_detail"),
+    path("", TemplateView.as_view(template_name="index.html"), name="index"),
+    path("about/", TemplateView.as_view(template_name="about.html"), name="about"),
 ]

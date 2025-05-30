@@ -27,19 +27,19 @@ def make_data_variable(notes):
     The layout/structure of this object is important because end-users will access it in templates and it needs to be consistent/predictable and provide good defaults.
     """
 
-    def getv(notes, v):
-        notes = notes.filter(judgement__variable_name=v)
-        r = {v: notes.last().data, v + "__all": notes}
-        return Box(r, default_box=True)
+    # Ensure notes are ordered from newest to oldest
+    notes = notes.order_by("-timestamp")
 
-    # get all notes for this session and flatten them so that we can access the latest
-    # instance of each Judgement/Note by variable name
-    vars = set(notes.values_list("judgement__variable_name", flat=True))
-    logger.info(f"Variables to include: {vars}")
-    dd = {}
-    for i in vars:
-        dd.update(getv(notes, i))
-    return Box(dd, default_box=True)
+    ctx = {}
+    seen = set()
+
+    for note in notes:
+        var = note.variable_name()
+        if var and var not in seen:
+            ctx[var] = note.data
+            seen.add(var)
+    print(f"\n\n\n{ctx}\n\n\n")
+    return Box(ctx, default_box=True)
 
 
 def hsv_to_rgb(h, s, v):

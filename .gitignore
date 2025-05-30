@@ -22,3 +22,4 @@ mindframe/__example_matrix_logs
 docs/_site
 mindframe_db.dump
 uploads/
+telegram_requests/

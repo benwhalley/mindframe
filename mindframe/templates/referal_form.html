@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block content %}
+
+<div class="row">
+    <h1 class="col-12">Create New Referral</h1>
+
+
+    <div class="col">
+    <form method="post" class="space-y-4">
+        {% csrf_token %}
+
+        {{form|crispy}}
+
+        <div class="pt-4">
+            <button type="submit"
+                    class="btn btn-primary">
+                Create Referral
+            </button>
+        </div>
+    </form>
+
+    </div>
+    <div class="col-4">
+        <p>
+            Referals are a way of introducing a new user to a conversation with a Bot.
+        They can include background notes on the client, which can be accessed in the bot's response.
+        </p>
+        <p>
+            To create a referral, choose the intervention and the bot user to use.
+            On the next page you will recieve a link to chat interface, and a link to a Telegram chat.
+        </p>
+    </div>
+</div>
+{% endblock %}

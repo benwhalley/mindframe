@@ -5,14 +5,23 @@ from distutils.util import strtobool
 from pathlib import Path
 
 import dj_database_url
+from celery.schedules import crontab
 from decouple import Csv, config
 from langfuse.callback import CallbackHandler
 
 logger = logging.getLogger(__name__)
 
+
+DEBUG = config("DEBUG", default=False, cast=bool)
+
+
 REDIS_URL = config("REDIS_URL", default="redis://redis:6379/0")
 CHAT_URL = config("CHAT_URL", default=None)
 WEB_URL = config("WEB_URL", default=None)
+WEBHOOK_BASE_URL = config("WEBHOOK_BASE_URL", default=WEB_URL)
+
+if WEBHOOK_BASE_URL != WEB_URL:
+    logger.info(f"WEBHOOK_BASE_URL: {WEBHOOK_BASE_URL}")
 
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
@@ -33,7 +42,6 @@ CSRF_TRUSTED_ORIGINS = config(
     cast=Csv(),
 )
 
-DEBUG = config("DEBUG", default=False, cast=bool)
 DDT = config("DDT", default=False, cast=bool)
 DEBUG_TOOLBAR_CONFIG = {
     "SHOW_TOOLBAR_CALLBACK": lambda request: DDT,  # This disables the toolbar by default
@@ -43,7 +51,8 @@ DEBUG_TOOLBAR_CONFIG = {
 if DEBUG:
     SECRET_KEY = config("SECRET_KEY", "1234")
 else:
-    config("SECRET_KEY")
+    SECRET_KEY = config("SECRET_KEY")
+
 COMPRESS_ENABLED = config("COMPRESS_ENABLED", default=True, cast=bool)
 COMPRESS_OFFLINE = config("COMPRESS_OFFLINE", default=True, cast=bool)
 
@@ -64,8 +73,9 @@ else:
 
 logger.info(f"DJMAIL_REAL_BACKEND is set to {DJMAIL_REAL_BACKEND}")
 
-
-langfuse_handler = CallbackHandler()
+langfuse_handler = CallbackHandler(
+    secret_key=config("LANGFUSE_SECRET_KEY"), public_key=config("LANGFUSE_PUBLIC_KEY")
+)
 # logger.info("Langfuse auth: ", langfuse_handler.auth_check())
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
@@ -73,11 +83,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Application definitions
 INSTALLED_APPS = [
-    "llmtools",
-    "mindframe",
     "treebeard",
     "debug_toolbar",
-    "hijack",
     "crispy_forms",
     "crispy_bootstrap5",
     # "compressor",
@@ -91,9 +98,11 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "whitenoise.runserver_nostatic",
     "rules.apps.AutodiscoverRulesConfig",
-    # "magiclink",
+    "llmtools",
+    "mindframe",
     "djmail",
     "django_celery_beat",
+    "markdownit",
 ]
 
 MIDDLEWARE = [
@@ -105,7 +114,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "hijack.middleware.HijackUserMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 
@@ -171,11 +179,10 @@ CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
-CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", default=False, cast=bool)
+CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", default=DEBUG, cast=bool)
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 
-from celery.schedules import crontab
 
 CELERY_BEAT_SCHEDULE = {
     "run-incomplete-jobs": {
@@ -244,7 +251,6 @@ if DEBUG:
 AUTHENTICATION_BACKENDS = (
     "rules.permissions.ObjectPermissionBackend",
     "django.contrib.auth.backends.ModelBackend",
-    # "magiclink.backends.MagicLinkBackend",
 )
 
 LOGIN_URL = "admin:index"
@@ -321,8 +327,7 @@ DEBUG_TOOLBAR_PANELS = [
 ]
 
 LOGIN_REDIRECT_URL = "/"
-HIJACK_LOGIN_REDIRECT_URL = "/"
-HIJACK_LOGOUT_REDIRECT_URL = "/"
+
 
 MAGICLINK_EMAIL_STYLES = {
     "logo_url": "https://psybot.llemma.net/static/logoplymouth.png",

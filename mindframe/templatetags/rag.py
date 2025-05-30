@@ -4,7 +4,8 @@ from django import template
 from django.db.models import Q
 from django.utils.safestring import mark_safe
 
-from mindframe.models import LLM, Memory, MemoryChunk
+from llmtools.models import LLM
+from mindframe.models import Memory, MemoryChunk
 
 logger = logging.getLogger(__name__)
 register = template.Library()

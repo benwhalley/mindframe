@@ -7,7 +7,10 @@ from decouple import config
 from django.conf import settings
 from django.db import models
 
-TELEGRAM_BOT_NAME = config("TELEGRAM_BOT_NAME", None)
+USE_CELERY_FOR_WEBHOOKS = not settings.DEBUG
+SAVE_TELEGRAM_REQUESTS = settings.DEBUG
+
+RESERVED_USERNAMES = ["system", "therapist", "client"]
 
 DEFAULT_CONVERSATION_MODEL_NAME = config("DEFAULT_CONVERSATION_MODEL_NAME", "gpt-4o-mini")
 DEFAULT_JUDGEMENT_MODEL_NAME = config("DEFAULT_JUDGEMENT_MODEL_NAME", "gpt-4o-mini")
@@ -54,6 +57,7 @@ class TurnTypes(models.TextChoices):
     BOT = "bot", "Bot utterance"
     OPENING = "opening", "Fixed opening line"
     JOIN = "join", "Join"  # joining a conversation
+    SYSTEM = "system", "System message"
     # LEFT = "left", "Left" # joining a conversation
 
 
@@ -77,4 +81,9 @@ class StepJudgementFrequencyChoices(models.TextChoices):
     EXIT = "exit", "When exiting the step"
 
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
+class BotInterfaceProviders(models.TextChoices):
+    """Specifies when/how frequently a judgement should be made during a step."""
+
+    TELEGRAM = "telegram", "Telegram"
+    # WEB = "web", "Web UI"
+    # MATRIX ...

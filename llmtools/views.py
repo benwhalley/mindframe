@@ -6,39 +6,65 @@ import zipfile
 from pathlib import Path
 from string import Template
 
+import magic
 from django import forms
-from django.core.files import File
-from django.template import Template, Context
-from django.core.files.uploadedfile import UploadedFile
-from django.shortcuts import get_object_or_404, redirect, render
-from django.contrib.auth.decorators import permission_required
-from django.urls import reverse
-from django.views.generic import DetailView, ListView
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.core.exceptions import ValidationError
+from django.core.files import File
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.generic import DetailView, ListView
+from langfuse.decorators import langfuse_context
 
 from llmtools.extract import extract_text
-from llmtools.llm_calling import chatter
 
 from .models import Job, JobGroup, Tool
-from .tasks import run_job_group
+from .tasks import run_job
+
+langfuse_context.configure(debug=False)
+mime = magic.Magic(mime=True)
+
+
+@login_required
+def download_excel(request, uuid: str):
+    jg = get_object_or_404(JobGroup, uuid=uuid)
+    buffer = jg.xlsx()
+
+    response = HttpResponse(
+        buffer, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="output.xlsx"'
+    return response
 
 
 class ToolInputForm(forms.Form):
     def __init__(self, *args, tool=None, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.fields["file"] = forms.FileField(
+            label="Upload a single file, or a ZIP file (or enter data below manually)",
+            help_text="Upload a single file, or a zip with multiple files to start a batch job",
+            required=False,
+        )
+        self.dynamic_fields = []
         if tool is not None:
             for field_name in tool.get_input_fields():
                 self.fields[field_name] = forms.CharField(
                     label=field_name,
-                    widget=forms.Textarea(attrs={"rows": 10}),
+                    widget=forms.Textarea(attrs={"rows": 3}),
                     required=False,
                 )
-        self.fields["file"] = forms.FileField(
-            label="Upload ZIP",
-            help_text="Upload a zip with multiple files to start a batch job",
-            required=False,
-        )
+                self.dynamic_fields.append(field_name)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        file_ = cleaned_data.get("file")
+        dynamic_filled = [cleaned_data.get(f) for f in self.dynamic_fields if cleaned_data.get(f)]
+        if not file_ and len(dynamic_filled) < 1:
+            raise ValidationError(
+                "You must either upload a file, or fill in at least one of the manual input fields."
+            )
+        return cleaned_data
 
 
 class JobGroupDetailView(PermissionRequiredMixin, DetailView):
@@ -62,56 +88,69 @@ class ToolListView(PermissionRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["jobgroups"] = JobGroup.objects.filter(owner=self.request.user)
+        if not self.request.user.is_authenticated:
+            return context
+
+        context["jobgroups"] = JobGroup.objects.filter(owner=self.request.user).order_by("-created")
         return context
+
+
+def process_file(uploaded_file, job_group):
+    ext = os.path.splitext(uploaded_file.name)[1] or ".bin"
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as temp_file:
+        uploaded_file.seek(0)
+        temp_file.write(uploaded_file.read())
+        temp_file_path = temp_file.name
+    text = extract_text(temp_file_path)
+    return Job.objects.create(
+        group=job_group,
+        context={"source": text},
+    )
+
+
+def process_zip_file(uploaded_file, job_group):
+    jobs = []
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with zipfile.ZipFile(uploaded_file, "r") as zip_ref:
+            zip_ref.extractall(temp_dir)
+            for root, _, files in os.walk(temp_dir):
+                for file_name in files:
+                    if file_name.startswith("."):
+                        continue
+                    file_path = os.path.join(root, file_name)
+                    with open(file_path, "rb") as f:
+                        django_file = File(f, name=Path(file_name).name)
+                        jobs.append(process_file(django_file, job_group))
+    return jobs
 
 
 @permission_required("llmtools.add_jobgroup")
 def tool_input_view(request, pk):
     tool = get_object_or_404(Tool, pk=pk)
+    form = ToolInputForm(request.POST or None, request.FILES or None, tool=tool)
 
     if request.method == "POST":
-        form = ToolInputForm(request.POST, tool=tool)
-        if form.is_valid():
-            uploaded_file = request.FILES.get("file")
-            # import pdb; pdb.set_trace()
-            if uploaded_file and isinstance(uploaded_file, UploadedFile):
-                job_group = JobGroup.objects.create(tool=tool, owner=request.user)
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    with zipfile.ZipFile(uploaded_file, "r") as zip_ref:
-                        zip_ref.extractall(temp_dir)
-                        for root, _, files in os.walk(temp_dir):
-                            for file_name in files:
-                                if file_name.startswith("."):
-                                    continue
-                                file_path = os.path.join(root, file_name)
-                                with open(file_path, "rb") as f:
-                                    django_file = File(f, name=Path(file_name).name)
-                                    text = extract_text(
-                                        file_path
-                                    )  # ← if you want to store extracted text too
-                                    Job.objects.create(
-                                        group=job_group, source_file=django_file, source=text
-                                    )
-                run_job_group.delay(job_group.id)
-                return redirect(job_group.get_absolute_url())
+        if not form.is_valid():
+            return render(request, "tool_result.html", {"tool": tool, "form": form})
 
+        job_group = JobGroup.objects.create(tool=tool, owner=request.user)
+        langfuse_context.update_current_observation(session_id=str(job_group.uuid))
+
+        uploaded_file = request.FILES.get("file", None)
+        if uploaded_file:
+            file_type = mime.from_buffer(uploaded_file.read(1024))
+            uploaded_file.seek(0)
+            if file_type == "application/zip":
+                jobs = process_zip_file(uploaded_file, job_group)
+            else:
+                jobs = [process_file(uploaded_file, job_group)]
+        else:
             cleaned_data_str = {key: str(value) for key, value in form.cleaned_data.items()}
+            jobs = [Job.objects.create(group=job_group, context=cleaned_data_str, tool=tool)]
 
-            # Create a Template object
-            template = Template(tool.prompt)
-            # Render the template with the cleaned data
-            context = Context(cleaned_data_str)
-            # raise Exception(template, context)
-            filled_prompt = template.render(context)
-            results = chatter(filled_prompt, tool.model)
+        for i in jobs:
+            run_job.delay(i.id)
 
-            return render(
-                request,
-                "tool_result.html",
-                {"tool": tool, "results": json.dumps(results, indent=2), "form": form},
-            )
+        return redirect(job_group.get_absolute_url())
     else:
-        form = ToolInputForm(tool=tool)
-
-    return render(request, "tool_result.html", {"tool": tool, "form": form})
+        return render(request, "tool_form.html", {"tool": tool, "form": form})

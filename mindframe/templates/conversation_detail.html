@@ -6,7 +6,7 @@
 {% load guidance %}
 {% block content %}
 <div class="container mt-5">
-    <h1 class="mb-4 mt-4">Conversation
+    <h1 class="mb-4 mt-4">Conversation {{object.id}}
     {% if turn.pk == leaf_node.pk %}
      at node {{turn.uuid|slice:5}}
     {% else %}

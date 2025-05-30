@@ -4,35 +4,42 @@
 
 <div class="row">
 
+    <h3 class="col-12 mb-4">LLM Tools</h3>
+
     <div class="col-6">
-  <h3>LLM Tools</h3>
-  <hr>
-  <ul>
+      <p>
+        Mindframe tools are simple ways to template LLM primpts, that can be used to automate tasks, especially when working with large numbers of documents.
+      </p>
+    </div>
+    <div class="col-6"> </div>
+
+    <div class="col">
+      <h5>Available tools</h5>
+  <ul class="list-group mb-4">
     {% for tool in tools %}
-      <li>
+      <li class="list-group-item">
         <a href="{% url 'tool_input' tool.id %}">{{ tool.name }}</a>
       </li>
     {% endfor %}
   </ul>
 
-  <hr>
   <!-- button to add a new  -->
-  <a href="{% url 'admin:llmtools_tool_add' %}" class="btn btn-primary">Add Tool</a>
+  <a href="{% url 'admin:llmtools_tool_add' %}" class="btn btn-success">Create New Tool</a>
   </div>
 
-  <div class="col-6">
-  <h3>Job Groups</h3>
+
+  {% if jobgroups %}
+  <div class="col">
+  <h5>Previous Jobs</h5>
   <ul>
     {% for jobgroup in jobgroups %}
       <li>
+        {{jobgroup.created}}
 
-
-        <a href="{% url 'jobgroup-detail' jobgroup.id %}">
-        {{jobgroup.modified}}</a>
-        <b>{{ jobgroup.tool.name }}</b>
-
-        {{jobgroup.complete|yesno:"Completed,In progress"}}
-        {% if jobgroup.complete %}
+        (Last update <a href="{% url 'jobgroup-detail' jobgroup.id %}">
+        {{jobgroup.modified}}</a>)
+        <b>{{ jobgroup.tool.name }}</b> {{jobgroup.status}}
+        {% if jobgroup.complete and not jobgroup.cancelled %}
             <span style="color:green;">&#10004;</span>  {# ✔ U+2714 #}
             {% else %}
             <span style="color:red;">&#10060;</span>   {# ❌ U+274C #}
@@ -42,6 +49,7 @@
       </li>
     {% endfor %}
   </div>
+  {% endif %}
 
 {% endblock %}
 

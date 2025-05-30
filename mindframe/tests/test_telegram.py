@@ -13,12 +13,12 @@ from mindframe.telegram import TelegramBotClient
 logger = logging.getLogger(__name__)
 
 
-tgmb = TelegramBotClient(
-    bot_name="MindframerBot",
-    bot_secret_token=config("TELEGRAM_BOT_TOKEN", None),
-    webhook_url=config("TELEGRAM_WEBHOOK_URL", None),
-    webhook_validation_token=config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN", None),
-)
+# tgmb = TelegramBotClient(
+#     bot_name="MindframerBot",
+#     bot_secret_token=config("TELEGRAM_BOT_TEN", None),
+#     webhook_url=config("TELEGRAM_WEBHOOK_URL", None),
+#     webhook_validation_token=config("TELEGRAM_WEBHOOKION_TOKEN", None),
+# )
 
 tgmb
 

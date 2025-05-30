@@ -38,7 +38,7 @@ def tool_input_api(request, tool_pk: int, data: ToolKeyBody):
     filled_prompt = tool.prompt.format(**data.fields)
 
     # Call your LLM function
-    result = chatter(filled_prompt, tool.model)
+    result = chatter(filled_prompt, tool.model, tool.credentials)
 
     return {"response": str(result.response)}
 

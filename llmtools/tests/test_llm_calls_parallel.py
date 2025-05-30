@@ -4,9 +4,10 @@ from pprint import pprint
 from unittest import mock
 
 from llmtools.llm_calling import chatter, chatter_
-from mindframe.models import LLM
+from llmtools.models import LLM, LLMCredentials
 
 model = LLM.objects.get(model_name="gpt-4o-mini")
+credentials = LLMCredentials.objects.get(pk=1)
 
 
 thinkofnumber = chatter(
@@ -16,6 +17,7 @@ think of a number between 1 and 10 [[number:A]]
 think of another number between 10 and 20 [[int:B]]
 """,
     model=model,
+    credentials=credentials,
 )
 assert int(thinkofnumber.outputs.A) in range(1, 11), "Number should be between 1 and 10"
 assert int(thinkofnumber.outputs.B) in range(10, 21), "Number should be between 10 and 20"
@@ -44,6 +46,7 @@ Describe {{city}} in {{season}} in a 10 line poem.
 # Get a model instance for testing
 model = LLM.objects.get(model_name="gpt-4o-mini")
 
+
 # Test with patched structured_chat
 # Time sequential execution (original chatter)
 start_time = time.time()
@@ -52,7 +55,7 @@ sequential_time = time.time() - start_time
 
 # Time parallel execution (our new implementation)
 start_time = time.time()
-parallel_result = chatter(dependent_prompt2, model, cache=False)
+parallel_result = chatter(dependent_prompt2, model, credentials, cache=False)
 parallel_time = time.time() - start_time
 
 
@@ -99,6 +102,7 @@ How funny are you? Pick one of the following: [[pick:C|unfunny, abitfunny, veryf
 Think about this chat session. What is happening here? [[think:D]]
 """,
     model=mini,
+    credentials=credentials,
 )
 t4
 
@@ -109,6 +113,7 @@ Think about this chat session. What is happening here? [[think:D]]
 Is this a real conversation [[pick:E|yes, no]]
 """,
     model=mini,
+    credentials=credentials,
 )
 t5
 
@@ -117,6 +122,7 @@ chatter(
 Think about mammals: [[think:D]]
 """,
     model=mini,
+    credentials=credentials,
 )
 
 # examples of segmenting a prompt
@@ -140,5 +146,5 @@ tell me if this joke is funny
 """
 
 model = LLM.objects.get(model_name="gpt-4o-mini")
-print(chatter(example_prompt, model))
-print(chatter(example_prompt2, model))
+print(chatter(example_prompt, model, credentials))
+print(chatter(example_prompt2, model, credentials))

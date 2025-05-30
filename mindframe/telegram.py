@@ -10,36 +10,23 @@ import traceback
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
-from decouple import config
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
-from django.urls import reverse
-from telegram import Bot, Update
+from telegram import Update
 
 from mindframe.bot import (
     InboundMessage,
     MediaContent,
     MediaType,
-    ReactionContent,
     WebhookBotClient,
 )
 from mindframe.conversation import listen, respond
-from mindframe.models import Conversation, CustomUser, Intervention, Turn
-from mindframe.settings import BranchReasons, TurnTypes
-from mindframe.tree import conversation_history, create_branch
+from mindframe.models import Conversation, CustomUser, Intervention, Referal
 
 logger = logging.getLogger(__name__)
 
 # Configuration constants
-TELEGRAM_WEBHOOK_VALIDATION_TOKEN = config("TELEGRAM_WEBHOOK_VALIDATION_TOKEN", None)
 TELEGRAM_IP_RANGES = [ipaddress.ip_network(ip) for ip in ["149.154.160.0/20", "91.108.4.0/22"]]
-TELEGRAM_BOT_TOKEN = config("TELEGRAM_BOT_TOKEN", default=None)
-
-
-# TELEGRAM_BOT_TOKEN="7868408035:AAH6NxjV556QnesLYe_qt976Uby2cpnIXkI"
-# TELEGRAM_WEBHOOK_VALIDATION_TOKEN="cd7e8d19e80a49f3b083e237557d8f84"
-# TELEGRAM_WEBHOOK_URL="https://test.mindframe.llemma.net/telegram-webhook/"
-# TELEGRAM_BOT_NAME=MindFramerBot
 
 
 class TelegramBotClient(WebhookBotClient):
@@ -259,13 +246,21 @@ class TelegramBotClient(WebhookBotClient):
 
         return user
 
-    def get_or_create_conversation(self, message: InboundMessage) -> Tuple[Any, bool]:
+    def get_or_create_conversation(
+        self, message: InboundMessage, intervention=None
+    ) -> Tuple[Any, bool]:
         """
         Get or create a conversation for this chat.
+        Initialises the conversation if it doesn't exist already with the user and intervention.
         """
         conversation, is_new = Conversation.objects.get_or_create(
-            chat_room_id=message.chat_id, archived=False
+            chat_room_id=message.chat_id, archived=False, bot_interface=self.bot_interface
         )
+        user = self.get_or_create_user(message)
+        if is_new:
+            self._initialise_new_conversation(
+                conversation, intervention or self.intervention, user, message.chat_id
+            )
         return conversation, is_new
 
     def format_message(self, text: str) -> str:
@@ -315,15 +310,17 @@ class TelegramBotClient(WebhookBotClient):
             return False
 
     def handle_command(
-        self, message: InboundMessage, conversation
+        self, message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], Optional[str]]:
         """
         Handle Telegram-specific commands.
         """
         # Command handler mapping
         command_handlers = {
+            "start": self.handle_start_command,
             "help": self.handle_help_command,
             "new": self.handle_new_command,
+            "clear": self.handle_clear_command,
             "settings": self.handle_settings_command,
             "web": self.handle_web_command,
             "list": self.handle_list_command,
@@ -331,20 +328,23 @@ class TelegramBotClient(WebhookBotClient):
         }
 
         if message.command in command_handlers:
-            return command_handlers[message.command](message.command_args, message, conversation)
+            return command_handlers[message.command](
+                message.command_args, message, conversation, request
+            )
 
         # If command not recognized, return a message about unknown command
         return None, f"Unknown command: /{message.command}. Type /help for available commands."
 
     def handle_help_command(
-        self, args: List[str], message: InboundMessage, conversation
+        self, args: List[str], message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], str]:
         """
         Help command implementation for Telegram.
         """
         help_text = (
             "Commands:\n"
-            "/new <INTERVENTION> - start a new conversation\n"
+            "/clear - start a fresh conversation\n"
+            "/new <bot_name> - start a new conversation with a specific bot\n"
             "/help - show this message\n"
             "/settings - show settings\n"
             "/web - show web page link for this conversation\n"
@@ -353,8 +353,33 @@ class TelegramBotClient(WebhookBotClient):
         )
         return None, help_text
 
+    def handle_start_command(
+        self, args: List[str], message: InboundMessage, conversation, request
+    ) -> Tuple[Optional[HttpResponse], Optional[str]]:
+        """
+        Start a new conversation with the specified intervention.
+        """
+        if not args:
+            logger.info(f"No args for start command: {args}")
+            return (
+                None,
+                "...",
+            )
+        token = args[0].strip()
+        referal = Referal.objects.get(uuid=token)
+
+        conversation.archived = True
+        conversation.save()
+
+        conversation = referal.conversation
+        conversation.chat_room_id = message.chat_id
+        conversation.save()
+
+        self.send_message(message.chat_id, "Using referal code ...")
+        return JsonResponse({"status": "ok"}, status=200), None
+
     def handle_new_command(
-        self, args: List[str], message: InboundMessage, conversation
+        self, args: List[str], message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], Optional[str]]:
         """
         Start a new conversation with the specified intervention.
@@ -370,23 +395,17 @@ class TelegramBotClient(WebhookBotClient):
         try:
             # Get the intervention
             intervention = get_object_or_404(Intervention, slug=slug)
-
-            # Archive old conversation and create a new one
+            logger.info(f"Started new conversation using {intervention}")
             conversation.archived = True
             conversation.save()
 
-            # Notify user
             self.send_message(
                 message.chat_id,
-                "Starting a new conversation (forgetting everything we talked about so far).",
+                f"Starting a new conversation with {intervention.title}. \n\nForgetting everything we talked about so far)...",
             )
 
-            # Create new conversation
-            new_conversation, _ = self.get_or_create_conversation(message)
-
-            # Begin the conversation with the intervention
-            conversation_started_ = self._initialise_new_conversation(
-                new_conversation, intervention, self.get_or_create_user(message), message.chat_id
+            new_conversation, _ = self.get_or_create_conversation(
+                message, intervention=intervention
             )
 
             return JsonResponse({"status": "ok"}, status=200), None
@@ -399,8 +418,36 @@ class TelegramBotClient(WebhookBotClient):
                 f"Error starting intervention. Available interventions: {available}",
             )
 
+    def handle_clear_command(
+        self, args: List[str], message: InboundMessage, conversation, request
+    ) -> Tuple[Optional[HttpResponse], Optional[str]]:
+        """
+        Start a new conversation with the specified intervention.
+        """
+
+        try:
+
+            conversation.archived = True
+            conversation.save()
+            self.send_message(
+                message.chat_id,
+                "Starting a new conversation (forgetting everything we talked about so far).",
+            )
+
+            new_conversation, _ = self.get_or_create_conversation(message)
+
+            return JsonResponse({"status": "ok"}, status=200), None
+
+        except Exception as e:
+            logger.error(f"Error starting new conversation: {e}")
+            available = ", ".join(Intervention.objects.all().values_list("slug", flat=True))
+            return (
+                None,
+                f"Error starting intervention. Available interventions: {available}",
+            )
+
     def handle_settings_command(
-        self, args: List[str], message: InboundMessage, conversation
+        self, args: List[str], message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], str]:
         """
         Settings command implementation for Telegram.
@@ -410,6 +457,7 @@ class TelegramBotClient(WebhookBotClient):
 
     # METHODS TO ACTUALLY HANDLE USER INPUT
     def process_webhook(self, request) -> HttpResponse:
+        """Process an incoming webhook request from Telegram."""
 
         try:
             message = self.parse_message(request)
@@ -417,7 +465,7 @@ class TelegramBotClient(WebhookBotClient):
             conversation, is_new = self.get_or_create_conversation(message)
 
             if message.command:
-                response, reply_text = self.handle_command(message, conversation)
+                response, reply_text = self.handle_command(message, conversation, request)
                 if response is not None:
                     return response
                 if reply_text is not None:
@@ -450,6 +498,7 @@ class TelegramBotClient(WebhookBotClient):
     def continue_webhook_conversation(self, user, conversation, message: InboundMessage):
         """Continue an existing conversation for a webhook client"""
         self.send_typing_indicator(message.chat_id)
+        logger.info(f"Continuing conversation {conversation.uuid} with user {user.username}")
         turn_to_respond_to = conversation.turns.all().last()
         user_turn = listen(turn_to_respond_to, message.text, user)
         bot_turn = respond(user_turn)

@@ -71,7 +71,7 @@ docker-compose run web \
 	mindframe.StepJudgement \
 	mindframe.Transition \
 	mindframe.Judgement \
-	mindframe.LLM \
+	llmtools.LLM \
 	--indent 2 \
 	--natural-foreign --natural-primary  \
 	--format=json > ~/dev/mindframe/mindframe/fixtures/demo.json

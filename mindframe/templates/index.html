@@ -1,23 +1,54 @@
 {% extends "base.html" %}
 {% block content %}
-    <h1 class="mb-4">MindFrame</h1>
+  <div class="container">
+    <h1 class="mb-4 text-3xl font-bold">MindFrame</h1>
+    <p class="mb-4 lead">
+      MindFrame is a research platform for delivering structured, evidence-based psychological
+      interactions via conversational AI.
 
-<!-- admin link -->
-<div class="row">
-    <div class="col-6">
-        <ul>
-            <li>
-                <a href="{% url 'intervention_list' %}">Interventions</a>
-            </li>
-            <hr>
+      It enables supervised therapeutic and research conversations, detailed data collection, and real-time summaries of performance and data collected.
+    </p>
 
-            <li><a href="{% url 'rag_test' %}">RAG/HyDE Search Comparison</a></li>
-            <hr>
-            <li><a href="/admin">Admin</a></li>
-        </ul>
+    <div class="row mb-5">
+
+    <div class="col-md-4">
+        <div class="card shadow-sm p-3">
+          <h2 class="text-xl font-semibold">About mindframe</h2>
+          <p class="mb-2">
+            MindFrame supports transparent, auditable conversational AI for psychological interventions, using structured
+            templates defined in plain text. Every decision made by the system can be traced,
+            reproduced, and adapted.
+          </p>
+          <a class="btn btn-outline-primary" href="{% url 'about' %}">System Overview</a>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card shadow-sm p-3">
+          <h2 class="text-xl font-semibold">Study Participants</h2>
+          <p class="mb-2">
+            We are not currently recruiting for any studies. When active, this page will provide
+            information about how to take part, what to expect, and how we handle your data.
+          </p>
+          <a class="btn btn-outline-secondary disabled" href="#">Coming soon</a>
+        </div>
+      </div>
+
+
+
+      <div class="col-md-4">
+        <div class="card shadow-sm p-3">
+          <h2 class="text-xl font-semibold">For Developers</h2>
+          <p class="mb-2">
+            Source code and documentation are available on GitHub. Contributions are welcome.
+            See our <a href="https://github.com/benwhalley/mindframe/blob/main/docs_/syntax.md">syntax guide</a>
+            for how to write and structure interventions, and visit the repository for setup and deployment instructions.
+          </p>
+          <a class="btn btn-outline-dark" href="https://github.com/benwhalley/mindframe">
+            GitHub Repository
+          </a>
+        </div>
+      </div>
     </div>
-</div>
-
-
-
+  </div>
 {% endblock %}

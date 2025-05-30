@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="container">
+    <h1 class="mb-4 text-3xl font-bold">MindFrame: Ethical, Transparent, and Secure</h1>
+
+    <p class="mb-4 lead">
+      MindFrame is a platform for ethical, psychologically informed conversational agents.
+      The project is designed to facilitate research and delivery of clincial tools in a transparent, auditable implementation, focused on safety, accessibility, and participant dignity.
+    </p>
+
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold">Ethical and Inclusive by Design</h2>
+      <ul class="list-disc pl-5">
+        <li>All interventions are structured using open, human-readable templates, in an open format designed for collaboration and transparency.</li>
+        <li>Interventions are developed following established psychological methods and peer-reviewed models.</li>
+        <li>The platform supports transparent oversight and version control of all intervention content.</li>
+        <li>We prioritise accessibility, including mobile-first design and multilingual support.</li>
+        <li>Participant consent, autonomy, and privacy are central to every design decision.</li>
+      </ul>
+    </div>
+
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold">Responsible AI Usage</h2>
+      <p>
+        MindFrame uses large language models (LLMs) provided by OpenAI through Microsoft Azure’s
+        enterprise agreement. These models operate in inference-only mode: no user data is used to
+        train or improve the models, and no inputs or outputs are retained by OpenAI. All data
+        processing remains within a European cloud infrastructure, compliant with GDPR and relevant university data governance frameworks.
+      </p>
+    </div>
+
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold">Accessible and User-Friendly</h2>
+      <p>
+        Interventions are delivered via familiar, mobile-friendly chat interfaces. Participants
+        can interact with the system through the web, Telegram, or Microsoft Teams. We are actively
+        developing support for the Matrix protocol (via Element) to provide end-to-end encrypted
+        delivery within a closed ecosystem, ensuring a higher standard of confidentiality and
+        control.
+      </p>
+    </div>
+
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold">Transparent Implementation</h2>
+      <p>
+        The platform is open source (<a href="https://github.com/benwhalley/mindframe" target="_blank">GitHub</a>)
+        and built using widely used, peer-reviewed software tools. Intervention logic is declared
+        in Markdown and YAML files, which are version controlled and easy to audit. System behaviour
+        is deterministic wherever possible, and all AI responses are logged with full context
+        (where permitted) for traceability.
+      </p>
+    </div>
+
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold">Contact & Further Information</h2>
+      <p>
+        We welcome enquiries from institutional review boards, governance bodies, and funding
+        agencies. Please <a href="mailto:ben.whalley@plymouth.ac.uk">contact Dr. Ben Whalley</a>
+        for further information or access to technical documentation, data protection impact
+        assessments (DPIAs), or example interventions.
+      </p>
+    </div>
+  </div>
+{% endblock %}
