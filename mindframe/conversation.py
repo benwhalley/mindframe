@@ -366,7 +366,7 @@ def respond(
     logger.info("Run online Judgements syncronously")
 
     [evaluate_judgement(sj.judgement, new_turn) for sj in judgements_to_make if not sj.offline]
-    # import pdb; pdb.set_trace()
+
     # ARE INTERRUPTIONS RESOLVED?
     # TODO: implement this
     # - check if we are in an interruption (unresolved checkpoint in the conversation history?)    # - if so, build a context dictionary using the Notes from judgements on this Turn
@@ -420,6 +420,7 @@ def respond(
         name=f"{new_turn.step.intervention.title}. Response in turn: {new_turn.uuid}",  # Use new turn ID
         session_id=new_turn.uuid,  # Make sure the session ID is correct
         output=new_turn.text,
+        input=turn.text,
     )
     langfuse_context.flush()
 

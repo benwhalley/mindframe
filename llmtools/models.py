@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import math
 import re
 import uuid
 from io import BytesIO
@@ -9,10 +10,10 @@ import instructor
 import pandas as pd
 from django.conf import settings
 from django.db import models
-from django.template import Context, Template
 from django.urls import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
+from jinja2 import DebugUndefined, Environment
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 
@@ -22,6 +23,7 @@ from langfuse.openai import OpenAI
 from actionable.mixins import ActionableObjectMixin, action_with_permission
 
 from .extract import extract_text
+from .langfuse_api import cost_for_session_usd
 from .llm_calling import chatter
 
 logger = logging.getLogger(__name__)
@@ -76,6 +78,10 @@ class JobGroup(ActionableObjectMixin, TimeStampedModel):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="job_groups"
     )
+
+    def cost(self):
+        tc = cost_for_session_usd(self.uuid)
+        return tc and math.ceil(tc * 1000) / 1000 or None
 
     def complete(self):
         return all(self.jobs.all().values_list("completed", flat=True))
@@ -199,7 +205,9 @@ class Job(TimeStampedModel):
         return self.source_file and self.source_file.path or None
 
     def run(self, force=False):
+
         logger.info(f"Running job: {self.id}")
+
         result = None
         try:
             if self.cancelled:
@@ -209,11 +217,16 @@ class Job(TimeStampedModel):
                 raise Exception("Job already completed")
 
             tool = self.get_tool()
-            # Create a Template object
-            template = Template(tool.prompt)
-            ctx = Context(self.context)
-            filled_prompt = template.render(ctx)
+
+            # Create a Template object, use jinja2 for rendering becase it preserves
+            # unmatched {{var}} placeholders
+            env = Environment(undefined=DebugUndefined)
+            template = env.from_string(tool.prompt)
+
+            filled_prompt = template.render(self.context)
+            logger.warning(f"Filled prompt: {filled_prompt}")
             result = chatter(filled_prompt, tool.model, tool.credentials)
+
             if len(result.keys()) > 1:
                 del result["RESPONSE_"]
 

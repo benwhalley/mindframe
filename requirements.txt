@@ -92,6 +92,7 @@ django==5.2
     #   crispy-bootstrap5
     #   dj-database-url
     #   django-appconf
+    #   django-cacheback
     #   django-celery-beat
     #   django-compressor
     #   django-crispy-forms
@@ -108,6 +109,8 @@ django==5.2
 django-appconf==1.1.0
     # via django-compressor
 django-autoslug==1.9.9
+    # via mindframe (pyproject.toml)
+django-cacheback==3.0.0
     # via mindframe (pyproject.toml)
 django-celery-beat==2.8.0
     # via mindframe (pyproject.toml)
@@ -216,6 +219,7 @@ jedi==0.19.2
     # via ipython
 jinja2==3.1.6
     # via
+    #   mindframe (pyproject.toml)
     #   gradio
     #   haystack-ai
     #   instructor
