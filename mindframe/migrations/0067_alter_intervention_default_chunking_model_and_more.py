@@ -7,7 +7,6 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("llmtools", "0018_remove_llm_credentials"),
         ("mindframe", "0066_conversation_llm_credentials"),
     ]
 
