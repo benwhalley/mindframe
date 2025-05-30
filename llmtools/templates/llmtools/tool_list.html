@@ -6,13 +6,12 @@
 
     <h3 class="col-12 mb-4">LLM Tools</h3>
 
-
-    <div class="col">
+    <div class="col-6">
       <p>
         Mindframe tools are simple ways to template LLM primpts, that can be used to automate tasks, especially when working with large numbers of documents.
       </p>
-
     </div>
+    <div class="col-6"> </div>
 
     <div class="col">
       <h5>Available tools</h5>
@@ -23,7 +22,6 @@
       </li>
     {% endfor %}
   </ul>
-
 
   <!-- button to add a new  -->
   <a href="{% url 'admin:llmtools_tool_add' %}" class="btn btn-success">Create New Tool</a>

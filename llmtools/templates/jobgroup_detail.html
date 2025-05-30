@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load markdownit %}
+{% load markdown %}
 {% load crispy_forms_tags %}
 {% load static %}
 
@@ -73,7 +73,7 @@
       <div class="accordion-item">
         <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
 
-          <button class="accordion-button collapsed"
+          <button class="accordion-button {{forloop.first|yesno:",collapsed"}}"
                   type="button"
                   data-bs-toggle="collapse"
                   data-bs-target="#collapse-{{ forloop.counter }}"
@@ -95,14 +95,14 @@
           </button>
         </h2>
         <div id="collapse-{{ forloop.counter }}"
-            class="accordion-collapse collapse"
+            class="accordion-collapse {{forloop.first|yesno:",collapse"}}"
             aria-labelledby="heading-{{ forloop.counter }}"
             data-bs-parent="#resultsAccordion">
           <div class="accordion-body p-2 small">
             <ul class="list-group list-group-flush">
               {% for j, k in i.result.items %}
                 <li class="list-group-item">
-                  <code>{{ j }}</code>: {{ k|markdownit }}
+                  <code>{{ j }}</code>: {{ k|markdown }}
                 </li>
               {% endfor %}
             </ul>

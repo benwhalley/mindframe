@@ -34,6 +34,35 @@
     <link href="https://fonts.googleapis.com/css2?family=Ancizar+Sans:ital,wght@0,100..1000;1,100..1000&family=Inconsolata:wght@200..900&display=swap" rel="stylesheet">
 
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/markdown.min.js"></script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-light.min.css">
+
+
+    <script>
+    hljs.registerLanguage('mindframe-md', function(hljs) {
+        const markdown = hljs.getLanguage('markdown');
+        return {
+        name: 'CustomMarkdown',
+        aliases: ['mindframe-md'],
+        contains: [
+            { className: 'variable-square', begin: /\[\[/, end: /\]\]/, relevance: 10 },
+            { className: 'variable-curly', begin: /\{\{/, end: /\}\}/, relevance: 10 },
+            { className: 'keyword', begin: /¡OBLIVIATE\b/, relevance: 10 },
+            ...markdown.contains
+        ]
+        };
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+        hljs.highlightAll();
+    });
+    </script>
+
+
+
     {% block extra_head %}{% endblock %}
 </head>
 <body>

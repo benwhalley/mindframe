@@ -24,3 +24,42 @@ code, pre, kbd, samp, tt {
     max-width: 100% !important;
   }
 }
+
+
+
+.hljs-variable-curly {
+  color: black !important;
+  font-size: 1.5em;
+  background-color: #caffbfDD;  /* optional for extra emphasis */
+  padding: 3px;
+  padding-right: 6px;
+  padding-left: 6px;
+}
+
+.hljs-variable-square{
+  color: black !important;
+  font-size: 1.5em;
+  background-color: #a2d2ffDD;
+  padding: 3px;
+  padding-right: 6px;
+  padding-left: 6px;
+}
+
+.hljs-section{
+  font-size:150%;
+}
+
+.hljs-keyword{
+  color: black !important;
+  font-weight: bold;
+
+  line-height-step: 1.2;
+  border-top: 1px solid #ffadad;  /* optional for extra emphasis */
+  padding: 3px;
+  display: block;
+
+}
+
+.language-mindframe-md {
+  background-color: white !important;
+}
