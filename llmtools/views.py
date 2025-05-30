@@ -5,6 +5,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 from string import Template
+
 import pandas as pd
 from django import forms
 from django.contrib.auth.decorators import login_required, permission_required
@@ -13,11 +14,12 @@ from django.core.files import File
 from django.core.files.uploadedfile import UploadedFile
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
 from django.views.generic import DetailView, ListView
+from langfuse.decorators import langfuse_context, observe
+
+langfuse_context.configure(debug=False)
 
 from llmtools.extract import extract_text
-from llmtools.llm_calling import chatter
 
 from .models import Job, JobGroup, Tool
 from .tasks import run_job
@@ -47,8 +49,8 @@ class ToolInputForm(forms.Form):
                     required=False,
                 )
         self.fields["file"] = forms.FileField(
-            label="Or, upload a ZIP file",
-            help_text="Upload a zip with multiple files to start a batch job",
+            label="Or, upload a single file, or a ZIP file",
+            help_text="Upload a single file, or a zip with multiple files to start a batch job",
             required=False,
         )
 
@@ -81,6 +83,7 @@ class ToolListView(PermissionRequiredMixin, ListView):
         return context
 
 
+@observe(capture_input=False, capture_output=False)
 @permission_required("llmtools.add_jobgroup")
 def tool_input_view(request, pk):
     tool = get_object_or_404(Tool, pk=pk)
@@ -89,15 +92,34 @@ def tool_input_view(request, pk):
         form = ToolInputForm(request.POST, tool=tool)
         if form.is_valid():
             uploaded_file = request.FILES.get("file")
-            # import pdb; pdb.set_trace()
+
             if uploaded_file and isinstance(uploaded_file, UploadedFile):
+                job_group = JobGroup.objects.create(tool=tool, owner=request.user)
+                langfuse_context.update_current_observation(session_id=str(job_group.uuid))
+
                 try:
                     with zipfile.ZipFile(uploaded_file, "r") as zip_ref:
-                        pass
+                        pass  # process zip below
+
                 except zipfile.BadZipFile:
-                    form.add_error("file", "The uploaded file is not a valid ZIP file.")
-                    return render(request, "tool_result.html", {"tool": tool, "form": form})
-                job_group = JobGroup.objects.create(tool=tool, owner=request.user)
+                    # Create a job group for a single file upload
+                    ext = os.path.splitext(uploaded_file.name)[1] or ".bin"
+                    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as temp_file:
+                        uploaded_file.seek(0)
+                        temp_file.write(uploaded_file.read())
+                        temp_file_path = temp_file.name
+                    text = extract_text(temp_file_path)
+                    # os.remove(temp_file_path)
+                    Job.objects.create(
+                        group=job_group,
+                        # source_file=django_file,
+                        context={"source": text},
+                    )
+
+                    # schedule jobs to run
+                    run_job.delay(job_group.jobs.first().id)
+                    return redirect(job_group.get_absolute_url())
+
                 with tempfile.TemporaryDirectory() as temp_dir:
                     with zipfile.ZipFile(uploaded_file, "r") as zip_ref:
                         zip_ref.extractall(temp_dir)
@@ -108,9 +130,7 @@ def tool_input_view(request, pk):
                                 file_path = os.path.join(root, file_name)
                                 with open(file_path, "rb") as f:
                                     django_file = File(f, name=Path(file_name).name)
-                                    text = extract_text(
-                                        file_path
-                                    )  # ← if you want to store extracted text too
+                                    text = extract_text(file_path)
                                     Job.objects.create(
                                         group=job_group,
                                         source_file=django_file,

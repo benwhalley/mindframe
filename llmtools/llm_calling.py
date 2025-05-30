@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import io
+import json
 import logging
 import re
 import traceback
@@ -15,6 +16,7 @@ from box import Box
 from colored import Back, Fore, Style
 from django.template import Context, Template
 from langfuse.decorators import langfuse_context, observe
+from moviepy import VideoFileClip
 from pydantic import Field
 from pydub import AudioSegment
 
@@ -175,7 +177,6 @@ def structured_chat(prompt, llm, return_type, max_retries=3, extra_body={}):
     Make a tool call to an LLM, returning the `response` field, and a completion object
     """
 
-    langfuse_context.update_current_observation(input=prompt)
     try:
         res, com = llm.client.chat.completions.create_with_completion(
             model=llm.model_name,
@@ -191,6 +192,7 @@ def structured_chat(prompt, llm, return_type, max_retries=3, extra_body={}):
         logger.warning(f"Error calling LLM: {e}\n{full_traceback}")
         res, com = None, None
 
+    langfuse_context.update_current_observation(input=prompt, output=res)
     return res, com
 
 
@@ -401,7 +403,8 @@ class SegmentDependencyGraph:
         for i, segment in enumerate(self.segments):
             segment_id = f"segment_{i}"
             # Find all template variables {{ VAR}} in the segment
-            template_vars = set(re.findall(r"\{\{\s*(\w+)\s*\}\}", segment))
+            # template_vars = set(re.findall(r"\{\{\s*(\w+)\s*\}\}", segment))
+            template_vars = set(re.findall(r"\{\{\s*(\w+)\s*\}\}", TEMPLATE_PREFIX + segment))
 
             # For each template variable, find which earlier segment defines it
             for var in template_vars:
@@ -439,6 +442,7 @@ class SegmentDependencyGraph:
         return execution_plan
 
 
+@observe(capture_input=False, capture_output=False)
 async def chatter_async(multipart_prompt: str, model, context={}, cache=True) -> ChatterResult:
     """
     Parallel version of chatter that processes independent segments concurrently.
@@ -464,7 +468,7 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
     # Analyze dependencies between segments
     dependency_graph = SegmentDependencyGraph(segments)
     execution_plan = dependency_graph.get_execution_plan()
-    print(execution_plan)
+    logger.info(f"Execution plan: {execution_plan}")
 
     # Final results and accumulated context
     final_results = ChatterResult()
@@ -492,11 +496,15 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
         for i, result in enumerate(batch_results):
             accumulated_context.update(dict(result))
             final_results.update(dict(result))
-
+        logger.info("Accumulated context", accumulated_context)
     # Set RESPONSE_ if needed
     if "RESPONSE_" not in final_results and final_results:
         last_key = next(reversed(final_results))
         final_results["RESPONSE_"] = final_results[last_key]
+
+    langfuse_context.update_current_observation(
+        input=multipart_prompt, output=json.dumps(final_results)
+    )
 
     return final_results
 
@@ -504,9 +512,6 @@ async def chatter_async(multipart_prompt: str, model, context={}, cache=True) ->
 def chatter(multipart_prompt: str, model, context={}, cache=True) -> ChatterResult:
     """Synchronous wrapper for chatter_async"""
     return async_to_sync(chatter_async)(multipart_prompt, model, context, cache)
-
-
-from moviepy import VideoFileClip
 
 
 def convert_audio(input_bytes, to="mp3"):

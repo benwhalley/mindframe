@@ -21,9 +21,12 @@ def clear_incomplete_jobs():
 
 @shared_task
 def run_incomplete_jobs():
+    # TODO ADD SOME RETRY LOGIC HERE TO PREVENT RUNNING FOREVER
+
     # Logic to clear incomplete jobs
     incomplete_jgs = set(
         Job.objects.filter(completed__isnull=True).values_list("group__id", flat=True)
     )
-    for i in incomplete_jgs:
-        run_job_group.delay(i)
+    for i in incomplete_jgs.order_by("-created"):
+        for j in i.jobs.all():
+            run_job.delay(j.pk)

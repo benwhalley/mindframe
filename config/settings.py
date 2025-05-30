@@ -5,10 +5,15 @@ from distutils.util import strtobool
 from pathlib import Path
 
 import dj_database_url
+from celery.schedules import crontab
 from decouple import Csv, config
 from langfuse.callback import CallbackHandler
 
 logger = logging.getLogger(__name__)
+
+
+DEBUG = config("DEBUG", default=False, cast=bool)
+
 
 REDIS_URL = config("REDIS_URL", default="redis://redis:6379/0")
 CHAT_URL = config("CHAT_URL", default=None)
@@ -37,7 +42,6 @@ CSRF_TRUSTED_ORIGINS = config(
     cast=Csv(),
 )
 
-DEBUG = config("DEBUG", default=False, cast=bool)
 DDT = config("DDT", default=False, cast=bool)
 DEBUG_TOOLBAR_CONFIG = {
     "SHOW_TOOLBAR_CALLBACK": lambda request: DDT,  # This disables the toolbar by default
@@ -175,11 +179,10 @@ CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
-CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", default=False, cast=bool)
+CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", default=DEBUG, cast=bool)
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 
-from celery.schedules import crontab
 
 CELERY_BEAT_SCHEDULE = {
     "run-incomplete-jobs": {
