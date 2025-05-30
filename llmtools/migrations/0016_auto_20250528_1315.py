@@ -1,6 +1,6 @@
 import django.db.models.deletion
-from django.db import migrations, models
 from decouple import config
+from django.db import migrations, models
 
 
 def create_default_llm_and_credentials(apps, schema_editor):

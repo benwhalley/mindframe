@@ -19,12 +19,13 @@ from langfuse.decorators import langfuse_context, observe
 
 langfuse_context.configure(debug=False)
 
+from django import forms
+from django.core.exceptions import ValidationError
+
 from llmtools.extract import extract_text
 
 from .models import Job, JobGroup, Tool
 from .tasks import run_job
-from django import forms
-from django.core.exceptions import ValidationError
 
 
 @login_required

@@ -3,7 +3,7 @@ import logging
 
 from decouple import config
 from django import forms
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -27,7 +27,15 @@ from mindframe.models import (
 logger = logging.getLogger(__name__)
 
 
-def make_referal_using_token(token, intervention_slug, username, data=None, bot_interface=None):
+def make_referal_using_token(
+    token, username, data=None, intervention_slug=None, bot_interface=None
+):
+
+    if not intervention_slug and not bot_interface:
+        raise Exception("Must provide either an intervention_slug or a bot_interface")
+
+    if intervention_slug and bot_interface:
+        raise Exception("Must provide either an intervention_slug or a bot_interface, not both")
 
     user = get_object_or_404(CustomUser, username=username)
 
@@ -35,7 +43,10 @@ def make_referal_using_token(token, intervention_slug, username, data=None, bot_
     referaltoken = get_object_or_404(ReferalToken, token=token)
 
     # Get and validate intervention
-    intervention = get_object_or_404(Intervention, slug=intervention_slug)
+    if intervention_slug:
+        intervention = get_object_or_404(Intervention, slug=intervention_slug)
+    else:
+        intervention = bot_interface.intervention
 
     # if the permitted_interventions field is empty, don't check anything
     if referaltoken.permitted_interventions.all().count() > 0:
@@ -72,7 +83,11 @@ def make_referal_using_token(token, intervention_slug, username, data=None, bot_
 
 class ReferalForm(forms.Form):
     referal_token = forms.ModelChoiceField(queryset=ReferalToken.objects.none())
-    intervention = forms.ModelChoiceField(queryset=Intervention.objects.none())
+    bot_interface = forms.ModelChoiceField(
+        queryset=BotInterface.objects.none(),
+        required=False,
+    )
+    intervention = forms.ModelChoiceField(queryset=Intervention.objects.none(), required=False)
     username = forms.CharField(
         required=True, initial="robert", help_text="A username for this participant."
     )
@@ -81,7 +96,7 @@ class ReferalForm(forms.Form):
         initial=True,
         help_text="If this is checked, a new user will be created if one matching the username doesn't already exist.",
     )
-    bot_interface = forms.ModelChoiceField(queryset=BotInterface.objects.none())
+
     data = forms.JSONField(
         required=False,
         initial={"nickname": "..."},
@@ -89,6 +104,13 @@ class ReferalForm(forms.Form):
     redirect = forms.ChoiceField(
         choices=[("web", "Web"), ("telegram", "Telegram"), ("json", "JSON")], initial="web"
     )
+
+    def clean(self):
+        cd = super().clean()
+
+        if not cd.get("intervention", None) and not cd.get("bot_interface", None):
+            raise ValidationError(f"You must either specify a bot or an intervention")
+        return cd
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -108,8 +130,10 @@ class ReferalForm(forms.Form):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-class CreateReferalView(LoginRequiredMixin, View):
+class CreateReferalView(LoginRequiredMixin, PermissionRequiredMixin, View):
     """View to handle creation of new referals from external sources"""
+
+    permission_required = "mindframe.add_referal"
 
     def get(self, request):
         form = ReferalForm()
@@ -117,35 +141,39 @@ class CreateReferalView(LoginRequiredMixin, View):
 
     def post(self, request):
         try:
+            form = ReferalForm(request.POST)
             try:
-                form = ReferalForm(request.POST)
+                form.is_valid()
+                data = form.cleaned_data
+                redirect = data.get("redirect", "web")
 
                 if not form.is_valid():
-                    return JsonResponse({"error": form.errors}, status=400)
+                    if redirect == "json":
+                        return JsonResponse({"error": form.errors}, status=400)
+                    else:
+                        return render(request, "referal_form.html", {"form": form})
 
-                data = form.cleaned_data
                 create_if_doesnt_exist = data.get("create_if_doesnt_exist", False)
 
                 if create_if_doesnt_exist:
                     user, _ = CustomUser.objects.get_or_create(
                         username=data.get("username"), role="client"
                     )
-
+                # token,  username, data=None, intervention_slug=None, bot_interface=None
                 referal = make_referal_using_token(
-                    data["referal_token"].token,
-                    data["intervention"].slug,
-                    data["username"],
+                    token=data["referal_token"].token,
+                    username=data["username"],
                     data=data["data"],
+                    intervention_slug=data["intervention"] and data["intervention"].slug or None,
                     bot_interface=data["bot_interface"],
                 )
+
             except Exception as e:
                 return JsonResponse({"error": str(e)}, status=400)
 
             web_url = request.build_absolute_uri(
                 reverse("conversation_detail", args=[referal.conversation.turns.all().last().uuid])
             )
-
-            redirect = data.get("redirect", "web")
 
             telegram_link = referal.external_chat_link()
 
@@ -164,7 +192,7 @@ class CreateReferalView(LoginRequiredMixin, View):
             return HttpResponseRedirect(reverse("referal_detail", args=[referal.uuid]))
 
         except Exception as e:
-            logger.warning(str(e))
+            logger.warning("PROBLEMN: ", str(e))
 
 
 class ReferalDetailView(LoginRequiredMixin, DetailView):

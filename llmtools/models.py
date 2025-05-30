@@ -14,11 +14,11 @@ from django.urls import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from jinja2 import DebugUndefined, Environment
-from openpyxl import Workbook
-from openpyxl.styles import Alignment
 
 # use langfuse for tracing
 from langfuse.openai import OpenAI
+from openpyxl import Workbook
+from openpyxl.styles import Alignment
 
 from actionable.mixins import ActionableObjectMixin, action_with_permission
 
