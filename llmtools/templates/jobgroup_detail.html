@@ -117,6 +117,7 @@
   <div class="col-4">
     <h5>Status</h5>
 
+
     {% if jobgroup.cost %}
     <p>Cost: ${{ jobgroup.cost }}</p>
     {% endif %}
@@ -148,7 +149,7 @@
               <li>Status: {{ jobgroup.status }}
               <li>All jobs completed: {{jobgroup.complete}}</li>
               <li>Cancelled: {{jobgroup.cancelled}}</li>
-
+              <li>UUID: <code>{{ jobgroup.uuid |truncatechars:6 }}</code></li>
               </li>
 
               <a class="mt-2 btn btn-outline-secondary" href="{% url "admin:llmtools_jobgroup_change" jobgroup.id %}">Edit Details</a>

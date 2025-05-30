@@ -23,6 +23,8 @@ from llmtools.extract import extract_text
 
 from .models import Job, JobGroup, Tool
 from .tasks import run_job
+from django import forms
+from django.core.exceptions import ValidationError
 
 
 @login_required
@@ -40,19 +42,30 @@ def download_excel(request, uuid: str):
 class ToolInputForm(forms.Form):
     def __init__(self, *args, tool=None, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.fields["file"] = forms.FileField(
+            label="Upload a single file, or a ZIP file (or enter data below manually)",
+            help_text="Upload a single file, or a zip with multiple files to start a batch job",
+            required=False,
+        )
+        self.dynamic_fields = []
         if tool is not None:
             for field_name in tool.get_input_fields():
                 self.fields[field_name] = forms.CharField(
                     label=field_name,
-                    widget=forms.Textarea(attrs={"rows": 10}),
+                    widget=forms.Textarea(attrs={"rows": 5}),
                     required=False,
                 )
-        self.fields["file"] = forms.FileField(
-            label="Or, upload a single file, or a ZIP file",
-            help_text="Upload a single file, or a zip with multiple files to start a batch job",
-            required=False,
-        )
+                self.dynamic_fields.append(field_name)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        file_ = cleaned_data.get("file")
+        dynamic_filled = [cleaned_data.get(f) for f in self.dynamic_fields if cleaned_data.get(f)]
+        if not file_ and len(dynamic_filled) < len(self.dynamic_fields):
+            raise ValidationError(
+                "You must either upload a file, or fill in all manual input fields."
+            )
+        return cleaned_data
 
 
 class JobGroupDetailView(PermissionRequiredMixin, DetailView):
@@ -89,7 +102,7 @@ def tool_input_view(request, pk):
     tool = get_object_or_404(Tool, pk=pk)
 
     if request.method == "POST":
-        form = ToolInputForm(request.POST, tool=tool)
+        form = ToolInputForm(request.POST or None, request.FILES or None, tool=tool)
         if form.is_valid():
             uploaded_file = request.FILES.get("file")
 
