@@ -55,14 +55,6 @@ class Migration(migrations.Migration):
                         help_text="Litellm model name, e.g. llama3.2 or gpt-4o", max_length=255
                     ),
                 ),
-                (
-                    "credentials",
-                    models.ForeignKey(
-                        null=True,
-                        on_delete=django.db.models.deletion.CASCADE,
-                        to="llmtools.llmcredentials",
-                    ),
-                ),
             ],
             options={
                 "unique_together": {("model_name",)},
