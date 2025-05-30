@@ -29,7 +29,6 @@ code, pre, kbd, samp, tt {
 
 .hljs-variable-curly {
   color: black !important;
-  font-size: 1.5em;
   background-color: #caffbfDD;  /* optional for extra emphasis */
   padding: 3px;
   padding-right: 6px;
@@ -38,7 +37,6 @@ code, pre, kbd, samp, tt {
 
 .hljs-variable-square{
   color: black !important;
-  font-size: 1.5em;
   background-color: #a2d2ffDD;
   padding: 3px;
   padding-right: 6px;
@@ -47,13 +45,14 @@ code, pre, kbd, samp, tt {
 
 .hljs-section{
   font-size:150%;
+  color: black !important;
 }
 
 .hljs-keyword{
   color: black !important;
   font-weight: bold;
 
-  line-height-step: 1.2;
+  line-height-step: 2;
   border-top: 1px solid #ffadad;  /* optional for extra emphasis */
   padding: 3px;
   display: block;

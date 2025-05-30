@@ -1,9 +1,9 @@
 import logging
+
 import nh3
+from django import template
 from django.utils.safestring import mark_safe
 from markdown_it import MarkdownIt
-from django import template
-
 
 register = template.Library()
 

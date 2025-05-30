@@ -7,19 +7,15 @@ from pathlib import Path
 from string import Template
 
 import magic
-
-
 from django import forms
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import DetailView, ListView
 from langfuse.decorators import langfuse_context
-
-from django import forms
-from django.core.exceptions import ValidationError
 
 from llmtools.extract import extract_text
 
