@@ -15,6 +15,10 @@ class LLMAdmin(admin.ModelAdmin):
 @admin.register(LLMCredentials)
 class LLMCredentialsAdmin(admin.ModelAdmin):
     search_fields = ["label"]
+    list_display = ["label", "llm_base_url", "key"]
+
+    def key(self, obj):
+        return obj.llm_api_key[:5] + "..."
 
 
 class JobInline(admin.TabularInline):
