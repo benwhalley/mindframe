@@ -12,7 +12,7 @@ def create_default_llm_and_credentials(apps, schema_editor):
         defaults={
             "label": "Default credentials",
             "llm_api_key": config("LITELLM_API_KEY", "dummy-key"),
-            "llm_base_url": config("LITELLM_BASE_URL", "https://example.com"),
+            "llm_base_url": config("LITELLM_ENDPOINT", "https://example.com"),
         },
     )
 
