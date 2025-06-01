@@ -2,11 +2,16 @@
 
 {% block object-tools-items %}
     <li>
-        <a class="" href="{{ start_new_chat_link }}" >Start new chat session</a>
+        <a class="" href="{{ start_new_chat_link }}" >Start test chat session</a>
     </li>
+
     <li>
-        <a class="" href="{{ diagram }}" >Diagram</a>
+        <a class="" href="{% url 'create_referal' %}" >Refer a new user to this Intervention</a>
     </li>
+
+    <!-- <li>
+        <a class="" href="{{ diagram }}" >Diagram</a>
+    </li> -->
 
     {{ block.super }}
 
@@ -16,9 +21,6 @@
 {% block field_sets %}
 <hr>
 
-Link to allow user to start and ANONYMOUS chat session with this intervention:
-
-<p><input type="text" value= "{{start_new_chat_link}}" style="width:20em;"></p>
 
 
 

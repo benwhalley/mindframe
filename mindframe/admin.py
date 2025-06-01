@@ -7,7 +7,6 @@ from django.contrib import admin
 from django.contrib.messages import constants
 from django.db import models
 from django.forms import Textarea
-from django.forms.models import model_to_dict
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
@@ -18,6 +17,7 @@ from ruamel.yaml import YAML
 from mindframe.graphing import mermaid_diagram
 from mindframe.settings import MINDFRAME_SHORTUUID_ALPHABET, BranchReasons, TurnTypes
 from mindframe.tree import create_branch
+from mindframe.views.referals import make_referal_using_plan
 
 from .models import (
     BotInterface,
@@ -30,13 +30,13 @@ from .models import (
     MemoryChunk,
     Note,
     Nudge,
-    Referal,
-    ReferalToken,
     ScheduledNudge,
     Step,
     StepJudgement,
     Transition,
     Turn,
+    UsagePlan,
+    UserReferal,
 )
 
 yaml = YAML()
@@ -155,19 +155,37 @@ class NoteInline(admin.TabularInline):
 @admin.register(Conversation)
 class ConversationAdmin(admin.ModelAdmin):
     save_on_top = True
-    list_filter = (IsSyntheticFilter, "archived", "turns__step__intervention")
+    list_filter = [
+        # IsSyntheticFilter,
+        "bot_interface",
+        "user_referal__usage_plan",
+        # "archived",
+        # "turns__step__intervention",
+    ]
+    list_per_page = 50
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, use_distinct = super().get_search_results(request, queryset, search_term)
+        return queryset.distinct(), use_distinct
+
     inlines = [TurnInline]
     readonly_fields = ["uuid"]
     list_display = [
         "__str__",
-        "id",
-        "last_turn_timestamp",
-        "summary",
-        "speakers",
         "active",
-        "n_turns",
-        "intervention",
+        "chat_room_id",
+        # "speakers",
+        "bot_interface",
+        "user_referal__usage_plan",
         "uuid",
+        "last_turn_timestamp",
+        # "summary",
+        "n_turns",
+        # "intervention",
+    ]
+    autocomplete_fields = [
+        "user_referal",
+        "bot_interface",
     ]
     list_prefetch_related = ["intervention", "speakers", "turns"]
     search_fields = ["uuid", "turns__speaker__username", "turns__speaker__last_name"]
@@ -387,9 +405,8 @@ class InterventionAdmin(admin.ModelAdmin):
         "intervention_type",
         "slug",
         "title",
-        "start_session_button",
     )
-    search_fields = ("title",)
+    search_fields = ("title", "slug")
     readonly_fields = ["version"]
     autocomplete_fields = [
         "default_conversation_model",
@@ -404,13 +421,6 @@ class InterventionAdmin(admin.ModelAdmin):
 
     def ver(self, obj):
         return obj.ver()
-
-    def start_session_button(self, obj):
-        anon_url = reverse("start_gradio_chat", kwargs={"intervention_slug": obj.slug})
-        return format_html(f'<a class="button" href="{anon_url}">New Anonymous Session</a> ')
-
-    start_session_button.short_description = "Start Session"
-    start_session_button.allow_tags = True
 
     def mermaid_diagram(self, obj):
 
@@ -470,31 +480,16 @@ class InterventionAdmin(admin.ModelAdmin):
         raise NotImplementedError("Importing interventions is not yet implemented.")
 
     def start_session(self, request, intervention_id):
+
         intervention = Intervention.objects.get(pk=intervention_id)
-        step = intervention.steps.all().first()
-        therapist, _ = CustomUser.objects.get_or_create(
-            username="therapist",
-            defaults={"role": "therapist", "email": "linda@example.com"},
-        )
-        conversation = Conversation.objects.create()
-        conversation.max_turns = intervention.default_max_turns
+        plan = UsagePlan.objects.get(label="Default UsagePlan")
 
-        human_starter = Turn.add_root(
-            conversation=conversation,
-            speaker=request.user,
-            text="",
-            turn_type=TurnTypes.OPENING,
+        # make_referal_using_plan(plan, user, data=None, intervention=None, bot_interface=None)
+        referal, conversation = make_referal_using_plan(
+            plan, request.user, data={"source": "Admin test session"}, intervention=intervention
         )
 
-        bot_turn = human_starter.add_child(
-            conversation=conversation,
-            speaker=therapist,
-            text=step.opening_line,
-            turn_type=TurnTypes.OPENING,
-            step=step,
-        )
-
-        return redirect(f"{settings.CHAT_URL}/?turn_id={bot_turn.uuid}")
+        return HttpResponseRedirect(reverse("referal_detail", args=[referal.uuid]))
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
 
@@ -509,8 +504,7 @@ class InterventionAdmin(admin.ModelAdmin):
                     ],
                 ),
                 "mermaid": self.mermaid_diagram(obj),
-                "start_new_chat_link": settings.WEB_URL
-                + reverse("start_gradio_chat", kwargs={"intervention_slug": obj.slug}),
+                "start_new_chat_link": reverse("admin:start_session", args=[obj.pk]),
             }
         )
 
@@ -629,21 +623,26 @@ class InterruptionAdmin(admin.ModelAdmin):
     ]
 
 
-@admin.register(ReferalToken)
-class ReferalTokenAdmin(admin.ModelAdmin):
-    list_display = ("token", "start", "end")
+@admin.register(UsagePlan)
+class UsagePlanAdmin(admin.ModelAdmin):
+    list_display = ("label", "referal_token", "start", "end")
     list_filter = ("start", "end")
-    search_fields = ("token",)
-    autocomplete_fields = ["permitted_interventions", "valid_for_groups"]
-    readonly_fields = ["token"]
+    search_fields = ("referal_token",)
+    autocomplete_fields = ["permitted_interventions", "llm_credentials"]
+    readonly_fields = [
+        "referal_token",
+    ]
 
 
-@admin.register(Referal)
-class ReferalAdmin(admin.ModelAdmin):
-    list_display = ("uuid", "source", "conversation", "created")
+@admin.register(UserReferal)
+class UserReferalAdmin(admin.ModelAdmin):
+    list_display = ("uuid", "usage_plan", "created")
     list_filter = ("created",)
-    search_fields = ("uuid", "source__token", "conversation__uuid")
-    autocomplete_fields = ["conversation", "source", "note"]
+    search_fields = (
+        "uuid",
+        "usage_plan__token",
+    )
+    autocomplete_fields = ["usage_plan", "note"]
     readonly_fields = ["uuid", "created"]
 
 
@@ -657,7 +656,12 @@ class BotInterfaceAdmin(admin.ModelAdmin):
         "provider_info",
         "webhook_url",
     ]
-    autocomplete_fields = ["intervention"]
+    search_fields = ["bot_name", "intervention__title"]
+    autocomplete_fields = [
+        "intervention",
+        "default_usage_plan",
+        "other_interventions_allowed",
+    ]
 
     actions = ["register"]
 

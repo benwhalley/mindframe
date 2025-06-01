@@ -1,8 +1,10 @@
+# ensure_defaults.py
 from decouple import config
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
 from llmtools.models import LLM, LLMCredentials
+from mindframe.models import UsagePlan
 from mindframe.settings import RESERVED_USERNAMES
 
 User = get_user_model()
@@ -27,7 +29,7 @@ class Command(BaseCommand):
         llmc, created = LLMCredentials.objects.get_or_create(
             pk=1,
             defaults={
-                "label": "Default credentials",
+                "label": "Default Credentials",
                 "llm_api_key": config("LITELLM_API_KEY", default="XXXXXXXX"),
                 "llm_base_url": config("LITELLM_ENDPOINT", default="https://example.com"),
             },
@@ -51,3 +53,14 @@ class Command(BaseCommand):
         )
         if created:
             self.stdout.write(self.style.SUCCESS(f"Created default LLM model as gpt-4o-mini"))
+
+        usage_plan, created = UsagePlan.objects.get_or_create(
+            label="Default UsagePlan",
+            defaults={
+                "referal_token": "defaultplan",
+                "llm_credentials_id": 1,
+                "max_conversation_turns": 100,
+            },
+        )
+        if created:
+            self.stdout.write(self.style.SUCCESS("Created default UsagePlan"))

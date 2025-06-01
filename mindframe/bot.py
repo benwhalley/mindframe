@@ -255,7 +255,7 @@ class MindframeBotClient(ABC):
         List available interventions.
         """
         try:
-            available = Intervention.objects.all()
+            available = Intervention.objects.filter(public=True)
             if not available:
                 return None, "No interventions are currently available."
 

@@ -14,7 +14,7 @@ class LLMAdmin(admin.ModelAdmin):
 
 @admin.register(LLMCredentials)
 class LLMCredentialsAdmin(admin.ModelAdmin):
-    search_fields = ["label"]
+    search_fields = ["label", "llm_base_url"]
     list_display = ["label", "llm_base_url", "key"]
 
     def key(self, obj):

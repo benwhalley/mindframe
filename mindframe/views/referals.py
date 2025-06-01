@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Tuple
 
 from decouple import config
 from django import forms
@@ -20,76 +21,59 @@ from mindframe.models import (
     CustomUser,
     Intervention,
     Note,
-    Referal,
-    ReferalToken,
+    UsagePlan,
+    UserReferal,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def make_referal_using_token(
-    token, username, data=None, intervention_slug=None, bot_interface=None
-):
+def make_referal_using_plan(
+    plan, user, data=None, intervention=None, bot_interface=None
+) -> Tuple[UserReferal, Conversation]:
 
-    if not intervention_slug and not bot_interface:
-        raise Exception("Must provide either an intervention_slug or a bot_interface")
+    if (intervention and bot_interface) or (not intervention and not bot_interface):
+        raise Exception("Must provide either intervention or bot_interface (but not both)")
 
-    if intervention_slug and bot_interface:
-        raise Exception("Must provide either an intervention_slug or a bot_interface, not both")
-
-    user = get_object_or_404(CustomUser, username=username)
-
-    # Get and validate token
-    referaltoken = get_object_or_404(ReferalToken, token=token)
-
-    # Get and validate intervention
-    if intervention_slug:
-        intervention = get_object_or_404(Intervention, slug=intervention_slug)
-    else:
+    if not intervention:
         intervention = bot_interface.intervention
 
     # if the permitted_interventions field is empty, don't check anything
-    if referaltoken.permitted_interventions.all().count() > 0:
-        if intervention not in referaltoken.permitted_interventions.all():
+    if plan.permitted_interventions.all().count() > 0:
+        if intervention not in plan.permitted_interventions.all():
             raise Exception("Intervention not permitted for this token")
 
-    # Validate username
-    if not referaltoken.user_valid(user):
-        raise Exception("Invalid username for token")
-
     # Create conversation
-    conversation = Conversation.objects.create()
+
+    referal = UserReferal.objects.create(usage_plan=plan)
+
+    conversation = Conversation.objects.create(user_referal=referal, bot_interface=bot_interface)
+
     bot_turn = initialise_new_conversation(conversation, intervention, user)
 
-    # add bot interface
-    conversation.bot_interface = bot_interface
-    conversation.save()
-
-    # Create note with referal data
-    if not data:
-        data = {"conversation_source": "Referal Token"}
-
+    # Create note with referal data and UserReferal
     note = Note.objects.create(
         # must be on the therapist's turn so notes are available to the therapist later
         turn=conversation.turns.exclude(speaker=user).first(),
         judgement=None,  # No judgement for referal data
-        data=data,
+        data=data or {"data_source": "UserReferal"},
     )
-    # Create referal
-    referal = Referal.objects.create(conversation=conversation, source=referaltoken, note=note)
 
-    return referal
+    referal.note = note
+    referal.save()
+
+    return referal, conversation
 
 
 class ReferalForm(forms.Form):
-    referal_token = forms.ModelChoiceField(queryset=ReferalToken.objects.none())
+    usage_plan = forms.ModelChoiceField(queryset=UsagePlan.objects.none())
     bot_interface = forms.ModelChoiceField(
         queryset=BotInterface.objects.none(),
         required=False,
     )
     intervention = forms.ModelChoiceField(queryset=Intervention.objects.none(), required=False)
     username = forms.CharField(
-        required=True, initial="robert", help_text="A username for this participant."
+        required=True, initial="AnonymousUser", help_text="A username for this participant."
     )
     create_if_doesnt_exist = forms.BooleanField(
         required=False,
@@ -116,17 +100,17 @@ class ReferalForm(forms.Form):
         super().__init__(*args, **kwargs)
 
         # Safe to query now
-        self.fields["referal_token"].queryset = ReferalToken.objects.all()
+        self.fields["usage_plan"].queryset = UsagePlan.objects.all()
         self.fields["intervention"].queryset = Intervention.objects.all()
         self.fields["bot_interface"].queryset = BotInterface.objects.all()
 
-        first_token = ReferalToken.objects.first()
-        if first_token:
-            self.fields["referal_token"].initial = first_token
+        # firstplan = UsagePlan.objects.filter(label__istartswith="default").first()
+        # if firstplan:
+        #     self.fields["usage_plan"].initial = firstplan
 
-        pick = Intervention.objects.filter(slug__istartswith="refer").first()
-        if pick:
-            self.fields["intervention"].initial = pick
+        # pick = Intervention.objects.filter(slug__istartswith="demo").first()
+        # if pick:
+        #     self.fields["intervention"].initial = pick
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -143,11 +127,11 @@ class CreateReferalView(LoginRequiredMixin, PermissionRequiredMixin, View):
         try:
             form = ReferalForm(request.POST)
             try:
-                form.is_valid()
+                valid = form.is_valid()
                 data = form.cleaned_data
                 redirect = data.get("redirect", "web")
 
-                if not form.is_valid():
+                if not valid:
                     if redirect == "json":
                         return JsonResponse({"error": form.errors}, status=400)
                     else:
@@ -159,23 +143,27 @@ class CreateReferalView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     user, _ = CustomUser.objects.get_or_create(
                         username=data.get("username"), role="client"
                     )
-                # token,  username, data=None, intervention_slug=None, bot_interface=None
-                referal = make_referal_using_token(
-                    token=data["referal_token"].token,
-                    username=data["username"],
+                else:
+                    user = CustomUser.objects.get(username=data["username"])
+
+                # plan, username, data=None, intervention_slug=None, bot_interface=None
+                user_referal, conversation = make_referal_using_plan(
+                    plan=data["usage_plan"],
+                    user=user,
                     data=data["data"],
-                    intervention_slug=data["intervention"] and data["intervention"].slug or None,
+                    intervention=data["intervention"],
                     bot_interface=data["bot_interface"],
                 )
 
             except Exception as e:
+                raise e
                 return JsonResponse({"error": str(e)}, status=400)
 
             web_url = request.build_absolute_uri(
-                reverse("conversation_detail", args=[referal.conversation.turns.all().last().uuid])
+                reverse("conversation_detail", args=[conversation.turns.all().last().uuid])
             )
 
-            telegram_link = referal.external_chat_link()
+            telegram_link = conversation.external_chat_link()
 
             if redirect == "telegram":
                 return HttpResponseRedirect(telegram_link)
@@ -183,21 +171,29 @@ class CreateReferalView(LoginRequiredMixin, PermissionRequiredMixin, View):
             if redirect == "json":
                 return JsonResponse(
                     {
-                        "referal": str(referal.uuid),
-                        "conversation_id": str(referal.conversation.uuid),
+                        "referal": str(user_referal.uuid),
+                        "conversation_id": str(conversation.uuid),
                         "url": web_url,
                         "telegram_link": telegram_link,
                     }
                 )
-            return HttpResponseRedirect(reverse("referal_detail", args=[referal.uuid]))
+            return HttpResponseRedirect(reverse("referal_detail", args=[user_referal.uuid]))
 
         except Exception as e:
+            raise e
             logger.warning("PROBLEMN: ", str(e))
 
 
-class ReferalDetailView(LoginRequiredMixin, DetailView):
-    model = Referal
+class ReferalDetailView(PermissionRequiredMixin, DetailView):
+
+    permission_required = "mindframe.add_referal"
+    model = UserReferal
     template_name = "referal_detail.html"
 
     slug_field = "uuid"
     slug_url_kwarg = "uuid"
+
+    # def get_context_data(self, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+    #     context["referal"] = self.object
+    #     return context

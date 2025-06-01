@@ -255,10 +255,10 @@ class LLM(models.Model):
     def __str__(self) -> str:
         return self.model_name
 
-    def chatter(self, prompt, credentials, context=None):
+    def chatter(self, prompt, credentials, context={}):
         from llmtools.llm_calling import chatter
 
-        return chatter(prompt, model=self, credentials=credentials, context={}, log_context={})
+        return chatter(prompt, model=self, credentials=credentials, context=context, log_context={})
 
     def client(self, credentials):
         # this is an Azure/OpenAI clent instance, but is used to query the litellm
@@ -280,18 +280,21 @@ class LLMCredentials(models.Model):
     label = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
-        return self.label or self.llm_api_key[:5]
+        return f"LLMCredentials: {self.label or self.llm_api_key[:5]}"
 
     llm_api_key = models.CharField(
         max_length=255,
         null=True,
         blank=True,
-        help_text="Override for LLM API key, used for this BotInterface.",
+        help_text="Litellm API key.",
     )
 
     llm_base_url = models.CharField(
         max_length=1024,
         null=True,
         blank=True,
-        help_text="Optional base URL for Litellm/OpenAI proxy for this interface.",
+        help_text="Optional base URL for Litellm/OpenAI proxy.",
     )
+
+    class Meta:
+        verbose_name_plural = "LLM Credentials"

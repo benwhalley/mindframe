@@ -27,6 +27,6 @@ def run_incomplete_jobs():
     incomplete_jgs = set(
         Job.objects.filter(completed__isnull=True).values_list("group__id", flat=True)
     )
-    for i in incomplete_jgs.order_by("-created"):
+    for i in incomplete_jgs:
         for j in i.jobs.all():
             run_job.delay(j.pk)

@@ -1,10 +1,10 @@
 
+- better budgeting
 
 - rationalise the starting of new conversatins for Bot and Anonymous web sessions
 
 - allow public interactions?
 - catch errors related to budget overruns
-
 
 
 - allow for different LLM API keys for bot interfaces
@@ -13,7 +13,6 @@ https://docs.litellm.ai/docs/proxy/users
 {
   "detail":"Authentication Error, ExceededTokenBudget: Current spend for token: 7.2e-05; Max Budget for Token: 2e-07"
 }
-
 
 
 # Research ideas
