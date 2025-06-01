@@ -60,7 +60,8 @@ class ReferalTests(TestCase):
         response = self.client.post(
             reverse("create_referal"),
             {
-                "referal_token": self.referal_token.id,
+                # plan_token ?? TODO
+                "plan_token_token": self.referal_token.id,
                 "intervention": self.intervention.id,
                 "username": "testclient",
                 "data": json.dumps(

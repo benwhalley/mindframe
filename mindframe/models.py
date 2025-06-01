@@ -190,7 +190,7 @@ class Intervention(LifecycleModel):
         return slugify(self.title)
 
     def __str__(self):
-        return f"{self.title} ({self.sem_ver}/{self.ver()})"
+        return f"{self.slug}: {self.title} ({self.sem_ver}/{self.ver()})"
 
     class Meta:
         unique_together = ("title", "version", "sem_ver")
@@ -535,7 +535,7 @@ class Note(models.Model):
         # if from a referal, use the keyword  'data'
         if self.judgement:
             return self.judgement.variable_name
-        if self.referal:
+        if self.user_referal:
             return "external"
 
     def val(self):
@@ -807,13 +807,20 @@ class Conversation(LifecycleModel):
     archived = models.BooleanField(default=False)
 
     chat_room_id = models.CharField(max_length=255, blank=True, null=True)
+
+    user_referal = models.ForeignKey(
+        "UserReferal",
+        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
+        related_name="conversations",
+    )
+
     bot_interface = models.ForeignKey(
         "BotInterface", on_delete=models.CASCADE, null=True, blank=True
     )
-    llm_credentials = models.ForeignKey(
-        "llmtools.LLMCredentials", on_delete=models.PROTECT, default=1
-    )
 
+    # TODO DEPRECATE THIS?
     max_turns = models.PositiveSmallIntegerField(blank=True, null=True)
 
     synthetic_turns_scheduled = models.PositiveSmallIntegerField(default=0)
@@ -829,6 +836,14 @@ class Conversation(LifecycleModel):
                 self.turns.all().order_by("depth").last().uuid,
             ],
         )
+
+    def external_chat_link(self):
+        if self.bot_interface:
+            bn = self.bot_interface.bot_name
+            telegram_link = f"https://t.me/{bn}?start={self.user_referal.uuid}"
+            return telegram_link
+        else:
+            return None
 
     def get_absolute_url(self):
         return settings.WEB_URL + reverse(
@@ -851,9 +866,9 @@ class Conversation(LifecycleModel):
             pk__in=self.turns.all().values_list("step__intervention__pk", flat=True)
         )
 
-    # class Meta:
-    #     # order by timestamp of the last turn added
-    #     ordering = ["-turns__timestamp"]
+    class Meta:
+        # order by PK as rough indication of creation order
+        ordering = ["-pk"]
 
 
 class Turn(NS_Node):
@@ -1167,35 +1182,39 @@ class ConversationalStrategy(LifecycleModel):
     text = models.TextField()
 
 
-class ReferalToken(SoftDeletableModel, TimeFramedModel, LifecycleModel):
+class UsagePlan(SoftDeletableModel, TimeFramedModel, LifecycleModel):
+
     label = models.CharField(max_length=255, blank=True, null=True)
-    token = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False)
+    referal_token = ShortUUIDField(
+        max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False
+    )
     permitted_interventions = models.ManyToManyField("Intervention", blank=True)
-    valid_for_groups = models.ManyToManyField("auth.Group", blank=True)
+
+    llm_credentials = models.ForeignKey(
+        "llmtools.LLMCredentials",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        help_text="Leave blank to use the default credentials.",
+    )
+
+    max_conversation_turns = models.PositiveSmallIntegerField(
+        null=True, blank=True, help_text="Maximum number of turns in a conversation"
+    )
 
     def __str__(self):
-        return f"ReferalToken: {self.label and self.label or 'Unlabelled'} <{self.token}>"
-
-    def user_valid(self, user):
-        if not self.valid_for_groups.exists():
-            return True
-
-        if user.groups.filter(pk__in=self.valid_for_groups.values_list("pk", flat=True)).exists():
-            return True
-        else:
-            logger.warning(
-                f"User {username} not found in valid_for_groups for ReferalToken {self.token}"
-            )
+        return f"UsagePlan: {self.label and self.label or 'Unlabelled'} <{self.referal_token}>"
 
 
-class Referal(TimeStampedModel, LifecycleModel):
+class UserReferal(TimeStampedModel, LifecycleModel):
     """
-    Records when an external service refers a user to Mindframe
+    Records when an a user is added to a conversation, optionally with metadata to use later.
 
-    Referals are created with a form post containing the following Json data
+    Referals can be from an external service, or internally to track UsagePlans.
+    Externally, referals are created with a form post containing the following Json data
 
     {
-        "token": str, # must be a valid ReferalToken.token
+        "token": str, # must be a valid UsagePlan.token
         "intervention": str, # must be a valid Intervention.slug
         "username": str, # must be a valid CustomUser.username AND username_valid() must be True
         "data": {str: str} # keys are valid python identifiers; values are also strings.
@@ -1213,28 +1232,27 @@ class Referal(TimeStampedModel, LifecycleModel):
     """
 
     uuid = ShortUUIDField(max_length=len(shortuuid.uuid()) + 1, unique=True, editable=False)
-    conversation = models.ForeignKey(
-        Conversation, on_delete=models.CASCADE, related_name="referals"
-    )
-    source = models.ForeignKey(
-        "ReferalToken", blank=False, null=False, related_name="referals", on_delete=models.PROTECT
+
+    redeemed = models.DateTimeField(null=True, blank=True)
+
+    usage_plan = models.ForeignKey(
+        "UsagePlan", blank=False, null=False, related_name="referals", on_delete=models.PROTECT
     )
     # used to record metadata about the referal http request - whatever we can capture
     log = models.JSONField(default=dict, null=True, blank=True)
     note = models.OneToOneField(
-        "Note", blank=True, null=True, on_delete=models.CASCADE, related_name="referal"
+        "Note", blank=True, null=True, on_delete=models.CASCADE, related_name="user_referal"
     )
 
-    def external_chat_link(self):
-        if self.conversation.bot_interface:
-            bn = self.conversation.bot_interface.bot_name
-            telegram_link = f"https://t.me/{bn}?start={self.uuid}"
-            return telegram_link
-        else:
-            return None
+    def get_absolute_url(self):
+        return reverse("referal_detail", args=[self.uuid])
+
+    @property
+    def conversation(self):
+        return self.conversations.all().order_by("-pk").first()
 
     def __str__(self):
-        return f"{self.source.token[:8]} created -> {self.conversation}"
+        return f"{self.usage_plan.referal_token[:6]} created ->"
 
 
 class BotInterface(LifecycleModel):
@@ -1243,10 +1261,20 @@ class BotInterface(LifecycleModel):
     intervention = models.ForeignKey(
         Intervention, on_delete=models.CASCADE, related_name="interfaces"
     )
+    other_interventions_allowed = models.ManyToManyField(Intervention, blank=True)
+
+    def interventions_allowed(self):
+        others = list(self.other_interventions_allowed.all().values_list("pk", flat=True))
+        return Intervention.objects.filter(pk__in=[self.intervention.pk] + others)
+
     provider = models.CharField(
         max_length=255,
         choices=BotInterfaceProviders.choices,
         default=BotInterfaceProviders.TELEGRAM,
+    )
+    # TODO make non-nullable
+    default_usage_plan = models.ForeignKey(
+        UsagePlan, on_delete=models.CASCADE, related_name="bot_interfaces", null=False, blank=False
     )
     bot_name = models.CharField(max_length=255, null=True, blank=True)
     dev_mode = models.BooleanField(default=False)
@@ -1255,10 +1283,6 @@ class BotInterface(LifecycleModel):
 
     provider_info = models.JSONField(null=True, blank=True)
     provider_info_updated = models.DateTimeField(null=True, blank=True)
-
-    budget_max_conversation_turns = models.PositiveSmallIntegerField(
-        null=True, blank=True, help_text="Maximum number of turns in a conversation"
-    )
 
     def bot_client(self):
         # todo make flexible to diff subclasses

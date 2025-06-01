@@ -1,50 +1,87 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="container">
+  <div class="row">
+    <h1 class="col-12">Referral Created Successfully</h1>
 
-    <div class="row">
-
-        <h1 class="col-12">
-            Referral Created Successfully
-        </h1>
+    <div class="col">
 
 
-        <div class="col">
-            <div>
-                <h5>Web Link</h5>
-                <a href="{{referal.conversation.get_absolute_url}}" class="text-blue-600 hover:underline break-all">{{ referal.conversation.get_absolute_url }}</a>
+       <div class="mt-4 space-x-3">
+        <a href="{{ object.conversation.chat_url }}"
+           class="btn btn-success">Chat in Web UI</a>
 
+        {% if object.conversation.external_chat_link %}
+        <a href="{{ object.conversation.external_chat_link }}"
+           class="btn btn-primary">Chat in Telegram</a>
+        {% endif %}
 
-                <h5 class="mt-4">External Chat Links To Start Conversation</h5>
-            <p>
-                <a class="btn btn-primary" href="{{referal.conversation.chat_url}}" class="text-blue-600 hover:underline break-all"> Chat in web UI </a>
-            </p>
-            <p>
-                {% if referal.external_chat_link %}
-            <a class="btn btn-outline-primary" href="{{referal.external_chat_link}}" class="text-blue-600 hover:underline break-all"> {{referal.external_chat_link}} </a>
-            {% endif %}
-            </p>
-            </div>
-        </div>
-        <div class="col-4">
+        <a href="{{ object.conversation.get_absolute_url }}"
+           class="btn btn-outline-secondary">Conversation Details</a>
+      </div>
 
-            <p>Referal: {{ referal.uuid }}</p>
-            <p>Conversation: <a href="{{referal.conversation.get_absolute_url}}">{{ referal.conversation.uuid }}</a></p>
+      <ul class="mt-5 list-group">
+        <li class="mb-2 list-group-item">
+          <strong>Conversation detail Page:</strong>
+          <a href="{% url 'conversation_detail' uuid=object.conversation.turns.last.uuid %}"
+             class="text-blue-600 hover:underline break-all"
+             id="detail-link">
+            {% url 'conversation_detail' uuid=object.conversation.turns.last.uuid %}
+          </a>
+          <button onclick="copyToClipboard('detail-link')" class="float-end btn btn-sm btn-outline-secondary ml-2">Copy</button>
+          <p class="small">Don't share with end users.</p>
+        </li>
+        <li class="mb-2 list-group-item">
+          <strong>Web Chat UI:</strong>
+          <a href="{{ object.conversation.chat_url }}"
+             class="text-blue-600 hover:underline break-all"
+             id="web-link">
+            {{ object.conversation.chat_url }}
+          </a>
+          <button onclick="copyToClipboard('web-link')" class="float-end btn btn-sm btn-outline-secondary ml-2">Copy</button>
+          <p class="small">This is a unique link for this user. Don't share widely.</p>
+        </li>
+        {% if object.conversation.external_chat_link %}
+        <li class="mb-2 list-group-item">
+          <strong>Telegram Link:</strong>
+          <a href="{{ object.conversation.external_chat_link }}"
+             class="text-blue-600 hover:underline break-all"
+             id="telegram-link">
+            {{ object.conversation.external_chat_link }}
+          </a>
+          <button onclick="copyToClipboard('telegram-link')" class="float-end btn btn-sm btn-outline-secondary ml-2">Copy</button>
 
+          <p class="small">This is a unique link for this user. Don't share widely.</p>
 
-        </div>
+        </li>
+        {% endif %}
+      </ul>
+
 
     </div>
 
-    <div class="flex space-x-4">
-        <a href="{{ web_url }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-            Open in Web
-        </a>
-        <a href="{{ telegram_link }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-            Open in Telegram
-        </a>
+    <div class="col-4">
+      <p>Referral ID: <code>{{ object.uuid|truncatechars:6 }}</code></p>
+      <p>Conversation: <a href="{{ object.conversation.get_absolute_url }}">
+        <code>{{ object.conversation.uuid|truncatechars:6 }}</code>
+    </a></p>
+
+    {% if object.conversations.all.count > 1 %}
+    <p>Multiple conversations available: {{object.conversations.all}} </p>
+    {% endif %}
+
     </div>
+  </div>
 </div>
-</div>
+
+<script>
+function copyToClipboard(elementId) {
+  const link = document.getElementById(elementId).href;
+  navigator.clipboard.writeText(link).then(() => {
+    alert('Copied to clipboard');
+  }).catch(err => {
+    console.error('Copy failed', err);
+  });
+}
+</script>
 {% endblock %}

@@ -10,8 +10,10 @@ import traceback
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
+import shortuuid
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from telegram import Update
 
 from mindframe.bot import (
@@ -20,8 +22,8 @@ from mindframe.bot import (
     MediaType,
     WebhookBotClient,
 )
-from mindframe.conversation import listen, respond
-from mindframe.models import Conversation, CustomUser, Intervention, Referal
+from mindframe.conversation import initialise_new_conversation, listen, respond
+from mindframe.models import Conversation, CustomUser, Intervention, UserReferal
 
 logger = logging.getLogger(__name__)
 
@@ -246,22 +248,20 @@ class TelegramBotClient(WebhookBotClient):
 
         return user
 
-    def get_or_create_conversation(
-        self, message: InboundMessage, intervention=None
-    ) -> Tuple[Any, bool]:
+    def get_conversation(self, message: InboundMessage, intervention=None) -> Tuple[Any, bool]:
         """
         Get or create a conversation for this chat.
         Initialises the conversation if it doesn't exist already with the user and intervention.
         """
-        conversation, is_new = Conversation.objects.get_or_create(
-            chat_room_id=message.chat_id, archived=False, bot_interface=self.bot_interface
-        )
-        user = self.get_or_create_user(message)
-        if is_new:
-            self._initialise_new_conversation(
-                conversation, intervention or self.intervention, user, message.chat_id
+        logger.warning(f"Getting conversation for {message.chat_id}")
+        try:
+            return Conversation.objects.get(
+                chat_room_id=message.chat_id,
+                archived=False,
+                bot_interface=self.bot_interface,
             )
-        return conversation, is_new
+        except Conversation.DoesNotExist:
+            return None
 
     def format_message(self, text: str) -> str:
         """
@@ -343,13 +343,13 @@ class TelegramBotClient(WebhookBotClient):
         """
         help_text = (
             "Commands:\n"
-            "/clear - start a fresh conversation\n"
             "/new <bot_name> - start a new conversation with a specific bot\n"
-            "/help - show this message\n"
-            "/settings - show settings\n"
-            "/web - show web page link for this conversation\n"
+            "/clear - start a fresh conversation\n"
+            # "/settings - show settings\n"
+            # "/web - show web page link for this conversation\n"
             "/list - list available interventions\n"
-            "/undo [n] - undo last n turns or a specific turn by UUID"
+            "/help - show this message\n"
+            # "/undo [n] - undo last n turns or a specific turn by UUID"
         )
         return None, help_text
 
@@ -357,25 +357,34 @@ class TelegramBotClient(WebhookBotClient):
         self, args: List[str], message: InboundMessage, conversation, request
     ) -> Tuple[Optional[HttpResponse], Optional[str]]:
         """
-        Start a new conversation with the specified intervention.
+        Start a new conversation with the specified intervention using a magic link from a referal.
         """
         if not args:
             logger.info(f"No args for start command: {args}")
             return (
                 None,
-                "...",
+                "Enter a referal token or click on a magic link to start a conversation.",
             )
         token = args[0].strip()
-        referal = Referal.objects.get(uuid=token)
+        self.send_message(message.chat_id, f"Using referal code {token[:6]}...")
 
-        conversation.archived = True
-        conversation.save()
+        try:
+            referal = UserReferal.objects.get(uuid=token, redeemed=None)
+            referal.redeemed = timezone.now()
+            referal.save()
+        except UserReferal.DoesNotExist:
+            self.send_message(message.chat_id, "Referal not found.")
+            return JsonResponse({"status": "referal_not_found"}, status=200), None
 
         conversation = referal.conversation
-        conversation.chat_room_id = message.chat_id
-        conversation.save()
+        if conversation.chat_room_id:
+            self.send_message(message.chat_id, f"Conversation already started.")
+        else:
+            conversation.chat_room_id = message.chat_id
+            conversation.save()
+            last_therapist_turn = conversation.turns.all().last()
+            self.send_message(message.chat_id, last_therapist_turn.text)
 
-        self.send_message(message.chat_id, "Using referal code ...")
         return JsonResponse({"status": "ok"}, status=200), None
 
     def handle_new_command(
@@ -395,24 +404,48 @@ class TelegramBotClient(WebhookBotClient):
         try:
             # Get the intervention
             intervention = get_object_or_404(Intervention, slug=slug)
-            logger.info(f"Started new conversation using {intervention}")
-            conversation.archived = True
-            conversation.save()
+
+            if (
+                conversation
+                and intervention not in conversation.bot_interface.interventions_allowed()
+            ):
+                self.send_message(message.chat_id, "Intervention not found.")
+                return JsonResponse({"status": "failed"}, status=200), None
 
             self.send_message(
                 message.chat_id,
-                f"Starting a new conversation with {intervention.title}. \n\nForgetting everything we talked about so far)...",
+                f"Starting a new conversation with {intervention.title}. \n\nForgetting anything we talked about so far)...",
             )
+            if conversation:
+                conversation.archived = True
+                conversation.save()
+                ref = conversation.user_referal
+                bot = conversation.bot_interface
+            else:
+                # if we dont have a conversation, create a new one
+                # and fake a user referal with default plan
+                ref = UserReferal.objects.create(usage_plan=self.bot_interface.default_usage_plan)
+                logger.info(f"Using {ref.usage_plan}")
+                bot = self.bot_interface
 
-            new_conversation, _ = self.get_or_create_conversation(
-                message, intervention=intervention
+            conversation = Conversation.objects.create(
+                chat_room_id=message.chat_id,
+                user_referal=ref,
+                bot_interface=bot,
             )
+            turn = initialise_new_conversation(
+                conversation, intervention, self.get_or_create_user(message)
+            )
+            self.send_message(message.chat_id, turn.text)
 
             return JsonResponse({"status": "ok"}, status=200), None
 
         except Exception as e:
             logger.error(f"Error starting new conversation: {e}")
-            available = ", ".join(Intervention.objects.all().values_list("slug", flat=True))
+            available = ", ".join(
+                self.bot_interface.interventions_allowed().values_list("slug", flat=True)
+            )
+
             return (
                 None,
                 f"Error starting intervention. Available interventions: {available}",
@@ -425,8 +458,10 @@ class TelegramBotClient(WebhookBotClient):
         Start a new conversation with the specified intervention.
         """
 
-        try:
+        if not conversation:
+            return (None, "No conversation found to clear.")
 
+        try:
             conversation.archived = True
             conversation.save()
             self.send_message(
@@ -434,17 +469,20 @@ class TelegramBotClient(WebhookBotClient):
                 "Starting a new conversation (forgetting everything we talked about so far).",
             )
 
-            new_conversation, _ = self.get_or_create_conversation(message)
+            referal_copy = conversation.user_referal
+            referal_copy.pk = None
+            referal_copy.uuid = shortuuid.uuid()
+            referal_copy.save()
+            new_conversation = conversation
+            new_conversation.pk = None
+            new_conversation.archived = False
+            new_conversation.user_referal = referal_copy
+            new_conversation.save()
 
             return JsonResponse({"status": "ok"}, status=200), None
 
         except Exception as e:
-            logger.error(f"Error starting new conversation: {e}")
-            available = ", ".join(Intervention.objects.all().values_list("slug", flat=True))
-            return (
-                None,
-                f"Error starting intervention. Available interventions: {available}",
-            )
+            return (None, f"Error starting new conversation: {e}")
 
     def handle_settings_command(
         self, args: List[str], message: InboundMessage, conversation, request
@@ -462,7 +500,7 @@ class TelegramBotClient(WebhookBotClient):
         try:
             message = self.parse_message(request)
             user = self.get_or_create_user(message)
-            conversation, is_new = self.get_or_create_conversation(message)
+            conversation = self.get_conversation(message)
 
             if message.command:
                 response, reply_text = self.handle_command(message, conversation, request)
@@ -473,7 +511,13 @@ class TelegramBotClient(WebhookBotClient):
                     return HttpResponse("OK", status=200)
 
             else:  # Process normal message flow
-                self.process_webhook_message(message)
+                if conversation:
+                    self.process_webhook_message(message)
+                else:
+                    self.send_message(
+                        message.chat_id,
+                        "No conversation found. Please start a new conversation (see /help).",
+                    )
         except Exception as e:
             logger.error(f"Error processing inbound request: {e}\n{request}")
             logger.error(traceback.format_exc())
@@ -486,17 +530,18 @@ class TelegramBotClient(WebhookBotClient):
         """
 
         user = self.get_or_create_user(message)
-        conversation, is_new = self.get_or_create_conversation(message)
-
-        if is_new:
-            # Send welcome message for new conversations
-            self.send_message(message.chat_id, "Welcome to the bot!")
+        conversation = self.get_conversation(message)
+        if not conversation:
+            self.send_message(
+                message.chat_id,
+                "No conversation found. Please start a new conversation (see /help).",
+            )
         else:
-            # Continue existing conversation
             self.continue_webhook_conversation(user, conversation, message)
 
     def continue_webhook_conversation(self, user, conversation, message: InboundMessage):
         """Continue an existing conversation for a webhook client"""
+
         self.send_typing_indicator(message.chat_id)
         logger.info(f"Continuing conversation {conversation.uuid} with user {user.username}")
         turn_to_respond_to = conversation.turns.all().last()

@@ -43,6 +43,7 @@ CSRF_TRUSTED_ORIGINS = config(
 )
 
 DDT = config("DDT", default=False, cast=bool)
+DDT = True
 DEBUG_TOOLBAR_CONFIG = {
     "SHOW_TOOLBAR_CALLBACK": lambda request: DDT,  # This disables the toolbar by default
 }

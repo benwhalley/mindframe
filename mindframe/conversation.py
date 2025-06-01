@@ -1,19 +1,20 @@
 import logging
 import pprint
-import traceback
-from collections import OrderedDict
 from itertools import cycle
 from typing import List, Optional
 
 from celery import shared_task
 from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
+from glom import Coalesce, glom
 from langfuse.decorators import langfuse_context, observe
 
 from llmtools.llm_calling import chatter
 from llmtools.models import LLM, LLMCredentials
-from mindframe.helpers import get_ordered_queryset, make_data_variable
-from mindframe.models import (
+
+from .budgeting import budget_exceeded, get_credentials
+from .helpers import get_ordered_queryset, make_data_variable
+from .models import (
     Conversation,
     CustomUser,
     Intervention,
@@ -23,45 +24,38 @@ from mindframe.models import (
     Transition,
     Turn,
 )
-from mindframe.settings import (
-    DEFAULT_CONVERSATION_MODEL_NAME,
-    DEFAULT_JUDGEMENT_MODEL_NAME,
+from .settings import (
     RoleChoices,
     StepJudgementFrequencyChoices,
     TurnTypes,
     mfuuid,
 )
-from mindframe.silly import silly_user
-from mindframe.tree import conversation_history, is_interrupted, iter_conversation_path
+from .tree import conversation_history, is_interrupted, iter_conversation_path
 
 logger = logging.getLogger(__name__)
 
 
-def budget_exceeded(turn: Turn) -> Optional[Turn]:
-    """Check if there is budget allocated for this conversation."""
-    history = conversation_history(turn, to_leaf=True)
-    N = len(history) + 1  # accounting for JOIN turn
-    if turn.conversation.max_turns and (N >= turn.conversation.max_turns):
-        logger.warning(f"Conversation {turn.conversation.uuid[:6]} has reached its max_turns.")
-        return True
+def get_model_for_turn(turn, type_="conversation") -> LLM:
+    # TODO: deprecate this
 
-    bi = turn.conversation.bot_interface
-    if bi and bi.budget_max_conversation_turns:
-        if N >= turn.conversation.bot_interface.budget_max_conversation_turns:
-            logger.warning(
-                f"Conversation {turn.conversation.uuid[:6]} has reached its budget based on the Bot Interface."
-            )
-            return True
-
-    return False
+    interv = glom(turn, "step.intervention", default=None)
+    if not interv:
+        raise Exception("No intervention found")
+    if type_.startswith("con"):
+        return interv.default_conversation_model
+    elif type_.startswith("jud"):
+        return interv.default_judgement_model
+    else:
+        raise NotImplementedError("Model type not recognised.")
 
 
-def budget_exceeded_warning_turn(turn: Turn) -> Turn:
+def system_message_turn_(turn: Turn, text: str) -> Turn:
+    """Helper to return a system message"""
     new_turn = turn.add_child(
         uuid=mfuuid(),
         conversation=turn.conversation,
         speaker=CustomUser.objects.get(username="system"),
-        text="The conversation has reached its maximum number of turns allowed.",
+        text=text,
         turn_type=TurnTypes.SYSTEM,
     )
     new_turn.save()
@@ -109,26 +103,6 @@ def transition_permitted(transition, turn) -> bool:
     return all(result for _, result in condition_evals)
 
 
-def get_credentials_for_turn(turn) -> LLMCredentials:
-    crd = LLMCredentials.objects.all().first()
-    if crd:
-        return crd
-    else:
-        raise Exception("No credentials found")
-
-
-def get_model_for_turn(turn, type_="conversation") -> LLM:
-    interv = turn.step and turn.step.intervention or None
-    if not interv:
-        raise Exception("No intervention found")
-    if type_.startswith("con"):
-        return interv.default_conversation_model
-    elif type_.startswith("jud"):
-        return interv.default_judgement_model
-    else:
-        raise NotImplementedError("Model type not recognised.")
-
-
 @observe(capture_input=False, capture_output=False)
 def evaluate_judgement(judgement, turn):
     ctx = speaker_context(turn)
@@ -137,7 +111,7 @@ def evaluate_judgement(judgement, turn):
     llmres = chatter(
         judgement.prompt_template,
         model=model,
-        credentials=get_credentials_for_turn(turn),
+        credentials=get_credentials(turn),
         context=ctx,
     )
     nt = Note.objects.create(turn=turn, judgement=judgement, data=llmres)
@@ -165,7 +139,7 @@ def complete_the_turn(turn) -> Turn:
     llmres = chatter(
         turn.step.prompt_template,
         model=model,
-        credentials=get_credentials_for_turn(turn),
+        credentials=get_credentials(turn),
         context=ctx,
     )
     turn.metadata = llmres
@@ -259,8 +233,9 @@ def respond(
 
     """
 
-    if budget_exceeded(turn):
-        return budget_exceeded_warning_turn(turn)
+    over_budget, warningmessage = budget_exceeded(turn)
+    if over_budget:
+        return system_message_turn_(turn, warningmessage)
 
     if not as_speaker:
         # this will be a Bot

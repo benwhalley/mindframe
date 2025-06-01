@@ -1,3 +1,4 @@
+# checks.py
 from django.apps import apps
 from django.core.checks import Warning, register
 
@@ -52,6 +53,20 @@ def check_llm_config(app_configs, **kwargs):
                 f"No default LLMCredentials found.",
                 hint="Use ensure_defaults to create one.",
                 id="mindframe.W003",
+            )
+        ]
+    return []
+
+
+@register()
+def check_usage_plan_exists(app_configs, **kwargs):
+    UsagePlan = apps.get_model("mindframe", "UsagePlan")
+    if not UsagePlan.objects.filter(label="Default UsagePlan").exists():
+        return [
+            Warning(
+                "No default UsagePlan found.",
+                hint="Run `manage.py ensure_defaults` to create one.",
+                id="mindframe.W004",
             )
         ]
     return []
