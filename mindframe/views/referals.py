@@ -104,13 +104,13 @@ class ReferalForm(forms.Form):
         self.fields["intervention"].queryset = Intervention.objects.all()
         self.fields["bot_interface"].queryset = BotInterface.objects.all()
 
-        firstplan = UsagePlan.objects.first()
-        if firstplan:
-            self.fields["usage_plan"].initial = firstplan
+        # firstplan = UsagePlan.objects.filter(label__istartswith="default").first()
+        # if firstplan:
+        #     self.fields["usage_plan"].initial = firstplan
 
-        pick = Intervention.objects.filter(slug__istartswith="refer").first()
-        if pick:
-            self.fields["intervention"].initial = pick
+        # pick = Intervention.objects.filter(slug__istartswith="demo").first()
+        # if pick:
+        #     self.fields["intervention"].initial = pick
 
 
 @method_decorator(csrf_exempt, name="dispatch")
