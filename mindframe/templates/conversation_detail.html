@@ -6,9 +6,9 @@
 {% load guidance %}
 {% block content %}
 <div class="container mt-5">
-    <h1 class="mb-4 mt-4">Conversation {{object.id}}
+    <h1 class="mb-4 mt-4">Conversation {{object.uuid|truncatechars:6}}
     {% if turn.pk == leaf_node.pk %}
-     at node {{turn.uuid|slice:5}}
+     at node {{turn.uuid|truncatechars:6}}
     {% else %}
     at node {{turn.uuid|slice:5}} (branch ends at
         <a href="{% url 'conversation_detail' leaf_node.uuid %}">{{leaf_node.uuid|  slice:5}}</a>)

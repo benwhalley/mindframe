@@ -33,11 +33,14 @@
         </li>
         <li class="mb-2 list-group-item">
           <strong>Web Chat UI:</strong>
-          <a href="{{ object.conversation.chat_url }}"
+          <a href="{{gradio_link}}"
              class="text-blue-600 hover:underline break-all"
              id="web-link">
-            {{ object.conversation.chat_url }}
+            {{gradio_link|truncatechars:70}}
           </a>
+
+
+
           <button onclick="copyToClipboard('web-link')" class="float-end btn btn-sm btn-outline-secondary ml-2">Copy</button>
           <p class="small">This is a unique link for this user. Don't share widely.</p>
         </li>

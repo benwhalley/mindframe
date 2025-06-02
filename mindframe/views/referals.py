@@ -24,6 +24,7 @@ from mindframe.models import (
     UsagePlan,
     UserReferal,
 )
+from mindframe.views.general import start_gradio_chat
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +194,14 @@ class ReferalDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView)
     slug_field = "uuid"
     slug_url_kwarg = "uuid"
 
-    # def get_context_data(self, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     context["referal"] = self.object
-    #     return context
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # TODO: tidy this
+        # the gradio chat url is a bit weird because it needs to the token
+        grchat = start_gradio_chat(
+            self.request, turn_uuid=self.object.conversation.turns.all().last().uuid
+        ).url
+
+        context["gradio_link"] = grchat
+        return context
