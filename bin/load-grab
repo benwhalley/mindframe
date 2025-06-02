@@ -1,8 +1,0 @@
-#!/bin/bash
-
-,drop-all-pg-sessions
-dropdb $1
-createdb $1
-
-pg_restore -cO -d $1 snapshot$1.pgdump
-echo "Restored to db $1, now run migrate."

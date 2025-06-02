@@ -1,4 +1,0 @@
-#!/bin/bash
-
-ssh dokku@mf "dokku postgres:export $1 > /var/lib/dokku/data/storage/snapshot$1.pgdump"
-rsync -avzh --progress "dokku@mf:/var/lib/dokku/data/storage/snapshot$1.pgdump" "snapshot$1.pgdump"

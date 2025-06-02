@@ -1,3 +1,0 @@
-echo "Remember to update poetry before pinning. Pinning now..."
-poetry export -o requirements.txt --without-hashes
-echo "Remember to commit requirements.txt before pushing."
