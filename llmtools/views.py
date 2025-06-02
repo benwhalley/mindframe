@@ -9,7 +9,7 @@ from string import Template
 import magic
 from django import forms
 from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.http import HttpResponse
@@ -67,7 +67,7 @@ class ToolInputForm(forms.Form):
         return cleaned_data
 
 
-class JobGroupDetailView(PermissionRequiredMixin, DetailView):
+class JobGroupDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
     permission_required = "llmtools.add_jobgroup"
     model = JobGroup
     template_name = "jobgroup_detail.html"
@@ -80,7 +80,7 @@ class JobGroupDetailView(PermissionRequiredMixin, DetailView):
         return context
 
 
-class ToolListView(PermissionRequiredMixin, ListView):
+class ToolListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     permission_required = "llmtools.add_jobgroup"
     model = Tool
     template_name = "tools/tools_list.html"

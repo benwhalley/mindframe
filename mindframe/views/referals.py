@@ -117,7 +117,7 @@ class ReferalForm(forms.Form):
 class CreateReferalView(LoginRequiredMixin, PermissionRequiredMixin, View):
     """View to handle creation of new referals from external sources"""
 
-    permission_required = "mindframe.add_referal"
+    permission_required = "mindframe.add_userreferal"
 
     def get(self, request):
         form = ReferalForm()
@@ -184,9 +184,9 @@ class CreateReferalView(LoginRequiredMixin, PermissionRequiredMixin, View):
             logger.warning("PROBLEMN: ", str(e))
 
 
-class ReferalDetailView(PermissionRequiredMixin, DetailView):
+class ReferalDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
 
-    permission_required = "mindframe.add_referal"
+    permission_required = "mindframe.add_userreferal"
     model = UserReferal
     template_name = "referal_detail.html"
 
