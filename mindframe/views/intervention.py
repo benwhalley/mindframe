@@ -15,7 +15,7 @@ from mindframe.models import Intervention, Step
 logger = logging.getLogger(__name__)
 
 
-class StepDetailView(PermissionRequiredMixin, LoginRequiredMixin, DetailView):
+class StepDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
 
     permission_required = "mindframe.view_intervention"
     model = Step
@@ -38,7 +38,7 @@ class InterventionListView(ListView):
         return ct
 
 
-class InterventionDetailView(PermissionRequiredMixin, LoginRequiredMixin, DetailView):
+class InterventionDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
     permission_required = "mindframe.view_intervention"
     model = Intervention
 
